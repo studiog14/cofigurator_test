@@ -3856,20 +3856,77 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
         grid.innerHTML='';
         const models=filterModels(sel);
         models.forEach(model=>{
+          // Wrapper jak na desktopie, aby działały style i ceny
+          const wrapper = document.createElement('div');
+          wrapper.className = 'thumbnail-wrapper';
+
           const mBtn=document.createElement('button');
           mBtn.className='thumbnail';
-          Object.assign(mBtn.style,{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'8px',background:'#fff',border:'1px solid #ccc',borderRadius:'8px',cursor:'pointer'});
+          Object.assign(mBtn.style,{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'8px',background:'#fff',border:'1px solid #e5e5e5',borderRadius:'10px',cursor:'pointer'});
+
+          // Oznaczenia promo/bestseller jak na desktopie (dla overlay i kolorów)
+          const promocja = (model.Promocja && (model.Promocja==='TRUE' || model.Promocja==='true' || model.Promocja==='tak' || model.Promocja==='✔'));
+          const procent = parseFloat(model.Procent)||0;
+          const bestseller = (model.Bestseller && (model.Bestseller==='TRUE' || model.Bestseller==='true' || model.Bestseller==='tak' || model.Bestseller==='✔'));
+          if (promocja) {
+            mBtn.classList.add('promotion');
+            if (procent>0) mBtn.setAttribute('data-discount', `-${procent}%`);
+          }
+          if (bestseller) mBtn.classList.add('bestseller');
+
           const img=document.createElement('img'); applyImgWithFallback(img,model);
           img.alt=model.Nazwa; Object.assign(img.style,{width:'100px',height:'100px',objectFit:'contain'});
-          const cap=document.createElement('div'); cap.textContent=model.Nazwa; Object.assign(cap.style,{fontSize:'12px',marginTop:'6px'});
-          mBtn.appendChild(img); mBtn.appendChild(cap);
+
+          // Podpis – usuń nawiasy (np. "(hooker)")
+          const cap=document.createElement('div');
+          cap.className = 'thumbnail-caption';
+          cap.textContent = (typeof stripBrackets==='function') ? stripBrackets(model.Nazwa) : (model.Nazwa||'');
+
+          // Ceny pod miniaturą – jak w renderOptions()
+          const priceDiv = document.createElement('div');
+          if (model.Typ==='model' && model.Cena) {
+            const cena = parseFloat(model.Cena)||0;
+            if (promocja && procent>0) {
+              const cenaPo = cena * (1 - procent/100);
+              if (bestseller) {
+                priceDiv.className = 'thumbnail-price promotion bestseller';
+                priceDiv.innerHTML = `
+                  <span class="original-price">${cena.toFixed(0)} zł</span>
+                  <span class="discounted-price">${cenaPo.toFixed(0)} zł</span>
+                  <span class="bestseller-badge">⭐ Bestseller</span>
+                `;
+              } else {
+                priceDiv.className = 'thumbnail-price promotion';
+                priceDiv.innerHTML = `
+                  <span class="original-price">${cena.toFixed(0)} zł</span>
+                  <span class="discounted-price">${cenaPo.toFixed(0)} zł</span>
+                `;
+              }
+            } else if (bestseller && cena>0) {
+              priceDiv.className = 'thumbnail-price bestseller';
+              priceDiv.innerHTML = `
+                <span class="bestseller-price">${cena.toFixed(0)} zł</span>
+                <span class="bestseller-badge">⭐ Bestseller</span>
+              `;
+            } else if (cena>0) {
+              priceDiv.className = 'thumbnail-price';
+              priceDiv.textContent = `${cena.toFixed(0)} zł`;
+            }
+          }
+
+          mBtn.appendChild(img);
+          wrapper.appendChild(mBtn);
+          wrapper.appendChild(cap);
+          if (priceDiv.textContent || priceDiv.innerHTML) wrapper.appendChild(priceDiv);
+
           mBtn.onclick=function(){
             window.mobileWelcomeDismissed=true; const welcome=document.getElementById('welcome-screen'); if(welcome) welcome.style.display='none';
             const appEl=document.getElementById('app'); if(appEl) appEl.style.visibility='visible';
             const tryLoad=()=>{ if(window.viewer && typeof loadModel==='function'){ loadModel(model); ensureConfigInMobilePanel(); return true; } return false; };
             if(!tryLoad()){ let attempts=0; const int=setInterval(()=>{ attempts++; if(tryLoad()||attempts>50) clearInterval(int); },100); }
           };
-          grid.appendChild(mBtn);
+
+          grid.appendChild(wrapper);
         });
       }
       renderList();
