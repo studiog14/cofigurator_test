@@ -129,7 +129,18 @@
                 const shimTag = '<script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1/dist/es-module-shims.min.js"></' + 'script>';
                 const hintCss = '<style id="mobile-hint-style">\
 @keyframes mobileHint{to{opacity:1}}\
+/* Active state (mobile) */\
 body.mobile-mode .category-button.active{background:#F5C842;color:#fff;border-color:#F5C842}\
+/* Narrow the mobile side panel to give more space to 3D */\
+body.mobile-mode #mobile-right-panel{width:clamp(230px,42vw,340px);max-width:clamp(230px,42vw,340px)}\
+/* Two category buttons per row on mobile */\
+body.mobile-mode #mobile-category-buttons-container{display:grid;grid-template-columns:1fr 1fr;gap:8px}\
+body.mobile-mode #mobile-category-buttons-container .category-button{width:100%;box-sizing:border-box}\
+/* Fallback common class names inside right panel */\
+body.mobile-mode #mobile-right-panel .category-buttons,\
+body.mobile-mode #mobile-right-panel .categories{display:grid;grid-template-columns:1fr 1fr;gap:8px}\
+body.mobile-mode #mobile-right-panel .category-buttons .category-button,\
+body.mobile-mode #mobile-right-panel .categories .category-button{width:100%;box-sizing:border-box}\
 </style>';
                 if(html.includes('</head>')){
                     html = html.replace(/<head[^>]*>/i, function(m){ return m + '\n  ' + shimTag + '\n  ' + hintCss + '\n'; });
@@ -244,6 +255,34 @@ body.mobile-mode .category-button.active{background:#F5C842;color:#fff;border-co
                                             }
                                         } catch(_) {}
                                         if (retries < 50) setTimeout(function(){ attachCategoryActiveSync(retries+1); }, 200);
+                                    })(0);
+
+                                    // Ensure two-per-row layout for category buttons even if container IDs differ
+                                    (function ensureTwoColCategoryLayout(retries){
+                                        try {
+                                            var cont = document.getElementById('mobile-category-buttons-container');
+                                            if (!cont) {
+                                                var panel = document.getElementById('mobile-right-panel');
+                                                if (panel) {
+                                                    // find a child with multiple direct .category-button children
+                                                    var nodes = panel.querySelectorAll('*');
+                                                    for (var i=0;i<nodes.length;i++){
+                                                        var el = nodes[i];
+                                                        try {
+                                                            var direct = el.querySelectorAll(':scope > .category-button');
+                                                            if (direct && direct.length >= 2) { cont = el; break; }
+                                                        } catch(_) { }
+                                                    }
+                                                }
+                                            }
+                                            if (cont) {
+                                                cont.style.display = 'grid';
+                                                cont.style.gridTemplateColumns = '1fr 1fr';
+                                                cont.style.gap = '8px';
+                                            } else if (retries < 50) {
+                                                setTimeout(function(){ ensureTwoColCategoryLayout(retries+1); }, 200);
+                                            }
+                                        } catch(_) { if (retries < 10) setTimeout(function(){ ensureTwoColCategoryLayout(retries+1); }, 500); }
                                     })(0);
 
                                     // Mobile click delegation fallback: trigger loadModel when thumbnail clicked even if original handler fails
