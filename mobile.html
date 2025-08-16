@@ -52,6 +52,62 @@
                 }
             }
 
+            // Hard reset cache/storage on mobile (one-time per tab) before loading the app
+            try {
+                const HR_FLAG = 'MOBILE_HARD_RESET_DONE_v1';
+                const alreadyDone = (window.name === HR_FLAG);
+                if (!alreadyDone) {
+                    try { var m = document.getElementById('boot-msg'); if (m) m.textContent = 'Czyszczenie pamięci podręcznej aplikacji…'; } catch(_){ }
+                    // Unregister all service workers
+                    try {
+                        if ('serviceWorker' in navigator && navigator.serviceWorker.getRegistrations) {
+                            const regs = await navigator.serviceWorker.getRegistrations();
+                            await Promise.all(regs.map(r => r && r.unregister ? r.unregister().catch(()=>{}) : Promise.resolve()));
+                        }
+                    } catch(_){ }
+                    // Delete all caches
+                    try {
+                        if (window.caches && caches.keys) {
+                            const keys = await caches.keys();
+                            await Promise.all(keys.map(k => caches.delete(k).catch(()=>{})));
+                        }
+                    } catch(_){ }
+                    // Clear IndexedDB databases when possible
+                    try {
+                        if (window.indexedDB) {
+                            // Modern browsers expose indexedDB.databases(); iOS 15 may not. Try/catch each delete.
+                            if (indexedDB.databases) {
+                                const dbs = await indexedDB.databases();
+                                await Promise.all((dbs||[]).map(db => {
+                                    if (!db || !db.name) return Promise.resolve();
+                                    return new Promise(res => {
+                                        try {
+                                            const req = indexedDB.deleteDatabase(db.name);
+                                            req.onsuccess = req.onerror = req.onblocked = () => res();
+                                        } catch(_) { res(); }
+                                    });
+                                }));
+                            }
+                        }
+                    } catch(_){ }
+                    // Clear Web Storage (best-effort)
+                    try { localStorage.clear(); } catch(_){ }
+                    try { sessionStorage.clear(); } catch(_){ }
+
+                    // Guard and reload with cache-busting param
+                    try { window.name = HR_FLAG; } catch(_){ }
+                    try {
+                        const u = new URL(location.href);
+                        u.searchParams.set('hr', Date.now().toString());
+                        location.replace(u.toString());
+                    } catch(_) { location.reload(); }
+                    return; // Stop bootstrap; it will continue after reload
+                } else {
+                    // Clean the guard so it doesn't leak
+                    try { window.name = ''; } catch(_){ }
+                }
+            } catch(_){ }
+
             // Safety: show hint after 8s and one-time auto-reload after 25s even if fetch stalls
             try {
                 setTimeout(function(){ var h=document.getElementById('boot-hint'); if(h) h.style.display='block'; },8000);
@@ -79,9 +135,6 @@
                 const shimTag = '<script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1/dist/es-module-shims.min.js"></' + 'script>';
                 const hintCss = '<style id="mobile-hint-style">\
 @keyframes mobileHint{to{opacity:1}}\
-body.mobile-mode #welcome-screen{display:none !important}\
-body.mobile-mode #app{visibility:visible !important}\
-body.mobile-mode #mobile-right-panel{display:block !important}\
 body.mobile-mode .category-button.active{background:#F5C842;color:#fff;border-color:#F5C842}\
 </style>';
                 if(html.includes('</head>')){
@@ -199,19 +252,39 @@ body.mobile-mode .category-button.active{background:#F5C842;color:#fff;border-co
                                         if (retries < 50) setTimeout(function(){ attachCategoryActiveSync(retries+1); }, 200);
                                     })(0);
 
-                                    // Ensure mobile list is rendered ASAP to avoid any flash of welcome UI
-                                    (function ensureMobileList(retries){
-                                        try {
-                                            var right = document.getElementById('mobile-right-panel');
-                                            if (right) right.style.display = 'block';
-                                            if (typeof window.ensureConfigInMobilePanel === 'function') window.ensureConfigInMobilePanel();
-                                            if (typeof window.renderMobileRightPanelList === 'function') {
-                                                window.renderMobileRightPanelList('Wszystkie');
-                                                return;
-                                            }
-                                        } catch(_) {}
-                                        if (retries < 80) setTimeout(function(){ ensureMobileList(retries+1); }, 100);
-                                    })(0);
+                                    // Mobile click delegation fallback: trigger loadModel when thumbnail clicked even if original handler fails
+                                    (function attachMobileThumbFallback(){
+                                        document.addEventListener('click', function(ev){
+                                            try {
+                                                var t = ev.target;
+                                                if (!t) return;
+                                                var thumb = t.closest && t.closest('#mobile-right-panel .thumbnail, #model-thumbnails .thumbnail, .model-thumbnail');
+                                                if (!thumb) return;
+                                                // Try to resolve model from caption text
+                                                var wrap = thumb.parentElement;
+                                                var cap = wrap && wrap.querySelector && wrap.querySelector('.thumbnail-caption');
+                                                var name = cap && cap.textContent ? cap.textContent.trim() : '';
+                                                if (!name && thumb.getAttribute) name = thumb.getAttribute('data-name') || '';
+                                                var norm = function(s){ try { return s.normalize('NFD').replace(/\p{Diacritic}/gu,'').trim(); } catch(_) { return (s||'').trim(); } };
+                                                var strip = function(s){ try { return (typeof window.stripBrackets==='function') ? window.stripBrackets(s) : String(s||'').replace(/\s*\([^)]*\)\s*/g,'').trim(); } catch(_) { return s; } };
+                                                var targetName = norm(strip(name));
+                                                var pick = null;
+                                                if (Array.isArray(window.allData)) {
+                                                    for (var i=0;i<window.allData.length;i++){
+                                                        var it = window.allData[i];
+                                                        if (it && it.Typ==='model'){
+                                                            var n = norm(strip(it.Nazwa||''));
+                                                            if (n && n.toLowerCase()===targetName.toLowerCase()) { pick = it; break; }
+                                                        }
+                                                    }
+                                                }
+                                                if (pick && typeof window.loadModel==='function'){
+                                                    var ml = document.getElementById('model-loader'); if (ml) ml.style.display='flex';
+                                                    window.loadModel(pick);
+                                                }
+                                            } catch(_){}
+                                        }, { passive: true });
+                                    })();
 
                                     // Tekst loadera dla mobile
                                     var lt = document.querySelector('#custom-loader .loading-text');
