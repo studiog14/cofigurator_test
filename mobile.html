@@ -141,11 +141,24 @@ body.mobile-mode #mobile-right-panel .category-buttons,\
 body.mobile-mode #mobile-right-panel .categories{display:grid !important;grid-template-columns:1fr 1fr !important;gap:8px !important}\
 body.mobile-mode #mobile-right-panel .category-buttons .category-button,\
 body.mobile-mode #mobile-right-panel .categories .category-button{width:100% !important;box-sizing:border-box}\
+/* Make category buttons look like tiles (kafelki) on mobile */\
+body.mobile-mode .category-button{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:86px;padding:10px;border:1px solid #e8e8e8;border-radius:12px;background:#fff;gap:8px}\
+body.mobile-mode .category-button img,\
+body.mobile-mode .category-button svg{max-width:64px;max-height:64px;object-fit:contain}\
+body.mobile-mode .category-button .label,\
+body.mobile-mode .category-button span{font-size:14px;line-height:1.2;text-align:center}\
 /* Welcome overlay/readability on mobile */\
 body.mobile-mode #welcome,\
 body.mobile-mode #welcome-overlay,\
 body.mobile-mode .welcome,\
 body.mobile-mode .welcome-overlay{max-width:min(92vw,560px);padding:16px;overflow-y:auto;max-height:80vh;word-break:break-word;overflow-wrap:anywhere}\
+/* Hide big intro/welcome on mobile to avoid initial flash */\
+body.mobile-mode #welcome,\
+body.mobile-mode .welcome,\
+body.mobile-mode #intro,\
+body.mobile-mode .intro,\
+body.mobile-mode #start,\
+body.mobile-mode .start{display:none !important}\
 /* Center 3D viewer area on mobile with safe selectors */\
 body.mobile-mode #viewer,\
 body.mobile-mode #viewer-container,\
@@ -279,50 +292,42 @@ body.mobile-mode .canvas-wrapper canvas{max-width:100%;max-height:100%;height:au
 
                                     // Ensure two-per-row layout for category buttons even if container IDs differ
                                     (function ensureTwoColCategoryLayout(retries){
+                                        function applyTwoCol(container){
+                                            if (!container) return;
+                                            container.style.display = 'grid';
+                                            container.style.gridTemplateColumns = '1fr 1fr';
+                                            container.style.gap = '8px';
+                                            // Also make children stretch nicely
+                                            try {
+                                                var kids = container.querySelectorAll('.category-button');
+                                                kids.forEach(function(k){ k.style.width='100%'; k.style.boxSizing='border-box'; });
+                                            } catch(_){}
+                                        }
                                         try {
-                                            var cont = document.getElementById('mobile-category-buttons-container');
-                                            if (!cont) {
-                                                var panel = document.getElementById('mobile-right-panel');
-                                                if (panel) {
-                                                    // find a child with multiple direct .category-button children
-                                                    var nodes = panel.querySelectorAll('*');
-                                                    for (var i=0;i<nodes.length;i++){
-                                                        var el = nodes[i];
-                                                        try {
-                                                            var direct = el.querySelectorAll(':scope > .category-button');
-                                                            if (direct && direct.length >= 2) { cont = el; break; }
-                                                        } catch(_) { }
-                                                    }
-                                                }
-                                            }
-                                            if (cont) {
-                                                cont.style.display = 'grid';
-                                                cont.style.gridTemplateColumns = '1fr 1fr';
-                                                cont.style.gap = '8px';
-                                                // Observe future DOM changes to persist 2-col layout
+                                            var panel = document.getElementById('mobile-right-panel') || document.body;
+                                            // Find a container that has at least two .category-button descendants
+                                            var candidates = panel.querySelectorAll('*');
+                                            var found = null;
+                                            for (var i=0;i<candidates.length;i++){
+                                                var el = candidates[i];
                                                 try {
-                                                    var apply = function(scope){
-                                                        var cands = (scope||document).querySelectorAll('#mobile-category-buttons-container, #mobile-right-panel .category-buttons, #mobile-right-panel .categories');
-                                                        cands.forEach(function(el){
-                                                            el.style.display = 'grid';
-                                                            el.style.gridTemplateColumns = '1fr 1fr';
-                                                            el.style.gap = '8px';
-                                                        });
-                                                    };
-                                                    apply(document);
-                                                    var mo = new MutationObserver(function(muts){
-                                                        for (var i=0;i<muts.length;i++){
-                                                            var t = muts[i].target;
-                                                            if (t && t.nodeType === 1) apply(t);
-                                                        }
-                                                    });
-                                                    var root = document.getElementById('mobile-right-panel') || document.body;
-                                                    mo.observe(root, { childList: true, subtree: true });
-                                                } catch(_) {}
-                                            } else if (retries < 50) {
-                                                setTimeout(function(){ ensureTwoColCategoryLayout(retries+1); }, 200);
+                                                    var count = el.querySelectorAll && el.querySelectorAll('.category-button').length;
+                                                    if (count >= 2) { found = el; break; }
+                                                } catch(_){}
                                             }
-                                        } catch(_) { if (retries < 10) setTimeout(function(){ ensureTwoColCategoryLayout(retries+1); }, 500); }
+                                            if (found) {
+                                                applyTwoCol(found);
+                                                // Persist with MutationObserver
+                                                try {
+                                                    var mo = new MutationObserver(function(muts){
+                                                        applyTwoCol(found);
+                                                    });
+                                                    mo.observe(found, { childList: true, subtree: true });
+                                                } catch(_){}
+                                                return;
+                                            }
+                                        } catch(_){}
+                                        if (retries < 50) setTimeout(function(){ ensureTwoColCategoryLayout(retries+1); }, 200);
                                     })(0);
 
                                     // Mobile click delegation fallback: trigger loadModel when thumbnail clicked even if original handler fails
