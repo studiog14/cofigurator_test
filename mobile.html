@@ -1,27 +1,108 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <title>FK Krzesła - Mobile</title>
-    <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="icons/favicon.png">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="format-detection" content="telephone=no" />
+    <title>Konfigurator krzeseł – Mobile</title>
+    <link rel="manifest" href="manifest.json" />
+    <link rel="apple-touch-icon" href="icons/favicon.png" />
+    <style>
+        html,body{height:100%;margin:0}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:#fff;color:#222}
+        .loader{display:flex;align-items:center;justify-content:center;flex-direction:column;height:100vh;gap:12px}
+        .spinner{width:40px;height:40px;border:3px solid #eee;border-top:3px solid #333;border-radius:50%;animation:spin 1s linear infinite}
+        @keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
+        .muted{color:#666;font-size:14px}
+        .error{color:#b00020}
+    </style>
     <script>
         (function(){
-            var target = 'index.html' + (window.location.search || '') + (window.location.hash || '');
-            try { window.location.replace(target); } catch(_) { window.location.href = target; }
+            // Minimal mobile-mode hint for CSS before app scripts run
+            document.addEventListener('DOMContentLoaded', function(){
+                try { document.body.classList.add('mobile-mode'); } catch(_) {}
+            });
         })();
     </script>
-    <style>
-        body{font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding:24px;}
-        .box{max-width:520px;margin:60px auto;text-align:center}
-        .muted{color:#666}
-        a.btn{display:inline-block;margin-top:12px;padding:10px 16px;border-radius:8px;background:#007AFF;color:#fff;text-decoration:none}
-    </style>
 </head>
 <body>
-    <p>Przekierowanie do konfiguratora… Jeśli nie nastąpi, <a href="index.html">kliknij tutaj</a>.</p>
+    <div id="boot-loader" class="loader">
+        <div class="spinner" aria-hidden="true"></div>
+        <div>Ładowanie wersji mobilnej…</div>
+        <div class="muted">Jeśli trwa zbyt długo, odśwież stronę.</div>
+    </div>
+
+    <script>
+        (async function(){
+            const container = document.getElementById('boot-loader');
+            function showError(msg){
+                if(container){
+                    container.innerHTML = '<div class="error">'+ (msg||'Błąd ładowania') +'</div>' +
+                        '<div class="muted">Spróbuj ponownie, lub otwórz wersję standardową: <a href="index.html">index.html</a></div>';
+                }
+            }
+
+            try {
+                // Pobierz źródło index.html i przygotuj wersję z shimami dla iOS
+                const res = await fetch('index.html', { credentials: 'same-origin' });
+                if(!res.ok){ throw new Error('HTTP '+res.status); }
+                let html = await res.text();
+
+                    // Prosty transpiler usuwający optional chaining / nullish coalescing w inline module script
+                    function transpileLight(src){
+                        let out = src;
+                        // optional call: obj?.method(args) -> (obj&&obj.method)(args)
+                        out = out.replace(/([\w$\.\]\)]+)\?\.([\w$]+)\s*\(/g, '($1&&$1.$2)(');
+                        // bracket access: obj?.[expr] -> (obj!=null?obj[expr]:undefined)
+                        out = out.replace(/([\w$\.\]\)]+)\?\.\[([^\]]+)\]/g, '($1!=null&&$1!==undefined?$1[$2]:undefined)');
+                        // property access: obj?.prop -> (obj!=null?obj.prop:undefined)
+                        out = out.replace(/([\w$\.\]\)]+)\?\.([\w$]+)/g, '($1!=null&&$1!==undefined?$1.$2:undefined)');
+                        // nullish coalescing: a ?? b -> a || b (przybliżenie)
+                        out = out.replace(/\?\?/g, '||');
+                        return out;
+                    }
+
+                // 1) Wstrzyknij es-module-shims w <head> (lub zaraz po <meta charset>)
+                const shimTag = '<script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1/dist/es-module-shims.min.js"></' + 'script>';
+                if(html.includes('</head>')){
+                    html = html.replace(/<head[^>]*>/i, function(m){ return m + '\n  ' + shimTag + '\n'; });
+                } else {
+                    // awaryjnie dodaj na początku
+                    html = shimTag + '\n' + html;
+                }
+
+                // 2) Konwersja import map i modułów na wariant shim
+                html = html
+                    .replace(/type="importmap"/g, 'type="importmap-shim"')
+                    .replace(/type="module"/g, 'type="module-shim"');
+
+                    // 2b) Przetranskrybuj inline module-shim scripts (bez dotykania zewnętrznych plików)
+                    html = html.replace(/<script([^>]*type=\"module-shim\"[^>]*)>([\s\S]*?)<\/script>/gi, function(_, attrs, code){
+                        try {
+                            const patched = transpileLight(code);
+                            return '<script'+attrs+'>'+patched+'<\/script>';
+                        } catch(e) {
+                            return '<script'+attrs+'>'+code+'<\/script>';
+                        }
+                    });
+
+                // 3) Delikatny sygnał do aplikacji, że to wariant mobile
+                //    (nie zmieniamy logiki index.html – tylko podpowiedź)
+                html = html.replace(/<body([^>]*)>/i, function(_, attrs){
+                    return '<body'+ (attrs||'') + ' class="mobile-mode">';
+                });
+
+                // 4) Podmień cały dokument – uruchomi to oryginalne skrypty w trybie shim
+                document.open();
+                document.write(html);
+                document.close();
+            } catch (e) {
+                console.error('Mobile loader failed:', e);
+                showError('Nie udało się wczytać aplikacji mobilnej.');
+            }
+        })();
+    </script>
 </body>
 </html>

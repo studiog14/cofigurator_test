@@ -24,13 +24,12 @@
   <!-- Cache buster for welcome screen fix -->
   <meta name="timestamp" content="2025-08-09-12:00" />
   
-  <!-- Polyfill for import maps / module resolution on older mobile browsers (e.g., iOS Safari < 16.4) -->
-  <script async src="https://unpkg.com/es-module-shims@1.9.0/dist/es-module-shims.js" crossorigin="anonymous"></script>
+  <!-- Note: Using native import maps for modern browsers; mobile fallbacks handled in ios-fallback.js -->
 
   <script src="ios-fallback.js?v=2025080912"></script>
 
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet" />
-  <script type="importmap-shim">
+  <script type="importmap">
 {
   "imports": {
     "threepipe": "https://unpkg.com/threepipe@0.0.50/dist/index.mjs",
@@ -3054,9 +3053,10 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
       const partOrder = ['seat', 'backseat_inside', 'backseat_outside', 'legs_material', 'backseat'];
       const partLabels = ['Siedzisko', 'Oparcie wew.', 'Oparcie zew.', 'Nogi', 'Siedzisko/Oparcie'];
       partOrder.forEach((part, idx) => {
-        const mat = window.selectedMaterials?.[part];
+        var mats = window.selectedMaterials || null;
+        var mat = mats ? mats[part] : null;
         if (mat) {
-          const price = parseFloat(mat.Cena) || 0;
+          var price = parseFloat(mat.Cena) || 0;
           totalPrice += price;
           originalTotalPrice += price;
           text += `${partLabels[idx]}: ${mat.Nazwa} (${price.toFixed(2)} PLN)\n`;
@@ -3081,8 +3081,8 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
 
       const summary = generateSummaryText();
 
-      document.getElementById('model').value = window.selectedChair?.Nazwa || 'Brak modelu';
-      document.getElementById('price').value = parseFloat(window.selectedChair?.Cena || 0).toFixed(2);
+  document.getElementById('model').value = (window.selectedChair && window.selectedChair.Nazwa) || 'Brak modelu';
+  document.getElementById('price').value = parseFloat((window.selectedChair && window.selectedChair.Cena) || 0).toFixed(2);
       document.getElementById('total').value = summary.totalPrice.toFixed(2);
 
       let configTextInput = document.getElementById('configText');
@@ -3097,7 +3097,8 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
 
       emailjs.sendForm('service_iqzcwli', 'template_qgq7htg', emailForm)
         .then(() => {
-          document.getElementById('emailModal')?.classList.add('hidden');
+          var emailModalEl = document.getElementById('emailModal');
+          if (emailModalEl) emailModalEl.classList.add('hidden');
 
           const successMessage = document.getElementById('success-message');
           successMessage.classList.remove('hidden');
@@ -3169,7 +3170,7 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
     </div>
   </div>
 
-  <script type="module-shim">
+  <script type="module">
     // Główna biblioteka Three.js (z importmap) - jak w poprzedniej wersji
     import * as THREE from 'three';
 
@@ -3306,7 +3307,7 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
           const nogaKategoria = (l.Kategoria || l.Typ || l.Grupa || '').toLowerCase();
           return nogaKategoria.includes('hooker');
         });
-        console.log('🦵 For hooker chair, found leg:', defaultLeg?.Nazwa);
+  console.log('🦵 For hooker chair, found leg:', (defaultLeg && defaultLeg.Nazwa));
       } else if (kategoria.includes('krzes')) {
         // Dla krzeseł: najpierw szukaj "regularne", potem inne krzesła
         defaultLeg = availableLegs.find(l => l.Nazwa && l.Nazwa.toLowerCase().includes('regularne'));
@@ -3316,12 +3317,12 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
             return nogaKategoria.includes('krzes') || nogaKategoria === '' || nogaKategoria === 'nogi';
           });
         }
-        console.log('🦵 For krzesła chair, found leg:', defaultLeg?.Nazwa);
+  console.log('🦵 For krzesła chair, found leg:', (defaultLeg && defaultLeg.Nazwa));
       }
       
       // Jeśli nie znaleziono odpowiedniej nogi, weź pierwszą dostępną
       const result = defaultLeg || availableLegs[0];
-      console.log('🦵 Final selected leg:', result?.Nazwa);
+  console.log('🦵 Final selected leg:', (result && result.Nazwa));
       return result;
     }
 
@@ -3635,8 +3636,8 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
 
       console.log('📡 Loading data from sheets...');
       await loadDataFromSheet();
-      console.log('✅ Data loaded successfully, items:', allData?.length);
-      console.log('🔍 Sample data:', allData?.slice(0, 3));
+  console.log('✅ Data loaded successfully, items:', (allData ? allData.length : 0));
+  console.log('🔍 Sample data:', (allData ? allData.slice(0, 3) : []));
       
       // Wywołaj renderowanie przycisków
       renderCategoryButtons();
@@ -3955,7 +3956,7 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
       const center = box.getCenter(new Vector3());
       setCameraView(center);
       currentModelContainer.position.sub(center);
-      if (viewer?.render) viewer.render();
+  if (viewer && viewer.render) viewer.render();
     } catch(e) { console.warn('Nie udało się ustawić kamery po załadowaniu modelu', e); }
 
     // Jeśli kubełek, to ewentualnie załaduj domyślne nogi
@@ -4093,7 +4094,7 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
 
   // ✅ Sprawdzenie zgodności kubełka z wariantem nóg
   if (selectedChair && selectedChair.Grupa.toLowerCase() === 'kubełek') {
-    const nazwaKubełka = selectedChair.Nazwa?.toLowerCase();
+  const nazwaKubełka = selectedChair.Nazwa ? selectedChair.Nazwa.toLowerCase() : undefined;
     
     // Sprawdź tradycyjną relację: noga -> kubełek (pole DlaKubełka w nodze)
     const zgodneKubełki = (variant.DlaKubełka || variant.DlaKubelka || '').toLowerCase().split(',').map(k => k.trim());
@@ -4157,7 +4158,7 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
   .filter(d => d.Grupa && d.Grupa.toLowerCase() === 'nogi')
   .filter(noga => {
     const nogaKategoria = (noga.Kategoria || noga.Typ || noga.Grupa || '').toLowerCase();
-    const chairKategoria = (selectedChair?.Kategoria || '').toLowerCase();
+  const chairKategoria = ((selectedChair && selectedChair.Kategoria) || '').toLowerCase();
     // Jeśli wybrano kategorię 'hookery', pokazuj tylko nogi z tej kategorii
     if (chairKategoria.includes('hooker')) {
       return nogaKategoria.includes('hooker');
@@ -4177,7 +4178,7 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
 
 // Ustaw pierwszą nogę jeśli jeszcze żadna nie została wybrana
 if (!selectedLeg && legs.length > 0) {
-  const defaultLeg = selectDefaultLeg(legs, selectedChair?.Kategoria);
+  const defaultLeg = selectDefaultLeg(legs, selectedChair ? selectedChair.Kategoria : undefined);
   setLegModel(defaultLeg);
 }
     renderOptions('legs-thumbnails', legs, item => {
@@ -4205,17 +4206,17 @@ if (!selectedLeg && legs.length > 0) {
     let forceRenderInterval;
 
     function triggerSceneRefresh() {
-      if (viewer?.scene?.mainCamera) {
+  if (viewer && viewer.scene && viewer.scene.mainCamera) {
         viewer.scene.mainCamera.position.x += 0.00001;
         if (viewer.scene.mainCamera.zoom !== undefined) {
           viewer.scene.mainCamera.zoom += 0.0001; // ⬅️ mikroskopijny zoom
         }
         viewer.scene.mainCamera.updateProjectionMatrix();
       }
-      if (viewer?.renderManager?.info) {
+  if (viewer && viewer.renderManager && viewer.renderManager.info) {
         viewer.renderManager.info.reset();
       }
-      if (viewer?.render) viewer.render();
+  if (viewer && viewer.render) viewer.render();
     }
 
 
@@ -4238,8 +4239,8 @@ if (!selectedLeg && legs.length > 0) {
     
 
     if (
-      selectedChair?.Grupa?.toLowerCase() === 'kubełek' &&
-      variant.TargetMeshOrModel?.toLowerCase().includes('legs') &&
+  (selectedChair && selectedChair.Grupa && selectedChair.Grupa.toLowerCase() === 'kubełek') &&
+  (variant.TargetMeshOrModel && variant.TargetMeshOrModel.toLowerCase().includes('legs')) &&
       variant.WariantModelu
     ) {
       // 👉 dla kubełków z podmianą nóg — zmień model nóg
@@ -4371,7 +4372,7 @@ async function applyMaterial(variant) {
     const meshPromises = targetNames.map(async (targetName) => {
       let container;
       if (targetName.toLowerCase() === 'legs') {
-        if (selectedChair?.Grupa?.toLowerCase() === 'krzesło' || !currentLegModel) {
+  if ((selectedChair && selectedChair.Grupa && selectedChair.Grupa.toLowerCase() === 'krzesło') || !currentLegModel) {
           container = currentModelContainer;
         } else {
           container = currentLegModel;
@@ -4381,7 +4382,7 @@ async function applyMaterial(variant) {
       }
 
       let targetObject = null;
-      container?.traverse(obj => {
+  if (container && container.traverse) container.traverse(obj => {
         if (
           obj.isMesh &&
           obj.name &&
@@ -4407,7 +4408,7 @@ async function applyMaterial(variant) {
           const tex = await textureLoader.loadAsync(url);
           tex.magFilter = LinearFilter;
           tex.minFilter = LinearMipMapLinearFilter;
-          tex.anisotropy = viewer?.renderer?.capabilities?.getMaxAnisotropy?.() || 4;
+          tex.anisotropy = (viewer && viewer.renderer && viewer.renderer.capabilities && viewer.renderer.capabilities.getMaxAnisotropy ? viewer.renderer.capabilities.getMaxAnisotropy() : 4);
           tex.wrapS = tex.wrapT = RepeatWrapping;
           tex.encoding = sRGBEncoding;
           tex.offset.set(0, 0);
@@ -4428,8 +4429,8 @@ async function applyMaterial(variant) {
         material.roughnessMap = null;
         material.metalnessMap = null;
         material.needsUpdate = true;
-        targetObject.material = material;
-        viewer.render?.();
+  targetObject.material = material;
+  if (viewer && viewer.render) viewer.render();
       } else if (folderPath && !/\.(jpg|jpeg|png|gif)$/i.test(folderPath)) {
         // --- PROGRESYWNE ŁADOWANIE ---
 
@@ -4465,10 +4466,10 @@ async function applyMaterial(variant) {
 
         // 4. Podmień materiał dopiero teraz (dopiero po basecolor)
         targetObject.material = material;
-        if (targetObject.geometry?.computeVertexNormals) {
+  if (targetObject.geometry && targetObject.geometry.computeVertexNormals) {
           targetObject.geometry.computeVertexNormals();
         }
-        viewer.render?.();
+  if (viewer && viewer.render) viewer.render();
 
         // 6. Progresywnie doładowuj pozostałe mapy i podmieniaj "w locie"
         loadTextureSafe(`${folderPath}/normal.jpg`).then(tex => {
@@ -4480,7 +4481,7 @@ async function applyMaterial(variant) {
             material.normalMap = tex;
             material.needsUpdate = true;
             targetObject.material = material;
-            viewer.render?.();
+            if (viewer && viewer.render) viewer.render();
           }
         });
 
@@ -4493,7 +4494,7 @@ async function applyMaterial(variant) {
             material.roughnessMap = tex;
             material.needsUpdate = true;
             targetObject.material = material;
-            viewer.render?.();
+            if (viewer && viewer.render) viewer.render();
           }
         });
 
@@ -4506,7 +4507,7 @@ async function applyMaterial(variant) {
             material.metalnessMap = tex;
             material.needsUpdate = true;
             targetObject.material = material;
-            viewer.render?.();
+            if (viewer && viewer.render) viewer.render();
           }
         });
 
@@ -4528,25 +4529,25 @@ async function applyMaterial(variant) {
       if (!mat.Folder && typeof mat.Wartość === 'string') {
         const parts = mat.Wartość.split('/');
         const last = parts[parts.length - 1];
-        if (last && texturesFilesByFolder?.[last]) {
+  if (last && texturesFilesByFolder && texturesFilesByFolder[last]) {
           mat.Folder = last;
           console.log(`📁 Dodano Folder='${last}' do '${key}'`);
         }
       }
     });
 
-    viewer.scene.traverse(obj => {
+  viewer.scene.traverse(obj => {
       if (obj.isMesh && obj.material) {
         obj.material.needsUpdate = true;
       }
     });
 
-    if (viewer?.scene?.mainCamera) {
+  if (viewer && viewer.scene && viewer.scene.mainCamera) {
       viewer.scene.mainCamera.position.x += 0.00001;
       viewer.scene.mainCamera.updateProjectionMatrix();
     }
 
-    if (viewer?.render) viewer.render();
+  if (viewer && viewer.render) viewer.render();
 
     updateSummary();
   } catch (e) {
@@ -4723,9 +4724,9 @@ function applyMaterialToSpecificMesh(variant, meshKey) {
 
   if (isLegs) {
     materialOptions = allData.filter(d =>
-      d.Grupa?.toLowerCase() === 'materiały_nóg' &&
+      (d.Grupa || '').toLowerCase() === 'materiały_nóg' &&
       isAllowedForGroup(d.GrupaDocelowa) &&
-      d.Visible?.toLowerCase() !== 'false'
+      ((d.Visible || '').toLowerCase() !== 'false')
     );
 
     if (selectedLeg && selectedLeg.Typ) {
@@ -4762,7 +4763,7 @@ function applyMaterialToSpecificMesh(variant, meshKey) {
 
     const groupedByCollection = {};
     materialOptions.forEach(mat => {
-      const key = mat.Kolekcja?.trim() || 'Inne';
+  const key = (mat.Kolekcja ? mat.Kolekcja.trim() : '') || 'Inne';
       if (!groupedByCollection[key]) groupedByCollection[key] = [];
       groupedByCollection[key].push(mat);
     });
@@ -4773,19 +4774,19 @@ function applyMaterialToSpecificMesh(variant, meshKey) {
 
   // 🧵 TKANINY (siedzisko, oparcie itd.)
   materialOptions = allData.filter(d =>
-    d.Grupa?.toLowerCase() === 'tkanina' &&
+    (d.Grupa || '').toLowerCase() === 'tkanina' &&
     d.TargetMeshOrModel &&
     d.TargetMeshOrModel.split(',').map(t => t.trim()).includes(targetMesh) &&
     isAllowedForGroup(d.GrupaDocelowa) &&
-    d.Visible?.toLowerCase() !== 'false'
+    ((d.Visible || '').toLowerCase() !== 'false')
   );
 
   // Zastosuj filtr wyszukiwania do materiałów nóg
   if (currentSearchFilter && isLegs) {
     materialOptions = allData.filter(d =>
-      d.Grupa?.toLowerCase() === 'materiały_nóg' &&
+      (d.Grupa || '').toLowerCase() === 'materiały_nóg' &&
       isAllowedForGroup(d.GrupaDocelowa) &&
-      d.Visible?.toLowerCase() !== 'false'
+      ((d.Visible || '').toLowerCase() !== 'false')
     ).filter(matchesSearchFilter);
     
     console.log(`🦵 Filtered leg materials to ${materialOptions.length} for filter: "${currentSearchFilter}"`);
@@ -4829,11 +4830,11 @@ function applyMaterialToSpecificMesh(variant, meshKey) {
 
   // 🧵 TKANINY (siedzisko, oparcie itd.)
   materialOptions = allData.filter(d =>
-    d.Grupa?.toLowerCase() === 'tkanina' &&
+    (d.Grupa || '').toLowerCase() === 'tkanina' &&
     d.TargetMeshOrModel &&
     d.TargetMeshOrModel.split(',').map(t => t.trim()).includes(targetMesh) &&
     isAllowedForGroup(d.GrupaDocelowa) &&
-    d.Visible?.toLowerCase() !== 'false'
+    ((d.Visible || '').toLowerCase() !== 'false')
   );
 
   // Zastosuj filtr wyszukiwania jeśli jest aktywny
@@ -4844,7 +4845,7 @@ function applyMaterialToSpecificMesh(variant, meshKey) {
 
   const groupedByCollection = {};
   materialOptions.forEach(mat => {
-    const key = mat.Kolekcja?.trim() || 'Inne';
+    const key = (mat.Kolekcja ? mat.Kolekcja.trim() : '') || 'Inne';
     if (!groupedByCollection[key]) groupedByCollection[key] = [];
     groupedByCollection[key].push(mat);
   });
@@ -5169,10 +5170,11 @@ if (lastOpenedCollection) {
         }
 
         // Użyj indeksu zamiast filtrowania całego allData
-        const legs = (window.dataIndices?.nogi || allData.filter(d => d.Grupa?.toLowerCase() === 'nogi')).filter(d => {
+  const legsIndex = (window.dataIndices && window.dataIndices.nogi) ? window.dataIndices.nogi : allData.filter(d => (d.Grupa || '').toLowerCase() === 'nogi');
+  const legs = legsIndex.filter(d => {
   // Filtrowanie kategorii
   const nogaKategoria = (d.Kategoria || d.Typ || d.Grupa || '').toLowerCase();
-  const chairKategoria = (selectedChair?.Kategoria || '').toLowerCase();
+  const chairKategoria = ((selectedChair && selectedChair.Kategoria) || '').toLowerCase();
   
   // Jeśli krzesło to 'hookery', pokazuj tylko nogi 'hooker'
   if (chairKategoria.includes('hooker')) {
@@ -5189,7 +5191,7 @@ if (lastOpenedCollection) {
   return czyNogaPasujeDoKubełka(d, selectedChair.Nazwa);
 });
 
-        console.log(`🦵 Filtered legs for ${selectedChair?.Nazwa}:`, legs.map(l => l.Nazwa));
+  console.log(`🦵 Filtered legs for ${selectedChair ? selectedChair.Nazwa : ''}:`, legs.map(l => l.Nazwa));
 
 
         renderOptions('legs-thumbnails', legs, item => {
@@ -5239,9 +5241,10 @@ renderOptions('legs-thumbnails', legs, item => {
         updateSummary();
       }
 
-      const visibleData = allData.filter(d =>
-        d.Visible?.toString().trim().length > 0
-      );
+      const visibleData = allData.filter(d => {
+        var v = (d.Visible != null ? d.Visible.toString() : '');
+        return v.trim().length > 0;
+      });
 
       // Flaga zapobiegająca wielokrotnemu renderowaniu kategorii
       let isCategoryButtonsRendered = false;
@@ -5304,12 +5307,12 @@ renderOptions('legs-thumbnails', legs, item => {
           const rawData = rows.map(row => {
             const values = row.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
             const obj = {};
-            headers.forEach((header, index) => obj[header] = values[index]?.trim().replace(/"/g, '') || '');
+            headers.forEach((header, index) => obj[header] = (values[index] ? values[index].trim().replace(/"/g, '') : '') || '');
             return obj;
           });
 
           // Filtrowanie DOPIERO po pełnym parsowaniu wszystkich danych
-          allData = rawData.filter(item => item.Visible?.toLowerCase() !== 'false');
+          allData = rawData.filter(item => ((item.Visible || '').toLowerCase() !== 'false'));
 
           // Sortowanie danych - modele pierwszych, potem nogi, potem materiały
           // To zapewnia że wszystkie potrzebne referencje są dostępne
@@ -5328,11 +5331,11 @@ renderOptions('legs-thumbnails', legs, item => {
           
           // Stwórz indeksy dla szybszego dostępu
           window.dataIndices = {
-            kubełki: allData.filter(d => d.Grupa?.toLowerCase() === 'kubełek'),
-            krzesła: allData.filter(d => d.Grupa?.toLowerCase() === 'krzesło'), 
-            nogi: allData.filter(d => d.Grupa?.toLowerCase() === 'nogi'),
-            materiałyNóg: allData.filter(d => d.Grupa?.toLowerCase() === 'materiały_nóg'),
-            tkaniny: allData.filter(d => d.Grupa?.toLowerCase() === 'tkanina')
+            kubełki: allData.filter(d => (d.Grupa || '').toLowerCase() === 'kubełek'),
+            krzesła: allData.filter(d => (d.Grupa || '').toLowerCase() === 'krzesło'), 
+            nogi: allData.filter(d => (d.Grupa || '').toLowerCase() === 'nogi'),
+            materiałyNóg: allData.filter(d => (d.Grupa || '').toLowerCase() === 'materiały_nóg'),
+            tkaniny: allData.filter(d => (d.Grupa || '').toLowerCase() === 'tkanina')
           };
           
           console.log('📊 Data indices created:', {
@@ -6406,7 +6409,7 @@ updateSummary();
         const zip = new JSZip();
 
         // 🪑 Eksport głównego modelu krzesła
-        const chairModel = window.selectedChair?.Nazwa || 'BrakModelu';
+  const chairModel = (window.selectedChair && window.selectedChair.Nazwa) || 'BrakModelu';
         const chairPath = `export/${chairModel}.${format}`;
 
         try {
@@ -6420,7 +6423,7 @@ updateSummary();
         }
 
         // 🦵 Eksport nóg (jeśli wybrano)
-        const legModel = window.selectedLeg?.Nazwa;
+  const legModel = (window.selectedLeg && window.selectedLeg.Nazwa);
         if (legModel) {
           const legPath = `export/${legModel}.${format}`;
           try {
@@ -6439,7 +6442,7 @@ updateSummary();
         // 🎨 Eksport materiałów / tekstur z kolekcją i bez
         const textureFolderInZip = zip.folder('textures');
         const materials = Object.values(window.selectedMaterials || {});
-        const collection = window.selectedChair?.Kolekcja?.trim() || '';
+  const collection = ((window.selectedChair && window.selectedChair.Kolekcja) ? window.selectedChair.Kolekcja.trim() : '') || '';
 
         for (const mat of materials) {
           const folder = mat.Folder || mat.Wartość;
@@ -6503,19 +6506,19 @@ updateSummary();
         if (!legsMaterialsContainer || !selectedChair || !selectedLeg) return;
 
         // 🧼 Czyść tylko kafelki materiałów nóg
-        legsMaterialsContainer.querySelectorAll('.material-tile')?.forEach(tile => tile.remove());
+  if (legsMaterialsContainer.querySelectorAll) legsMaterialsContainer.querySelectorAll('.material-tile').forEach(tile => tile.remove());
 
         const allEntries = allData;
 
-        const chairType = selectedChair.Grupa?.trim().toLowerCase();       // 'krzesło' lub 'kubełek'
-        const legVariant = selectedLeg.Nazwa?.trim().toLowerCase();       // np. 'regularne'
+  const chairType = (selectedChair.Grupa ? selectedChair.Grupa.trim().toLowerCase() : undefined);       // 'krzesło' lub 'kubełek'
+  const legVariant = (selectedLeg.Nazwa ? selectedLeg.Nazwa.trim().toLowerCase() : undefined);       // np. 'regularne'
 
         const filteredMaterials = allEntries.filter(mat => {
           // ✅ tylko materiały nóg
-          if (mat.Grupa?.trim().toLowerCase() !== 'materiały_nóg') return false;
+          if (((mat.Grupa ? mat.Grupa.trim().toLowerCase() : '')) !== 'materiały_nóg') return false;
 
           // ✅ czy materiał pasuje do typu krzesła (GrupaDocelowa)
-          const grupaDocelowa = mat.GrupaDocelowa?.toLowerCase() || '';
+          const grupaDocelowa = (mat.GrupaDocelowa ? mat.GrupaDocelowa.toLowerCase() : '') || '';
           const grupy = grupaDocelowa.split(',').map(g => g.trim());
           if (!grupy.includes(chairType)) return false;
 
@@ -6523,7 +6526,7 @@ updateSummary();
           if (chairType === 'krzesło') return true;
 
           // ✅ jeśli kubełek → DlaModeluNóg musi zawierać aktualny wariant nóg
-          const dlaModelu = (mat.DlaModeluNóg || mat.DlaModeluNog || mat.DlaModelu)?.toLowerCase().trim();
+          const dlaModelu = ((mat.DlaModeluNóg || mat.DlaModeluNog || mat.DlaModelu) ? (mat.DlaModeluNóg || mat.DlaModeluNog || mat.DlaModelu).toLowerCase().trim() : undefined);
           if (!dlaModelu || dlaModelu.length === 0) return false;
 
           const allowedVariants = dlaModelu.split(',').map(v => v.trim());
@@ -6937,7 +6940,7 @@ function setDefaultMaterialsFromSheet() {
       // Funkcja renderująca przyciski kategorii
       function renderCategoryButtons(retryCount = 0) {
         const maxRetries = 10;
-        console.log(`🎯 renderCategoryButtons called (attempt ${retryCount + 1}/${maxRetries}), allData:`, allData?.length);
+  console.log(`🎯 renderCategoryButtons called (attempt ${retryCount + 1}/${maxRetries}), allData:`, (allData ? allData.length : 0));
         
         // Jeśli przyciski już zostały wyrenderowane, nie rób tego ponownie
         if (isCategoryButtonsRendered) {
@@ -7367,7 +7370,7 @@ function setDefaultMaterialsFromSheet() {
       // Funkcja renderująca modele promocyjne
       function renderPromotionalModels() {
         console.log('🔍 Checking promotional models...');
-        console.log('AllData length:', allData?.length);
+  console.log('AllData length:', (allData ? allData.length : 0));
         
         if (!allData || allData.length === 0) {
           console.error('❌ No allData available for promotions');
@@ -7409,7 +7412,7 @@ function setDefaultMaterialsFromSheet() {
       // Funkcja renderująca modele bestsellery
       function renderBestsellerModels() {
         console.log('🔍 Checking bestseller models...');
-        console.log('AllData length:', allData?.length);
+  console.log('AllData length:', (allData ? allData.length : 0));
         
         if (!allData || allData.length === 0) {
           console.error('❌ No allData available for bestsellers');
@@ -7482,7 +7485,7 @@ function setDefaultMaterialsFromSheet() {
 
       // Funkcja renderująca promocje na starcie
       function renderPromotions() {
-        console.log('🎉 renderPromotions called, allData length:', allData?.length);
+  console.log('🎉 renderPromotions called, allData length:', (allData ? allData.length : 0));
         
         if (!allData || !Array.isArray(allData) || allData.length === 0) {
           console.log('❌ No allData available for renderPromotions');
@@ -7548,7 +7551,7 @@ function setDefaultMaterialsFromSheet() {
 
       // Funkcja renderująca kategorie i krzesła w PWA Success Screen - UŻYWA MOBILNYCH FUNKCJI
       function renderPWACategoryButtons() {
-        console.log('📱 renderPWACategoryButtons called - używa mobilnych funkcji, allData:', allData?.length);
+  console.log('📱 renderPWACategoryButtons called - używa mobilnych funkcji, allData:', (allData ? allData.length : 0));
         
         // Czekaj na załadowanie danych jeśli jeszcze nie są dostępne
         if (!allData || !Array.isArray(allData) || allData.length === 0) {
@@ -7589,7 +7592,7 @@ function setDefaultMaterialsFromSheet() {
       
       // Funkcja renderująca kategorie w mobilnej sekcji PWA
       function renderMobileCategories() {
-        console.log('📱 renderMobileCategories called, allData:', allData?.length);
+  console.log('📱 renderMobileCategories called, allData:', (allData ? allData.length : 0));
         
         const container = document.getElementById('mobile-category-buttons-container');
         if (!container) {
@@ -8070,7 +8073,7 @@ function setDefaultMaterialsFromSheet() {
       
       // Funkcja renderująca kategorie w głównej mobilnej sekcji (welcome screen)
       function renderMobileMainCategories() {
-        console.log('📱 renderMobileMainCategories called, allData:', allData?.length);
+  console.log('📱 renderMobileMainCategories called, allData:', (allData ? allData.length : 0));
         
         // Dodatkowe debugowanie ekranu i viewport
         console.log('📱 Window dimensions:', window.innerWidth + 'x' + window.innerHeight);
@@ -8628,7 +8631,7 @@ function setDefaultMaterialsFromSheet() {
             .filter(d => {
               // Filtrowanie kategorii
               const nogaKategoria = (d.Kategoria || d.Typ || d.Grupa || '').toLowerCase();
-              const chairKategoria = (selectedChair?.Kategoria || '').toLowerCase();
+              const chairKategoria = ((selectedChair && selectedChair.Kategoria) || '').toLowerCase();
               
               // Jeśli krzesło to 'hookery', pokazuj tylko nogi 'hooker'
               if (chairKategoria.includes('hooker')) {
@@ -8686,7 +8689,7 @@ function setDefaultMaterialsFromSheet() {
 
         if (!searchToggle || !searchPanel) {
           console.error('❌ Search elements not found');
-          console.log('HTML content around search:', document.getElementById('search-container')?.innerHTML);
+          console.log('HTML content around search:', (document.getElementById('search-container') ? document.getElementById('search-container').innerHTML : ''));
           return;
         }
 
@@ -9074,7 +9077,7 @@ function setDefaultMaterialsFromSheet() {
           viewOptionsBtn.style.flex = '';
         } else {
           // Fallback na starą logikę
-          const group = item.Grupa?.toLowerCase();
+          const group = (item.Grupa ? item.Grupa.toLowerCase() : undefined);
           if (group === 'krzesło' || group === 'kubełek') {
             goToChairBtn.style.display = 'block';
             goToChairBtn.textContent = 'Przejdź do krzesła';
@@ -9193,7 +9196,7 @@ function setDefaultMaterialsFromSheet() {
           showChairsWithLegs(item);
         } else {
           // Fallback na starą logikę
-          const group = item.Grupa?.toLowerCase();
+          const group = (item.Grupa ? item.Grupa.toLowerCase() : undefined);
           
           if (group === 'krzesło' || group === 'kubełek') {
             loadModel(item);
@@ -9207,7 +9210,7 @@ function setDefaultMaterialsFromSheet() {
               alert('Najpierw wybierz model krzesła');
             }
           } else if (group === 'nogi') {
-            if (selectedChair && selectedChair.Grupa?.toLowerCase() === 'kubełek') {
+            if (selectedChair && selectedChair.Grupa && selectedChair.Grupa.toLowerCase() === 'kubełek') {
               setLegModel(item);
               showScreen('config');
             } else {

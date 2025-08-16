@@ -1,5 +1,5 @@
 // Zwiększ wersję przy każdej zmianie - BŁĘDY JS FIX
-const CACHE_NAME = 'v44-mobile-desktop-conditional';
+const CACHE_NAME = 'v45-mobile-desktop-conditional';
 const urlsToCache = [
   './',
   'index.html',
