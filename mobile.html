@@ -217,7 +217,7 @@ body.mobile-mode #bottom-toolbar img{width:18px !important;height:18px !importan
 /* Mobile-only: small grab tab to open toolbar */
 body.mobile-mode #mobile-toolbar-tab{position:fixed;left:0;top:50%;transform:translateY(-50%);background:#F5C842;border:1px solid #d2a81e;border-right:none;border-radius:0 8px 8px 0;padding:8px 6px;z-index:2001;box-shadow:0 2px 8px rgba(0,0,0,.12);display:flex;align-items:center;justify-content:center;opacity:.97}
 body.mobile-mode #mobile-toolbar-tab.hidden{display:none}
-body.mobile-mode #mobile-toolbar-tab span{font-size:12px;color:#222;writing-mode:vertical-rl;transform:rotate(180deg);font-weight:600;letter-spacing:.2px}
+body.mobile-mode #mobile-toolbar-tab span{font-size:11px;color:#222;writing-mode:vertical-rl;transform:rotate(180deg);font-weight:600;letter-spacing:.2px;font-family:'Poppins',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif}
 /* Await selection: hide toolbar and tab, and hide canvas to prevent flicker */
 body.mobile-mode.mobile-await-selection #mobile-toolbar-tab{display:none !important}
 body.mobile-mode.mobile-await-selection #bottom-toolbar{display:none !important}
@@ -225,7 +225,7 @@ body.mobile-mode.mobile-await-selection #canvas{visibility:hidden !important}
 /* Mobile: slightly smaller 'Twoja konfiguracja' / export button */
 body.mobile-mode #export-config{padding:6px 8px !important;font-size:12px !important}
 /* Mobile: compact 'Twoja konfiguracja' button */
-body.mobile-mode #config-overview-button{padding:5px 9px !important;font-size:11px !important;bottom:12px !important;left:12px !important;border-radius:16px !important;z-index:2002 !important}
+body.mobile-mode #config-overview-button{padding:5px 9px !important;font-size:11px !important;bottom:12px !important;left:12px !important;border-radius:16px !important;z-index:2002 !important;font-family:'Poppins',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif !important;font-weight:600 !important}
 /* Center the yellow thumb exactly on the narrow vertical track on mobile */
 body.mobile-mode #brightness-panel #brightness-slider::-webkit-slider-thumb{left:0 !important;margin:0 !important}
 body.mobile-mode #brightness-panel input[type="range"]::-webkit-slider-thumb{left:0 !important;margin:0 !important}
@@ -238,11 +238,11 @@ body.mobile-mode #bottom-toolbar img{width:16px !important;height:16px !importan
 body.mobile-mode #mobile-toolbar-tab{padding:6px 5px !important}
 /* Part icons styled like collection icons */
 body.mobile-mode #part-tabs button,
-body.mobile-mode #part-tabs .part-btn{width:64px !important;height:64px !important;border:1px solid #ccc !important;border-radius:8px !important;background:#fff !important;display:flex !important;align-items:center !important;justify-content:center !important;padding:6px !important}
-body.mobile-mode #part-tabs img{width:40px !important;height:40px !important;object-fit:contain !important}
+body.mobile-mode #part-tabs .part-btn{width:56px !important;height:56px !important;border:1px solid #ccc !important;border-radius:8px !important;background:#fff !important;display:flex !important;align-items:center !important;justify-content:center !important;padding:6px !important}
+body.mobile-mode #part-tabs img{width:36px !important;height:36px !important;object-fit:contain !important}
 /* Material icons square and proportional like collection icons */
-body.mobile-mode #material-panel-viewer{grid-template-columns:repeat(auto-fill,minmax(72px,1fr)) !important}
-body.mobile-mode #material-panel-viewer .thumbnail{height:80px !important}
+body.mobile-mode #material-panel-viewer{grid-template-columns:repeat(auto-fill,minmax(80px,1fr)) !important}
+body.mobile-mode #material-panel-viewer .thumbnail{width:80px !important;height:80px !important;display:flex !important;align-items:center !important;justify-content:center !important;margin:0 auto !important}
 body.mobile-mode #material-panel-viewer .thumbnail img{width:64px !important;height:64px !important;object-fit:contain !important;border-radius:8px !important}
 </style>`;
                 if(html.includes('</head>')){
