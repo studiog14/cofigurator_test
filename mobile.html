@@ -45,9 +45,9 @@
         (async function(){
             console.log('[mobile.html] bootstrap start');
             const bootContainer = document.getElementById('boot-loader');
-            function showError(msg){
+        function showError(msg){
                 if(bootContainer){
-                    bootContainer.innerHTML = '<div class="error">'+ (msg||'Błąd ładowania') +'</div>' +
+            bootContainer.innerHTML = '<div class="error">'+ (msg||'Błąd ladowania danych') +'</div>' +
                         '<div class="muted">Spróbuj ponownie, lub otwórz wersję standardową: <a href="index.html">index.html</a></div>';
                 }
             }
@@ -291,6 +291,26 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                                                         }
                                                         if (picked && typeof picked.click==='function') { picked.click(); }
                                                         window.__mobileSelectedPromoOnce = true;
+                                                    }
+                                                } catch(_){ }
+                                                // After wiring clicks, auto-select "Promocje" once – but only when data is loaded
+                                                try {
+                                                    if (!window.__mobileSelectedPromoOnce) {
+                                                        var tryPick = function(attempt){
+                                                            try {
+                                                                if (Array.isArray(window.allData) && window.allData.length > 0) {
+                                                                    var allBtns = container.querySelectorAll('.category-button');
+                                                                    var picked = null;
+                                                                    for (var i=0;i<allBtns.length;i++){
+                                                                        var t = (allBtns[i].dataset && (allBtns[i].dataset.category||'') || allBtns[i].textContent || '').toLowerCase();
+                                                                        if (t.indexOf('promocj') !== -1) { picked = allBtns[i]; break; }
+                                                                    }
+                                                                    if (picked && typeof picked.click==='function') { picked.click(); window.__mobileSelectedPromoOnce = true; return; }
+                                                                }
+                                                            } catch(_){ }
+                                                            if (attempt < 40) setTimeout(function(){ tryPick(attempt+1); }, 250);
+                                                        };
+                                                        tryPick(0);
                                                     }
                                                 } catch(_){ }
                                                 return;
