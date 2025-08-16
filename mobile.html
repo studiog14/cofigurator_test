@@ -55,7 +55,7 @@
 <body>
         <div id="boot-loader" class="loader">
             <div class="spinner" aria-hidden="true"></div>
-            <div id="boot-msg">Trwa uruchamianie konfiguratora…</div>
+            <div id="boot-msg">Trwa ładowanie konfiguratora</div>
             <div id="boot-hint" class="muted" style="display:none">To może potrwać dłuższą chwilę — pobieramy modele i tekstury. Jeśli ekran nie zniknie, odśwież stronę.</div>
         </div>
 
@@ -259,7 +259,7 @@ body.mobile-mode #export-config{padding:6px 8px !important;font-size:12px !impor
 
                     // 2d) Zmień komunikat loadera i wstrzyknij wskazówkę (CSS-only reveal po 8s)
                     html = html.replace(/<div\s+class=\"loading-text\"([^>]*)>([\s\S]*?)<\/div>/i, function(_, attrs){
-                        return '<div class="loading-text"'+attrs+'>Trwa uruchamianie konfiguratora…<\/div>' +
+                        return '<div class="loading-text"'+attrs+'>Trwa ładowanie konfiguratora<\/div>' +
                                '<div id="mobile-longload-hint" style="margin-top:12px;font-size:14px;color:#666;text-align:center;max-width:320px;opacity:0;animation:mobileHint 0s linear 8s forwards">To może potrwać dłuższą chwilę — pobieramy modele i tekstury. Jeśli ekran nie zniknie, odśwież stronę.<\/div>';
                     });
 
@@ -551,7 +551,7 @@ body.mobile-mode #export-config{padding:6px 8px !important;font-size:12px !impor
 
                                     // Tekst loadera dla mobile
                                     var lt = document.querySelector('#custom-loader .loading-text');
-                                    if (lt) { lt.textContent = 'Trwa uruchamianie konfiguratora…'; }
+                                    if (lt) { lt.textContent = 'Trwa ładowanie konfiguratora'; }
 
                                     // Hint po 8s, auto-refresh po 20s (jednorazowo)
                                     setTimeout(function(){
