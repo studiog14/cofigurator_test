@@ -567,16 +567,25 @@ body.mobile-mode #export-config{padding:6px 8px !important;font-size:12px !impor
 
                                     // Removed auto-refresh timer on mobile
                                     
-                                    // Usuń overlay gdy UI będzie gotowe (fallback if not removed earlier)
+                                    // Usuń overlay gdy UI będzie gotowe (tak, aby ekran powitalny i panel UI pojawiły się jednocześnie)
                                     try {
+                                        var tries = 0;
                                         var removeOverlay = function(){
                                             var panel = document.getElementById('mobile-right-panel');
-                                            var loaded = panel && panel.children && panel.children.length > 0;
-                                            var app = document.getElementById('app');
-                                            var appVisible = app && app.classList && app.classList.contains('visible');
-                                            var loader = document.getElementById('custom-loader');
-                                            var loaderHidden = loader && (loader.style.display==='none' || loader.getAttribute('aria-hidden')==='true');
-                                            if (!window.__mobileBootOverlayDone && (loaded || appVisible || loaderHidden)) {
+                                            var panelReady = false;
+                                            try {
+                                                if (panel) {
+                                                    // Uznaj panel za gotowy, gdy pojawią się kluczowe elementy UI
+                                                    panelReady = !!(
+                                                        panel.querySelector('#search-container') ||
+                                                        panel.querySelector('#mobile-category-buttons-container') ||
+                                                        panel.querySelector('#category-buttons-container') ||
+                                                        panel.querySelector('#model-thumbnails') ||
+                                                        panel.querySelector('#legs-thumbnails')
+                                                    );
+                                                }
+                                            } catch(_) {}
+                                            if (!window.__mobileBootOverlayDone && panelReady) {
                                                 window.__mobileBootOverlayDone = true;
                                                 if (__mobileOverlay) {
                                                     __mobileOverlay.style.opacity = '0';
@@ -584,14 +593,19 @@ body.mobile-mode #export-config{padding:6px 8px !important;font-size:12px !impor
                                                 }
                                                 return true;
                                             }
+                                            // Retry for a while to uniknąć zablokowania ekranu
+                                            tries++;
+                                            if (tries < 40) setTimeout(removeOverlay, 250);
+                                            else {
+                                                // Ostateczny fallback po ~10s
+                                                if (!window.__mobileBootOverlayDone) {
+                                                    window.__mobileBootOverlayDone = true;
+                                                    try { if (__mobileOverlay) { __mobileOverlay.style.opacity='0'; setTimeout(function(){ try{__mobileOverlay.remove();}catch(_){}} ,200); } } catch(_){}
+                                                }
+                                            }
                                             return false;
                                         };
-                                        if (!removeOverlay()) {
-                                            setTimeout(removeOverlay, 500);
-                                            setTimeout(removeOverlay, 1000);
-                                            setTimeout(removeOverlay, 2000);
-                                            setTimeout(removeOverlay, 4000);
-                                        }
+                                        removeOverlay();
                                     } catch(_){ }
                                 } catch(_){ }
                                 
