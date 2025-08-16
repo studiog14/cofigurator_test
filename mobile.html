@@ -223,12 +223,25 @@ body.mobile-mode.mobile-await-selection #canvas{visibility:hidden !important}
 /* Mobile: slightly smaller 'Twoja konfiguracja' / export button */
 body.mobile-mode #export-config{padding:6px 8px !important;font-size:12px !important}
 /* Mobile: compact 'Twoja konfiguracja' button */
-body.mobile-mode #config-overview-button{padding:6px 10px !important;font-size:12px !important;bottom:8px !important;left:56px !important;border-radius:16px !important;z-index:2002 !important}
+body.mobile-mode #config-overview-button{padding:5px 9px !important;font-size:11px !important;bottom:12px !important;left:12px !important;border-radius:16px !important;z-index:2002 !important}
 /* Center the yellow thumb exactly on the narrow vertical track on mobile */
 body.mobile-mode #brightness-panel #brightness-slider::-webkit-slider-thumb{left:0 !important;margin:0 !important}
 body.mobile-mode #brightness-panel input[type="range"]::-webkit-slider-thumb{left:0 !important;margin:0 !important}
 body.mobile-mode #brightness-panel #brightness-slider::-moz-range-thumb{margin:0 !important}
 body.mobile-mode #brightness-panel #brightness-slider::-ms-thumb{margin:0 !important}
+/* Further compact left toolbar on mobile */
+body.mobile-mode #bottom-toolbar{gap:8px !important;padding:6px 6px !important}
+body.mobile-mode #bottom-toolbar button{padding:4px 6px !important}
+body.mobile-mode #bottom-toolbar img{width:16px !important;height:16px !important}
+body.mobile-mode #mobile-toolbar-tab{padding:6px 5px !important}
+/* Part icons styled like collection icons */
+body.mobile-mode #part-tabs button,
+body.mobile-mode #part-tabs .part-btn{width:64px !important;height:64px !important;border:1px solid #ccc !important;border-radius:8px !important;background:#fff !important;display:flex !important;align-items:center !important;justify-content:center !important;padding:6px !important}
+body.mobile-mode #part-tabs img{width:40px !important;height:40px !important;object-fit:contain !important}
+/* Material icons square and proportional like collection icons */
+body.mobile-mode #material-panel-viewer{grid-template-columns:repeat(auto-fill,minmax(72px,1fr)) !important}
+body.mobile-mode #material-panel-viewer .thumbnail{height:80px !important}
+body.mobile-mode #material-panel-viewer .thumbnail img{width:64px !important;height:64px !important;object-fit:contain !important;border-radius:8px !important}
 </style>`;
                 if(html.includes('</head>')){
                     html = html.replace(/<head[^>]*>/i, function(m){ return m + '\n  ' + shimTag + '\n  ' + hintCss + '\n'; });
@@ -384,6 +397,30 @@ body.mobile-mode #brightness-panel #brightness-slider::-ms-thumb{margin:0 !impor
                                                             } catch(_) {}
                                                             var res = await __origLoadModel.call(this, v);
                                                             try { if (typeof window.__adjustMobileCanvas==='function') window.__adjustMobileCanvas(); } catch(_) {}
+                                                            // Mobile-only: slightly zoom in for non-hooker chairs
+                                                            try {
+                                                                if (document.body.classList.contains('mobile-mode') && window.viewer && window.viewer.scene && window.viewer.scene.mainCamera) {
+                                                                    var chair = (window.selectedChair || v || {});
+                                                                    var isHooker = (String(chair.Kategoria||'').toLowerCase().includes('hooker') || String(chair.Kategoria||'').toLowerCase().includes('hoker'));
+                                                                    if (!isHooker) {
+                                                                        var cam = window.viewer.scene.mainCamera;
+                                                                        // Move camera a bit closer along its forward vector
+                                                                        try {
+                                                                            var f = cam.getWorldDirection(new (window.THREE?THREE.Vector3:window.viewer.THREE?.Vector3||function(){})());
+                                                                            if (f && f.x!==undefined) {
+                                                                                cam.position.addScaledVector(f, -0.35); // small nudge closer
+                                                                                cam.updateProjectionMatrix();
+                                                                            }
+                                                                        } catch(_){ /* fallback: tweak zoom via controls distance if available */
+                                                                            if (window.viewer.controls) {
+                                                                                try { window.viewer.controls.minDistance = Math.max(0.8, (window.viewer.controls.minDistance||1) * 0.9); } catch(_){}
+                                                                                try { window.viewer.controls.maxDistance = Math.max(2.0, (window.viewer.controls.maxDistance||8) * 0.95); } catch(_){}
+                                                                                try { window.viewer.controls.update(); } catch(_){}
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            } catch(_){ }
                                                             // After first successful model load, we can safely remove boot overlay early
                                                             try {
                                                                 if (window.__mobileBootOverlayDone !== true && __mobileOverlay) {
