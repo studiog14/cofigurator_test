@@ -4,11 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="format-detection" content="telephone=no" />
     <title>Konfigurator krzeseł – Mobile</title>
     <link rel="manifest" href="manifest.json" />
     <link rel="apple-touch-icon" href="icons/favicon.png" />
+    <link rel="icon" href="favicon.png" />
     <style>
         html,body{height:100%;margin:0}
         body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:#fff;color:#222}
@@ -51,16 +53,8 @@
 
                     // Prosty transpiler usuwający optional chaining / nullish coalescing w inline module script
                     function transpileLight(src){
-                        let out = src;
-                        // optional call: obj?.method(args) -> (obj&&obj.method)(args)
-                        out = out.replace(/([\w$\.\]\)]+)\?\.([\w$]+)\s*\(/g, '($1&&$1.$2)(');
-                        // bracket access: obj?.[expr] -> (obj!=null?obj[expr]:undefined)
-                        out = out.replace(/([\w$\.\]\)]+)\?\.\[([^\]]+)\]/g, '($1!=null&&$1!==undefined?$1[$2]:undefined)');
-                        // property access: obj?.prop -> (obj!=null?obj.prop:undefined)
-                        out = out.replace(/([\w$\.\]\)]+)\?\.([\w$]+)/g, '($1!=null&&$1!==undefined?$1.$2:undefined)');
-                        // nullish coalescing: a ?? b -> a || b (przybliżenie)
-                        out = out.replace(/\?\?/g, '||');
-                        return out;
+                        // iOS 15 wspiera optional chaining; unikamy ryzykownych podmian regex.
+                        return src;
                     }
 
                 // 1) Wstrzyknij es-module-shims w <head> (lub zaraz po <meta charset>)
@@ -82,7 +76,6 @@
                         try {
                         let patched = transpileLight(code);
                         // Dodatkowe mobilne gardy na brakujące elementy DOM
-                        patched = patched.replace(/const\s+closeBtn\s*=\s*emailModal\.querySelector\(/g, 'const closeBtn = emailModal ? emailModal.querySelector(');
                         patched = patched.replace(/buyButton\.addEventListener\(/g, 'buyButton && buyButton.addEventListener(');
                         patched = patched.replace(/closeBtn\.addEventListener\(/g, 'closeBtn && closeBtn.addEventListener(');
                         patched = patched.replace(/emailModal\.addEventListener\(/g, 'emailModal && emailModal.addEventListener(');
@@ -93,7 +86,16 @@
                         }
                     });
 
-                        // 2c) Wstrzyknij skrypt mobilny: zmiana tekstu głównego loadera i opóźniona podpowiedź odświeżenia
+                // 2c) Odłóż ładowanie zewnętrznych CDN scriptów na później, aby uniknąć parser-blocking via document.write
+                html = html.replace(/<script\s+src="https:\/\/cdn\.jsdelivr\.net\/npm\/qrcodejs\/qrcode\.min\.js"[^>]*><\/script>/gi,
+                    '<script data-mobile-defer-src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"><\\/script>');
+                html = html.replace(/<script\s+src="https:\/\/cdn\.emailjs\.com\/dist\/email\.min\.js"[^>]*><\/script>/gi,
+                    '<script data-mobile-defer-src="https://cdn.emailjs.com/dist/email.min.js"><\\/script>');
+                // Zabezpiecz emailjs.init tak, aby poczekał na bibliotekę
+                html = html.replace(/emailjs\.init\(([^)]*)\);/i,
+                    '(function initEmail(){ if (window.emailjs&&emailjs.init){ try{ emailjs.init($1); }catch(_){ } } else { setTimeout(initEmail,200); } })();');
+
+                                                // 2d) Wstrzyknij skrypt mobilny: tekst loadera, opóźniona podpowiedź, auto-refresh i doładowanie CDN
                         const mobileHelperScript = `
                             <script>(function(){
                                 document.addEventListener('DOMContentLoaded', function(){
@@ -129,9 +131,21 @@
                                             } catch(_) { location.reload(); }
                                         }
                                         setTimeout(maybeAutoReload, 20000);
+
+                                                                                // Doładuj odłożone CDN-y w tle (bez blokowania parsera)
+                                                                                try {
+                                                                                    var placeholders = document.querySelectorAll('script[data-mobile-defer-src]');
+                                                                                    placeholders.forEach(function(ph){
+                                                                                        var s = document.createElement('script');
+                                                                                        s.src = ph.getAttribute('data-mobile-defer-src');
+                                                                                        s.defer = true;
+                                                                                        (ph.parentNode || document.head || document.documentElement).insertBefore(s, ph);
+                                                                                        ph.parentNode && ph.parentNode.removeChild(ph);
+                                                                                    });
+                                                                                } catch(_){ }
                                     } catch(_){}
                                 });
-                            })();<\/script>`;
+                            })();<\\/script>`;
                         if (html.includes('</head>')) {
                             html = html.replace(/<\/head>/i, mobileHelperScript + '\n</head>');
                         } else {
