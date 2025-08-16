@@ -81,7 +81,13 @@
                     // 2b) Przetranskrybuj inline module-shim scripts (bez dotykania zewnętrznych plików)
                     html = html.replace(/<script([^>]*type=\"module-shim\"[^>]*)>([\s\S]*?)<\/script>/gi, function(_, attrs, code){
                         try {
-                            const patched = transpileLight(code);
+                        let patched = transpileLight(code);
+                        // Dodatkowe mobilne gardy na brakujące elementy DOM
+                        patched = patched.replace(/const\s+closeBtn\s*=\s*emailModal\.querySelector\(/g, 'const closeBtn = emailModal ? emailModal.querySelector(');
+                        patched = patched.replace(/buyButton\.addEventListener\(/g, 'buyButton && buyButton.addEventListener(');
+                        patched = patched.replace(/closeBtn\.addEventListener\(/g, 'closeBtn && closeBtn.addEventListener(');
+                        patched = patched.replace(/emailModal\.addEventListener\(/g, 'emailModal && emailModal.addEventListener(');
+                        patched = patched.replace(/emailForm\.addEventListener\(/g, 'emailForm && emailForm.addEventListener(');
                             return '<script'+attrs+'>'+patched+'<\/script>';
                         } catch(e) {
                             return '<script'+attrs+'>'+code+'<\/script>';

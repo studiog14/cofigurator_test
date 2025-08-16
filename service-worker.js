@@ -67,6 +67,13 @@ self.addEventListener('fetch', (event) => {
   const req = event.request;
   const accept = req.headers.get('accept') || '';
   const method = (req && req.method) || 'GET';
+  const url = new URL(req.url);
+  const scheme = url.protocol; // e.g., 'http:', 'https:', 'chrome-extension:'
+
+  // Ignore non-http(s) schemes entirely
+  if (scheme !== 'http:' && scheme !== 'https:') {
+    return; // let the browser handle it
+  }
 
   // Treat navigations and HTML requests as network-first
   const isNavigation = req.mode === 'navigate' || accept.includes('text/html');
