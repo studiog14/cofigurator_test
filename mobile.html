@@ -236,19 +236,7 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                                                         try { var ml = document.getElementById('model-loader'); if (ml) ml.style.display = 'flex'; } catch(_){}
                                                         try { return await __origLoadModel.call(this, variant); }
                                                         finally {
-                                                            try { setTimeout(function(){ var ml2=document.getElementById('model-loader'); if(ml2) ml2.style.display='none'; }, 300); } catch(_){}
-                                                            // After first model load, auto-select Promocje once if available
-                                                            try {
-                                                                if (!window.__mobileSelectedPromoOnce) {
-                                                                    var cont = document.getElementById('mobile-category-buttons-container') || document.getElementById('category-buttons-container') || document;
-                                                                    var all = cont.querySelectorAll('.category-button');
-                                                                    for (var i=0;i<all.length;i++){
-                                                                        var t = (all[i].dataset && (all[i].dataset.category||'') || all[i].textContent || '').toLowerCase();
-                                                                        if (t.includes('promocj')) { all[i].click(); break; }
-                                                                    }
-                                                                    window.__mobileSelectedPromoOnce = true;
-                                                                }
-                                                            } catch(_){ }
+                                                            try { setTimeout(function(){ var ml2 = document.getElementById('model-loader'); if (ml2) ml2.style.display = 'none'; }, 300); } catch(_){}
                                                         }
                                                     };
                                                     wrapped.__mobileWrapped = true;
@@ -257,7 +245,7 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                                                 return;
                                             }
                                         } catch(_) {}
-                                        if (retries < 100) setTimeout(function(){ hookLoadModel(retries+1); }, 100);
+                                        if (retries < 100) setTimeout(function(){ hookLoadModel(retries + 1); }, 100);
                                     })(0);
 
                                     // Mobile category buttons: ensure active state mirrors desktop behavior
@@ -280,19 +268,7 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                                                         }
                                                     } catch(_){}
                                                 }, { passive: true });
-                                                // Auto-select Promocje once on first render
-                                                try {
-                                                    if (!window.__mobileSelectedPromoOnce) {
-                                                        var allBtns = container.querySelectorAll('.category-button');
-                                                        var picked = null;
-                                                        for (var i=0;i<allBtns.length;i++){
-                                                            var t = (allBtns[i].dataset && (allBtns[i].dataset.category||'') || allBtns[i].textContent || '').toLowerCase();
-                                                            if (t.includes('promocj')) { picked = allBtns[i]; break; }
-                                                        }
-                                                        if (picked && typeof picked.click==='function') { picked.click(); }
-                                                        window.__mobileSelectedPromoOnce = true;
-                                                    }
-                                                } catch(_){ }
+                                                // removed premature auto-select on first render
                                                 // After wiring clicks, auto-select "Promocje" once – but only when data is loaded
                                                 try {
                                                     if (!window.__mobileSelectedPromoOnce) {
