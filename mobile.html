@@ -155,6 +155,9 @@
 @keyframes mobileHint{to{opacity:1}}
 /* Active category state on mobile same as desktop */
 body.mobile-mode .category-button.active{background:#F5C842;color:#fff;border-color:#F5C842}
+/* Ensure Promocje category uses red like desktop */
+body.mobile-mode .category-button.promotion{border-color:#FF6B6B;color:#FF6B6B}
+body.mobile-mode .category-button.promotion.active{background:#FF6B6B !important;border-color:#FF6B6B !important;color:#fff !important}
 /* Ensure right panel is wide enough for 2 tiles */
 body.mobile-mode #mobile-right-panel{width:clamp(260px,38vw,360px);max-width:clamp(260px,38vw,360px)}
 /* Make welcome overlay flush with the panel edge (match clamp width) */
@@ -219,6 +222,13 @@ body.mobile-mode.mobile-await-selection #bottom-toolbar{display:none !important}
 body.mobile-mode.mobile-await-selection #canvas{visibility:hidden !important}
 /* Mobile: slightly smaller 'Twoja konfiguracja' / export button */
 body.mobile-mode #export-config{padding:6px 8px !important;font-size:12px !important}
+/* Mobile: compact 'Twoja konfiguracja' button */
+body.mobile-mode #config-overview-button{padding:6px 10px !important;font-size:12px !important;bottom:8px !important;left:56px !important;border-radius:16px !important;z-index:2002 !important}
+/* Center the yellow thumb exactly on the narrow vertical track on mobile */
+body.mobile-mode #brightness-panel #brightness-slider::-webkit-slider-thumb{left:0 !important;margin:0 !important}
+body.mobile-mode #brightness-panel input[type="range"]::-webkit-slider-thumb{left:0 !important;margin:0 !important}
+body.mobile-mode #brightness-panel #brightness-slider::-moz-range-thumb{margin:0 !important}
+body.mobile-mode #brightness-panel #brightness-slider::-ms-thumb{margin:0 !important}
 </style>`;
                 if(html.includes('</head>')){
                     html = html.replace(/<head[^>]*>/i, function(m){ return m + '\n  ' + shimTag + '\n  ' + hintCss + '\n'; });
@@ -421,11 +431,34 @@ body.mobile-mode #export-config{padding:6px 8px !important;font-size:12px !impor
                                             function openBar(){ try { bar.classList.add('mobile-open'); tab.classList.add('hidden'); } catch(_){} }
                                             function closeBar(){ try { bar.classList.remove('mobile-open'); tab.classList.remove('hidden'); } catch(_){} }
                                             tab.addEventListener('click', openBar, { passive: true });
-                                            // Close when tapping outside toolbar
+                                            // Helper to check and close subpanels (HDR list, brightness, export)
+                                            function anySubpanelOpen(){
+                                                try {
+                                                    var hdrP = document.getElementById('hdr-panel');
+                                                    var briP = document.getElementById('brightness-panel');
+                                                    var expP = document.getElementById('export-panel');
+                                                    var dimO = document.getElementById('dimension-overlay');
+                                                    var open = false;
+                                                    if (hdrP && !hdrP.classList.contains('hidden') && hdrP.style.display !== 'none') open = true;
+                                                    if (briP && !briP.classList.contains('hidden') && briP.style.display !== 'none') open = true;
+                                                    if (expP && !expP.classList.contains('hidden') && expP.style.display !== 'none') open = true;
+                                                    if (dimO && dimO.style.display !== 'none') open = true;
+                                                    return open;
+                                                } catch(_) { return false; }
+                                            }
+                                            function closeSubpanels(){
+                                                try {
+                                                    var ids=['hdr-panel','brightness-panel','export-panel'];
+                                                    ids.forEach(function(id){ var el=document.getElementById(id); if(!el) return; el.classList.add('hidden'); el.style.display = (id==='hdr-panel' ? 'none' : el.style.display); });
+                                                    var dimO=document.getElementById('dimension-overlay'); if(dimO) dimO.style.display='none';
+                                                } catch(_){}
+                                            }
+                                            // Two-step outside tap: close open subpanels first, then the toolbar
                                             document.addEventListener('click', function(e){
                                                 try {
                                                     if (!bar.classList.contains('mobile-open')) return;
                                                     if (bar.contains(e.target) || tab.contains(e.target)) return;
+                                                    if (anySubpanelOpen()) { closeSubpanels(); return; }
                                                     closeBar();
                                                 } catch(_){}
                                             }, { passive: true });
@@ -454,6 +487,11 @@ body.mobile-mode #export-config{padding:6px 8px !important;font-size:12px !impor
                                                         var scope = container.querySelectorAll('.category-button');
                                                         scope.forEach(function(b){ b.classList.remove('active'); });
                                                         btn.classList.add('active');
+                                                        try {
+                                                            var label = (btn.textContent||'').trim().toLowerCase();
+                                                            scope.forEach(function(b){ if((b.textContent||'').trim().toLowerCase()!=='promocje'){ b.classList.remove('promotion'); } });
+                                                            if (label === 'promocje') btn.classList.add('promotion');
+                                                        } catch(_){ }
                                                     } catch(_){}
                                                     try {
                                                         if (typeof window.renderMobileRightPanelList === 'function' && cat) {
@@ -468,6 +506,29 @@ body.mobile-mode #export-config{padding:6px 8px !important;font-size:12px !impor
                                             }
                                         } catch(_) {}
                                         if (retries < 50) setTimeout(function(){ attachCategoryActiveSync(retries+1); }, 200);
+                                    })(0);
+
+                                    // Mobile: default to 'Promocje' category on first load and style the pill in red
+                                    (function ensurePromotionsDefault(retries){
+                                        try {
+                                            // If function exists, render the promotions list in the right panel
+                                            if (typeof window.renderMobileRightPanelList === 'function') {
+                                                window.renderMobileRightPanelList('Promocje');
+                                            }
+                                            // Mark the Promocje button as active + promotion for red style
+                                            var cont = document.getElementById('mobile-right-panel') || document;
+                                            var btns = cont.querySelectorAll('.category-button');
+                                            if (btns && btns.length) {
+                                                var promoBtn = Array.from(btns).find(function(b){ return (b.textContent||'').trim().toLowerCase()==='promocje'; });
+                                                if (promoBtn) {
+                                                    btns.forEach(function(b){ b.classList.remove('active'); });
+                                                    promoBtn.classList.add('active');
+                                                    promoBtn.classList.add('promotion');
+                                                    return; // success
+                                                }
+                                            }
+                                        } catch(_) {}
+                                        if (retries < 50) setTimeout(function(){ ensurePromotionsDefault(retries+1); }, 200);
                                     })(0);
 
                                     // Mobile click delegation fallback: trigger loadModel when thumbnail clicked even if original handler fails
