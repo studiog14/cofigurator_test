@@ -201,6 +201,17 @@ body.mobile-mode #mobile-right-panel #search-results{max-height:220px} \
 body.mobile-mode #mobile-right-panel #search-filter-indicator{display:block !important;margin:6px 8px 10px 8px !important} \
 /* Hide legacy intro IDs only on mobile; keep #welcome-screen visible */\
 body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, body.mobile-mode .intro, body.mobile-mode #start, body.mobile-mode .start{display:none !important}\
+/* Mobile-only: hide QR button in the floating toolbar */\
+body.mobile-mode #qr-button{display:none !important}\
+/* Mobile-only: make the left toolbar compact and slide-out */\
+body.mobile-mode #bottom-toolbar{left:8px !important;padding:6px 4px !important;gap:10px !important;border-radius:10px !important;box-shadow:0 4px 12px rgba(0,0,0,.1) !important;transform:translate(-70%, -50%) !important} \
+body.mobile-mode #bottom-toolbar.mobile-open{transform:translate(0, -50%) !important} \
+body.mobile-mode #bottom-toolbar button{padding:6px 8px !important;border-radius:8px !important} \
+body.mobile-mode #bottom-toolbar img{width:18px !important;height:18px !important} \
+/* Mobile-only: small grab tab to open toolbar */\
+body.mobile-mode #mobile-toolbar-tab{position:fixed;left:0;top:50%;transform:translateY(-50%);background:#fff;border:1px solid #ccc;border-right:none;border-radius:0 8px 8px 0;padding:8px 6px;z-index:2001;box-shadow:0 2px 8px rgba(0,0,0,.08);display:flex;align-items:center;justify-content:center;opacity:.95} \
+body.mobile-mode #mobile-toolbar-tab.hidden{display:none} \
+body.mobile-mode #mobile-toolbar-tab span{font-size:12px;color:#666;writing-mode:vertical-rl;transform:rotate(180deg)} \
 </style>';
                 if(html.includes('</head>')){
                     html = html.replace(/<head[^>]*>/i, function(m){ return m + '\n  ' + shimTag + '\n  ' + hintCss + '\n'; });
@@ -318,8 +329,8 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                                     var __mobileOverlay = document.createElement('div');
                                     __mobileOverlay.id = 'mobile-boot-overlay';
                                     __mobileOverlay.setAttribute('aria-hidden','true');
-                                    __mobileOverlay.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:2147483647;transition:opacity .25s ease;';
-                                        __mobileOverlay.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:9998;transition:opacity .25s ease;';
+                                    // Keep overlay above app but below any system UI
+                                    __mobileOverlay.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:9998;transition:opacity .2s ease;';
                                     (document.body || document.documentElement).appendChild(__mobileOverlay);
                                     // Doładuj skrypty CDN
                                     var placeholders = document.querySelectorAll('script[data-mobile-defer-src]');
@@ -350,6 +361,14 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                                                             } catch(_) {}
                                                             var res = await __origLoadModel.call(this, v);
                                                             try { if (typeof window.__adjustMobileCanvas==='function') window.__adjustMobileCanvas(); } catch(_) {}
+                                                            // After first successful model load, we can safely remove boot overlay early
+                                                            try {
+                                                                if (window.__mobileBootOverlayDone !== true && __mobileOverlay) {
+                                                                    __mobileOverlay.style.opacity = '0';
+                                                                    setTimeout(function(){ try { __mobileOverlay.remove(); } catch(_){} }, 200);
+                                                                    window.__mobileBootOverlayDone = true;
+                                                                }
+                                                            } catch(_){}
                                                             return res;
                                                         }
                                                         finally {
@@ -372,6 +391,38 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                                         } catch(_) {}
                                         if (retries < 100) setTimeout(function(){ hookLoadModel(retries+1); }, 100);
                                     })(0);
+
+                                    // Mobile-only: create a small slide tab to toggle the left toolbar, and auto-compact it
+                                    (function setupMobileToolbar(){
+                                        try {
+                                            var bar = document.getElementById('bottom-toolbar');
+                                            if (!bar) return;
+                                            // Ensure visible class remains managed by app; we only slide position
+                                            // Start compact (hidden beyond edge); show a small tab
+                                            var tab = document.createElement('div');
+                                            tab.id = 'mobile-toolbar-tab';
+                                            tab.innerHTML = '<span>Narzędzia</span>';
+                                            document.body.appendChild(tab);
+                                            function openBar(){ try { bar.classList.add('mobile-open'); tab.classList.add('hidden'); } catch(_){} }
+                                            function closeBar(){ try { bar.classList.remove('mobile-open'); tab.classList.remove('hidden'); } catch(_){} }
+                                            tab.addEventListener('click', openBar, { passive: true });
+                                            // Close when tapping outside toolbar
+                                            document.addEventListener('click', function(e){
+                                                try {
+                                                    if (!bar.classList.contains('mobile-open')) return;
+                                                    if (bar.contains(e.target) || tab.contains(e.target)) return;
+                                                    closeBar();
+                                                } catch(_){}
+                                            }, { passive: true });
+                                            // Also close when HDR panel opens to avoid overlap
+                                            document.getElementById('hdr-toggle')?.addEventListener('click', function(){ openBar(); }, { passive: true });
+                                            document.getElementById('hdr-panel')?.addEventListener('click', function(){ closeBar(); }, { passive: true });
+                                            // Auto-close on orientation change to reset position
+                                            window.addEventListener('orientationchange', function(){ setTimeout(closeBar, 300); }, { passive: true });
+                                            // Initially closed
+                                            closeBar();
+                                        } catch(_){}
+                                    })();
 
                                     // Mobile category buttons: ensure active state mirrors desktop behavior
                                     (function attachCategoryActiveSync(retries){
@@ -499,7 +550,7 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
 
                                     // Removed auto-refresh timer on mobile
                                     
-                                    // Usuń overlay gdy UI będzie gotowe
+                                    // Usuń overlay gdy UI będzie gotowe (fallback if not removed earlier)
                                     try {
                                         var removeOverlay = function(){
                                             var panel = document.getElementById('mobile-right-panel');
@@ -508,9 +559,12 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                                             var appVisible = app && app.classList && app.classList.contains('visible');
                                             var loader = document.getElementById('custom-loader');
                                             var loaderHidden = loader && (loader.style.display==='none' || loader.getAttribute('aria-hidden')==='true');
-                                            if (loaded || appVisible || loaderHidden) {
-                                                __mobileOverlay.style.opacity = '0';
-                                                setTimeout(function(){ try { __mobileOverlay.remove(); } catch(_){} }, 250);
+                                            if (!window.__mobileBootOverlayDone && (loaded || appVisible || loaderHidden)) {
+                                                window.__mobileBootOverlayDone = true;
+                                                if (__mobileOverlay) {
+                                                    __mobileOverlay.style.opacity = '0';
+                                                    setTimeout(function(){ try { __mobileOverlay.remove(); } catch(_){} }, 200);
+                                                }
                                                 return true;
                                             }
                                             return false;
@@ -519,6 +573,7 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                                             setTimeout(removeOverlay, 500);
                                             setTimeout(removeOverlay, 1000);
                                             setTimeout(removeOverlay, 2000);
+                                            setTimeout(removeOverlay, 4000);
                                         }
                                     } catch(_){ }
                                 } catch(_){ }
