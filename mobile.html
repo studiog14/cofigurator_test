@@ -7,7 +7,7 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="format-detection" content="telephone=no" />
-    <title>Konfigurator krzeseł</title>
+    <title>Konfigurator krzeseł – Mobile</title>
     <link rel="manifest" href="manifest.json" />
     <link rel="apple-touch-icon" href="icons/favicon.png" />
     <link rel="icon" href="favicon.png" />
@@ -37,17 +37,17 @@
 <body>
         <div id="boot-loader" class="loader">
             <div class="spinner" aria-hidden="true"></div>
-            <div id="boot-msg">Trwa uruchamianie konfiguratora…</div>
-            <div id="boot-hint" class="muted" style="display:none">To może potrwać dłuższą chwilę — pobieramy modele i grafiki. Jeśli ekran nie zniknie, odśwież stronę.</div>
+            <div id="boot-msg">Inicjalizacja konfiguratora w wersji mobilnej</div>
+            <div id="boot-hint" class="muted" style="display:none">Strona ładuje się zbyt długo... Odśwież przeglądarkę/stronę</div>
         </div>
 
     <script>
         (async function(){
             console.log('[mobile.html] bootstrap start');
             const bootContainer = document.getElementById('boot-loader');
-        function showError(msg){
+            function showError(msg){
                 if(bootContainer){
-            bootContainer.innerHTML = '<div class="error">'+ (msg||'Błąd ladowania danych') +'</div>' +
+                    bootContainer.innerHTML = '<div class="error">'+ (msg||'Błąd ładowania') +'</div>' +
                         '<div class="muted">Spróbuj ponownie, lub otwórz wersję standardową: <a href="index.html">index.html</a></div>';
                 }
             }
@@ -130,25 +130,21 @@
                 const hintCss = '<style id="mobile-hint-style">\
 @keyframes mobileHint{to{opacity:1}}\
 /* Active category state on mobile same as desktop */\
-body.mobile-mode .category-button.active{background:#F5C842!important;color:#fff!important;border-color:#F5C842!important}\
+body.mobile-mode .category-button.active{background:#F5C842;color:#fff;border-color:#F5C842}\
 /* Ensure right panel is wide enough for 2 tiles */\
-body.mobile-mode #mobile-right-panel{width:clamp(260px,38vw,360px)!important;max-width:clamp(260px,38vw,360px)!important}\
+body.mobile-mode #mobile-right-panel{width:clamp(260px,38vw,360px);max-width:clamp(260px,38vw,360px)}\
 /* Categories: two per row without changing button look */\
 body.mobile-mode #mobile-category-buttons-container,\
-body.mobile-mode #category-buttons-container{display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px!important;margin-bottom:10px!important}\
-body.mobile-mode #mobile-category-buttons-container{margin-bottom:10px!important}\
-/* Model thumbnails and all option grids: two columns on mobile */\
-body.mobile-mode .options-grid,\
-body.mobile-mode #model-thumbnails,\
-body.mobile-mode #legs-thumbnails,\
-body.mobile-mode #material-panel-viewer,\
-body.mobile-mode #part-tabs{display:grid!important;grid-template-columns:1fr 1fr!important;gap:10px!important;margin-top:8px!important}\
-body.mobile-mode .thumbnail-wrapper{width:100%!important}\
-body.mobile-mode .thumbnail{width:100%!important;padding:8px!important}\
-body.mobile-mode .thumbnail img{width:100%!important;height:auto!important;max-height:88px!important;object-fit:contain!important}\
-body.mobile-mode .thumbnail-caption{font-size:12px!important}\
+body.mobile-mode #category-buttons-container{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}\
+body.mobile-mode #mobile-category-buttons-container{margin-bottom:10px}\
+/* Model thumbnails: two columns inside right panel */\
+body.mobile-mode #mobile-right-panel #model-thumbnails,\
+body.mobile-mode #mobile-right-panel .options-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}\
+body.mobile-mode #mobile-right-panel .thumbnail-wrapper{width:100%}\
+body.mobile-mode #mobile-right-panel .thumbnail{width:100%} \
+body.mobile-mode #mobile-right-panel .thumbnail img{width:100%;height:auto;max-height:90px;object-fit:contain}\
 /* Hide intro/welcome flash only on mobile */\
-body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, body.mobile-mode .intro, body.mobile-mode #start, body.mobile-mode .start{display:none!important}\
+body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, body.mobile-mode .intro, body.mobile-mode #start, body.mobile-mode .start{display:none !important}\
 </style>';
                 if(html.includes('</head>')){
                     html = html.replace(/<head[^>]*>/i, function(m){ return m + '\n  ' + shimTag + '\n  ' + hintCss + '\n'; });
@@ -188,10 +184,10 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                 html = html.replace(/emailjs\.init\(([^)]*)\);/i,
                     '(function initEmail(){ if (window.emailjs&&emailjs.init){ try{ emailjs.init($1); }catch(_){ } } else { setTimeout(initEmail,200); } })();');
 
-            // 2d) Zmień komunikat loadera i wstrzyknij wskazówkę (CSS-only reveal po 8s)
+                    // 2d) Zmień komunikat loadera i wstrzyknij wskazówkę (CSS-only reveal po 8s)
                     html = html.replace(/<div\s+class=\"loading-text\"([^>]*)>([\s\S]*?)<\/div>/i, function(_, attrs){
-                return '<div class="loading-text"'+attrs+'>Trwa uruchamianie konfiguratora…<\/div>' +
-                       '<div id="mobile-longload-hint" style="margin-top:12px;font-size:14px;color:#666;text-align:center;max-width:320px;opacity:0;animation:mobileHint 0s linear 8s forwards">To może potrwać dłuższą chwilę — pobieramy modele i grafiki. Jeśli ekran nie zniknie, odśwież stronę.<\/div>';
+                        return '<div class="loading-text"'+attrs+'>Inicjalizacja konfiguratora w wersji mobilnej<\/div>' +
+                               '<div id="mobile-longload-hint" style="margin-top:12px;font-size:14px;color:#666;text-align:center;max-width:320px;opacity:0;animation:mobileHint 0s linear 8s forwards">Strona ładuje się zbyt długo... Odśwież przeglądarkę/stronę<\/div>';
                     });
 
                     // 2e) Doładuj odłożone CDN-y po wstawieniu dokumentu – bez wstrzykiwania dodatkowych <script> w stringu
@@ -207,15 +203,8 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                 document.write(html);
                 document.close();
 
-                                // 5) Po wstawieniu: dociąż CDN-y, włącz mobile UX i anty-flash overlay
+                                // 5) Po wstawieniu: doładuj odłożone CDN-y i ustaw mobilny komunikat loadera + hint i auto-refresh
                                 try {
-                                    // Anti-flash overlay (hide previous hero for a moment)
-                                    var __mobileOverlay = document.createElement('div');
-                                    __mobileOverlay.id = 'mobile-boot-overlay';
-                                    __mobileOverlay.setAttribute('aria-hidden','true');
-                                    __mobileOverlay.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:2147483647;transition:opacity .25s ease;';
-                                    (document.body || document.documentElement).appendChild(__mobileOverlay);
-
                                     // Doładuj skrypty CDN
                                     var placeholders = document.querySelectorAll('script[data-mobile-defer-src]');
                                     placeholders.forEach(function(ph){
@@ -235,9 +224,7 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                                                     var wrapped = async function(variant){
                                                         try { var ml = document.getElementById('model-loader'); if (ml) ml.style.display = 'flex'; } catch(_){}
                                                         try { return await __origLoadModel.call(this, variant); }
-                                                        finally {
-                                                            try { setTimeout(function(){ var ml2 = document.getElementById('model-loader'); if (ml2) ml2.style.display = 'none'; }, 300); } catch(_){}
-                                                        }
+                                                        finally { try { setTimeout(function(){ var ml2=document.getElementById('model-loader'); if(ml2) ml2.style.display='none'; }, 300); } catch(_){} }
                                                     };
                                                     wrapped.__mobileWrapped = true;
                                                     window.loadModel = wrapped;
@@ -245,7 +232,7 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                                                 return;
                                             }
                                         } catch(_) {}
-                                        if (retries < 100) setTimeout(function(){ hookLoadModel(retries + 1); }, 100);
+                                        if (retries < 100) setTimeout(function(){ hookLoadModel(retries+1); }, 100);
                                     })(0);
 
                                     // Mobile category buttons: ensure active state mirrors desktop behavior
@@ -268,27 +255,6 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                                                         }
                                                     } catch(_){}
                                                 }, { passive: true });
-                                                // removed premature auto-select on first render
-                                                // After wiring clicks, auto-select "Promocje" once – but only when data is loaded
-                                                try {
-                                                    if (!window.__mobileSelectedPromoOnce) {
-                                                        var tryPick = function(attempt){
-                                                            try {
-                                                                if (Array.isArray(window.allData) && window.allData.length > 0) {
-                                                                    var allBtns = container.querySelectorAll('.category-button');
-                                                                    var picked = null;
-                                                                    for (var i=0;i<allBtns.length;i++){
-                                                                        var t = (allBtns[i].dataset && (allBtns[i].dataset.category||'') || allBtns[i].textContent || '').toLowerCase();
-                                                                        if (t.indexOf('promocj') !== -1) { picked = allBtns[i]; break; }
-                                                                    }
-                                                                    if (picked && typeof picked.click==='function') { picked.click(); window.__mobileSelectedPromoOnce = true; return; }
-                                                                }
-                                                            } catch(_){ }
-                                                            if (attempt < 40) setTimeout(function(){ tryPick(attempt+1); }, 250);
-                                                        };
-                                                        tryPick(0);
-                                                    }
-                                                } catch(_){ }
                                                 return;
                                             }
                                         } catch(_) {}
@@ -331,7 +297,7 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
 
                                     // Tekst loadera dla mobile
                                     var lt = document.querySelector('#custom-loader .loading-text');
-                                    if (lt) { lt.textContent = 'Trwa uruchamianie konfiguratora…'; }
+                                    if (lt) { lt.textContent = 'Inicjalizacja konfiguratora w wersji mobilnej'; }
 
                                     // Hint po 8s, auto-refresh po 20s (jednorazowo)
                                     setTimeout(function(){
@@ -340,46 +306,29 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                                         var hint = document.createElement('div');
                                         hint.id = 'mobile-longload-hint';
                                         hint.style.cssText = 'margin-top:12px;font-size:14px;color:#666;text-align:center;max-width:320px;';
-                                        hint.textContent = 'To może potrwać dłuższą chwilę — pobieramy modele i grafiki. Jeśli ekran nie zniknie, odśwież stronę.';
+                                        hint.textContent = 'Strona ładuje się zbyt długo... Odśwież przeglądarkę/stronę';
                                         try { loader.appendChild(hint); } catch(_){}
                                     }, 8000);
 
                                     // Removed auto-refresh timer on mobile
                                 } catch(_){ }
                                 
-                                // Persist two-column grids for all option areas after rerenders on mobile
+                                // Persist two-column model grid after UI rerenders on mobile
                                 try {
-                                    var applyAllGrids = function(){
-                                        try {
-                                            var nodes = document.querySelectorAll('.options-grid, #model-thumbnails, #legs-thumbnails, #material-panel-viewer, #part-tabs');
-                                            nodes.forEach(function(el){
-                                                el.style.display = 'grid';
-                                                el.style.gridTemplateColumns = '1fr 1fr';
-                                                el.style.gap = '10px';
-                                                el.style.marginTop = '8px';
-                                            });
-                                        } catch(_){ }
-                                    };
-                                    applyAllGrids();
-                                    var mo = new MutationObserver(function(){ applyAllGrids(); });
-                                    mo.observe(document.body, { childList: true, subtree: true });
-                                } catch(_){ }
-
-                                // Remove anti-flash overlay when UI is ready
-                                try {
-                                    var removeOverlay = function(){
-                                        var panel = document.getElementById('mobile-right-panel');
-                                        var loaded = panel && panel.children && panel.children.length > 0;
-                                        var appVisible = (document.getElementById('app') || {}).classList ? (document.getElementById('app').classList.contains('visible')) : false;
-                                        if (loaded || appVisible) {
-                                            __mobileOverlay.style.opacity = '0';
-                                            setTimeout(function(){ try { __mobileOverlay.remove(); } catch(_){ } }, 250);
-                                            return true;
-                                        }
-                                        return false;
-                                    };
-                                    if (!removeOverlay()) { setTimeout(removeOverlay, 600); setTimeout(removeOverlay, 1200); }
-                                } catch(_){ }
+                    var rightPanel = document.getElementById('mobile-right-panel') || document.body;
+                    var thumbsContainer = rightPanel.querySelector('#model-thumbnails') || rightPanel.querySelector('.options-grid');
+                    if (thumbsContainer) {
+                                        var mo = new MutationObserver(function(){
+                                            try {
+                        thumbsContainer.style.display = 'grid';
+                        thumbsContainer.style.gridTemplateColumns = '1fr 1fr';
+                        thumbsContainer.style.gap = '10px';
+                        thumbsContainer.style.marginTop = '8px';
+                                            } catch(_){}
+                                        });
+                    mo.observe(thumbsContainer, { childList: true, subtree: true });
+                                    }
+                                } catch(_){}
             } catch (e) {
                 console.error('Mobile loader failed:', e);
                 showError('Nie udało się wczytać aplikacji mobilnej.');
