@@ -150,75 +150,76 @@
 
                 // 1) Wstrzyknij es-module-shims w <head> (lub zaraz po <meta charset>)
                 const shimTag = '<script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1/dist/es-module-shims.min.js"></' + 'script>';
-                const hintCss = '<style id="mobile-hint-style">\
-@keyframes mobileHint{to{opacity:1}}\
-/* Active category state on mobile same as desktop */\
-body.mobile-mode .category-button.active{background:#F5C842;color:#fff;border-color:#F5C842}\
-/* Ensure right panel is wide enough for 2 tiles */\
-body.mobile-mode #mobile-right-panel{width:clamp(260px,38vw,360px);max-width:clamp(260px,38vw,360px)}\
-/* Make welcome overlay flush with the panel edge (match clamp width) */\
-body.mobile-mode #welcome-screen{width:calc(100% - clamp(260px,38vw,360px)) !important}\
-/* Mobile scroll improvements: prevent body rubber-banding and scroll within right panel only */\
-html.mobile-mode, body.mobile-mode{overscroll-behavior-y:contain;overscroll-behavior:contain}\
-body.mobile-mode{overflow:hidden}\
-/* Consistent white background to hide any canvas through-gaps */\
-html.mobile-mode, body.mobile-mode, body.mobile-mode #welcome-screen, body.mobile-mode #mobile-right-panel{background:#fff !important}\
-/* Prefer tap interactions; helps avoid double-tap zoom */\
-body.mobile-mode{touch-action:manipulation}\
-/* Ensure right panel is wide enough for 2 tiles (use shared var to avoid gaps) */\
-body.mobile-mode{--panelW: clamp(260px,38vw,360px)}\
-body.mobile-mode #mobile-right-panel{width:var(--panelW) !important;max-width:var(--panelW) !important;border-left:0 !important;box-shadow:none !important;margin-left:-2px !important}\
-/* Override welcome width using the same var to avoid any seam; also ensure no edge styling */\
-body.mobile-mode #welcome-screen{width:calc(100% - var(--panelW) + 2px) !important;border-right:0 !important;box-shadow:none !important}\
-body.mobile-mode #mobile-right-panel{height:100dvh;max-height:100dvh;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scroll-padding-bottom:96px;padding-bottom:calc(96px + env(safe-area-inset-bottom, 0px))}\
-@supports (height: 100svh){ body.mobile-mode #mobile-right-panel{height:100svh;max-height:100svh} }\
-/* Fallback for older browsers that lack 100dvh: use JS-set --vh */\
-@supports not (height: 100dvh){ body.mobile-mode #mobile-right-panel{height:calc(var(--vh, 1vh) * 100);max-height:calc(var(--vh, 1vh) * 100)} }\
-/* Categories: two per row without changing button look */\
-body.mobile-mode #mobile-category-buttons-container,\
-body.mobile-mode #category-buttons-container{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}\
-body.mobile-mode #mobile-category-buttons-container{margin-bottom:10px}\
-/* Model thumbnails: two columns inside right panel */\
-body.mobile-mode #mobile-right-panel #model-thumbnails,\
-body.mobile-mode #mobile-right-panel #legs-thumbnails,\
-body.mobile-mode #mobile-right-panel #material-panel-viewer,\
-body.mobile-mode #mobile-right-panel .options-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}\
-/* Bottom spacer at the end of the panel (not between lists) */\
-body.mobile-mode #mobile-right-panel::after{content:"";display:block;height:96px}\
-body.mobile-mode #mobile-right-panel .thumbnail-wrapper{width:100%}\
-    /* Frame-sized tile: fixed height so image never overlaps caption/price */\
-    body.mobile-mode #mobile-right-panel .thumbnail{width:100%;height:120px;display:flex;align-items:center;justify-content:center;padding:8px;background:#fff;border:1px solid #e5e5e5;border-radius:10px;box-sizing:border-box} \
-    /* Image constrained to the frame */\
-    body.mobile-mode #mobile-right-panel .thumbnail img{max-width:100%;max-height:90px;width:auto;height:auto;object-fit:contain;display:block}\
-    /* Ensure caption and price are clearly below the frame */\
-    body.mobile-mode #mobile-right-panel .thumbnail-caption{margin-top:8px;font-size:13px} \
-/* Search UI inside the mobile panel */\
-body.mobile-mode #mobile-right-panel #search-container{position:sticky !important;top:0 !important;z-index:1500;background:rgba(255,255,255,0.96);padding:8px 8px;margin:0 0 8px 0;display:flex;align-items:center;gap:8px} \
-body.mobile-mode #mobile-right-panel #search-toggle{transform:none !important;width:40px;height:40px} \
-body.mobile-mode #mobile-right-panel #search-panel{position:static !important;width:100% !important;max-width:100% !important;opacity:1 !important;visibility:visible !important;padding:0 !important;box-shadow:none !important;transform:none !important;background:transparent !important} \
-body.mobile-mode #mobile-right-panel #search-input{margin:0; display:block} \
-body.mobile-mode #mobile-right-panel #search-results{max-height:220px} \
-body.mobile-mode #mobile-right-panel #search-filter-indicator{display:block !important;margin:6px 8px 10px 8px !important} \
-/* Hide legacy intro IDs only on mobile; keep #welcome-screen visible */\
-body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, body.mobile-mode .intro, body.mobile-mode #start, body.mobile-mode .start{display:none !important}\
-/* Mobile-only: hide QR button in the floating toolbar */\
-body.mobile-mode #qr-button{display:none !important}\
-/* Mobile-only: make the left toolbar compact and slide-out */\
-body.mobile-mode #bottom-toolbar{left:8px !important;padding:6px 4px !important;gap:10px !important;border-radius:10px !important;box-shadow:0 4px 12px rgba(0,0,0,.1) !important;transform:translate(calc(-100% - 8px), -50%) !important} \
-body.mobile-mode #bottom-toolbar.mobile-open{transform:translate(0, -50%) !important} \
-body.mobile-mode #bottom-toolbar button{padding:6px 8px !important;border-radius:8px !important} \
-body.mobile-mode #bottom-toolbar img{width:18px !important;height:18px !important} \
-/* Mobile-only: small grab tab to open toolbar */\
-body.mobile-mode #mobile-toolbar-tab{position:fixed;left:0;top:50%;transform:translateY(-50%);background:#F5C842;border:1px solid #d2a81e;border-right:none;border-radius:0 8px 8px 0;padding:8px 6px;z-index:2001;box-shadow:0 2px 8px rgba(0,0,0,.12);display:flex;align-items:center;justify-content:center;opacity:.97} \
-body.mobile-mode #mobile-toolbar-tab.hidden{display:none} \
-body.mobile-mode #mobile-toolbar-tab span{font-size:12px;color:#222;writing-mode:vertical-rl;transform:rotate(180deg);font-weight:600;letter-spacing:.2px} \
-/* Await selection: hide toolbar and tab, and hide canvas to prevent flicker */\
-body.mobile-mode.mobile-await-selection #mobile-toolbar-tab{display:none !important} \
-body.mobile-mode.mobile-await-selection #bottom-toolbar{display:none !important} \
-body.mobile-mode.mobile-await-selection #canvas{visibility:hidden !important} \
-/* Mobile: slightly smaller 'Twoja konfiguracja' / export button */\
-body.mobile-mode #export-config{padding:6px 8px !important;font-size:12px !important} \
-</style>';
+                const hintCss = `
+<style id="mobile-hint-style">
+@keyframes mobileHint{to{opacity:1}}
+/* Active category state on mobile same as desktop */
+body.mobile-mode .category-button.active{background:#F5C842;color:#fff;border-color:#F5C842}
+/* Ensure right panel is wide enough for 2 tiles */
+body.mobile-mode #mobile-right-panel{width:clamp(260px,38vw,360px);max-width:clamp(260px,38vw,360px)}
+/* Make welcome overlay flush with the panel edge (match clamp width) */
+body.mobile-mode #welcome-screen{width:calc(100% - clamp(260px,38vw,360px)) !important}
+/* Mobile scroll improvements: prevent body rubber-banding and scroll within right panel only */
+html.mobile-mode, body.mobile-mode{overscroll-behavior-y:contain;overscroll-behavior:contain}
+body.mobile-mode{overflow:hidden}
+/* Consistent white background to hide any canvas through-gaps */
+html.mobile-mode, body.mobile-mode, body.mobile-mode #welcome-screen, body.mobile-mode #mobile-right-panel{background:#fff !important}
+/* Prefer tap interactions; helps avoid double-tap zoom */
+body.mobile-mode{touch-action:manipulation}
+/* Ensure right panel is wide enough for 2 tiles (use shared var to avoid gaps) */
+body.mobile-mode{--panelW: clamp(260px,38vw,360px)}
+body.mobile-mode #mobile-right-panel{width:var(--panelW) !important;max-width:var(--panelW) !important;border-left:0 !important;box-shadow:none !important;margin-left:-2px !important}
+/* Override welcome width using the same var to avoid any seam; also ensure no edge styling */
+body.mobile-mode #welcome-screen{width:calc(100% - var(--panelW) + 2px) !important;border-right:0 !important;box-shadow:none !important}
+body.mobile-mode #mobile-right-panel{height:100dvh;max-height:100dvh;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scroll-padding-bottom:96px;padding-bottom:calc(96px + env(safe-area-inset-bottom, 0px))}
+@supports (height: 100svh){ body.mobile-mode #mobile-right-panel{height:100svh;max-height:100svh} }
+/* Fallback for older browsers that lack 100dvh: use JS-set --vh */
+@supports not (height: 100dvh){ body.mobile-mode #mobile-right-panel{height:calc(var(--vh, 1vh) * 100);max-height:calc(var(--vh, 1vh) * 100)} }
+/* Categories: two per row without changing button look */
+body.mobile-mode #mobile-category-buttons-container,
+body.mobile-mode #category-buttons-container{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+body.mobile-mode #mobile-category-buttons-container{margin-bottom:10px}
+/* Model thumbnails: two columns inside right panel */
+body.mobile-mode #mobile-right-panel #model-thumbnails,
+body.mobile-mode #mobile-right-panel #legs-thumbnails,
+body.mobile-mode #mobile-right-panel #material-panel-viewer,
+body.mobile-mode #mobile-right-panel .options-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+/* Bottom spacer at the end of the panel (not between lists) */
+body.mobile-mode #mobile-right-panel::after{content:"";display:block;height:96px}
+body.mobile-mode #mobile-right-panel .thumbnail-wrapper{width:100%}
+/* Frame-sized tile: fixed height so image never overlaps caption/price */
+body.mobile-mode #mobile-right-panel .thumbnail{width:100%;height:120px;display:flex;align-items:center;justify-content:center;padding:8px;background:#fff;border:1px solid #e5e5e5;border-radius:10px;box-sizing:border-box}
+/* Image constrained to the frame */
+body.mobile-mode #mobile-right-panel .thumbnail img{max-width:100%;max-height:90px;width:auto;height:auto;object-fit:contain;display:block}
+/* Ensure caption and price are clearly below the frame */
+body.mobile-mode #mobile-right-panel .thumbnail-caption{margin-top:8px;font-size:13px}
+/* Search UI inside the mobile panel */
+body.mobile-mode #mobile-right-panel #search-container{position:sticky !important;top:0 !important;z-index:1500;background:rgba(255,255,255,0.96);padding:8px 8px;margin:0 0 8px 0;display:flex;align-items:center;gap:8px}
+body.mobile-mode #mobile-right-panel #search-toggle{transform:none !important;width:40px;height:40px}
+body.mobile-mode #mobile-right-panel #search-panel{position:static !important;width:100% !important;max-width:100% !important;opacity:1 !important;visibility:visible !important;padding:0 !important;box-shadow:none !important;transform:none !important;background:transparent !important}
+body.mobile-mode #mobile-right-panel #search-input{margin:0; display:block}
+body.mobile-mode #mobile-right-panel #search-results{max-height:220px}
+body.mobile-mode #mobile-right-panel #search-filter-indicator{display:block !important;margin:6px 8px 10px 8px !important}
+/* Hide legacy intro IDs only on mobile; keep #welcome-screen visible */
+body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, body.mobile-mode .intro, body.mobile-mode #start, body.mobile-mode .start{display:none !important}
+/* Mobile-only: hide QR button in the floating toolbar */
+body.mobile-mode #qr-button{display:none !important}
+/* Mobile-only: make the left toolbar compact and slide-out */
+body.mobile-mode #bottom-toolbar{left:8px !important;padding:6px 4px !important;gap:10px !important;border-radius:10px !important;box-shadow:0 4px 12px rgba(0,0,0,.1) !important;transform:translate(calc(-100% - 8px), -50%) !important}
+body.mobile-mode #bottom-toolbar.mobile-open{transform:translate(0, -50%) !important}
+body.mobile-mode #bottom-toolbar button{padding:6px 8px !important;border-radius:8px !important}
+body.mobile-mode #bottom-toolbar img{width:18px !important;height:18px !important}
+/* Mobile-only: small grab tab to open toolbar */
+body.mobile-mode #mobile-toolbar-tab{position:fixed;left:0;top:50%;transform:translateY(-50%);background:#F5C842;border:1px solid #d2a81e;border-right:none;border-radius:0 8px 8px 0;padding:8px 6px;z-index:2001;box-shadow:0 2px 8px rgba(0,0,0,.12);display:flex;align-items:center;justify-content:center;opacity:.97}
+body.mobile-mode #mobile-toolbar-tab.hidden{display:none}
+body.mobile-mode #mobile-toolbar-tab span{font-size:12px;color:#222;writing-mode:vertical-rl;transform:rotate(180deg);font-weight:600;letter-spacing:.2px}
+/* Await selection: hide toolbar and tab, and hide canvas to prevent flicker */
+body.mobile-mode.mobile-await-selection #mobile-toolbar-tab{display:none !important}
+body.mobile-mode.mobile-await-selection #bottom-toolbar{display:none !important}
+body.mobile-mode.mobile-await-selection #canvas{visibility:hidden !important}
+/* Mobile: slightly smaller 'Twoja konfiguracja' / export button */
+body.mobile-mode #export-config{padding:6px 8px !important;font-size:12px !important}
+</style>`;
                 if(html.includes('</head>')){
                     html = html.replace(/<head[^>]*>/i, function(m){ return m + '\n  ' + shimTag + '\n  ' + hintCss + '\n'; });
                 } else {
