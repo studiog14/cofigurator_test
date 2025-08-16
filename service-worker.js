@@ -66,6 +66,7 @@ self.addEventListener('message', (event) => {
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   const accept = req.headers.get('accept') || '';
+  const method = (req && req.method) || 'GET';
 
   // Treat navigations and HTML requests as network-first
   const isNavigation = req.mode === 'navigate' || accept.includes('text/html');
@@ -74,9 +75,11 @@ self.addEventListener('fetch', (event) => {
     event.respondWith((async () => {
       try {
         const networkResp = await fetch(req, { cache: 'no-store' });
-        // Update cache in background
-        const cache = await caches.open(CACHE_NAME);
-        cache.put(req, networkResp.clone());
+        // Update cache in background (GET only)
+        if (method === 'GET') {
+          const cache = await caches.open(CACHE_NAME);
+          cache.put(req, networkResp.clone());
+        }
         return networkResp;
       } catch (err) {
         // Fallback to cache (offline)
@@ -91,13 +94,19 @@ self.addEventListener('fetch', (event) => {
 
   // For other assets: cache-first with background update
   event.respondWith((async () => {
+    // Do not try to cache non-GET requests (e.g. HEAD)
+    if (method !== 'GET') {
+      try { return await fetch(req); } catch (_) { return new Response('', { status: 504, statusText: 'Gateway Timeout' }); }
+    }
     const cached = await caches.match(req);
     if (cached) {
       // Try to update in background
       fetch(req).then(async (resp) => {
         try {
-          const cache = await caches.open(CACHE_NAME);
-          cache.put(req, resp.clone());
+          if (resp && resp.status === 200) {
+            const cache = await caches.open(CACHE_NAME);
+            cache.put(req, resp.clone());
+          }
         } catch (_) { /* noop */ }
       }).catch(() => {});
       return cached;
