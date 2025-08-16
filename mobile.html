@@ -204,14 +204,20 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
 /* Mobile-only: hide QR button in the floating toolbar */\
 body.mobile-mode #qr-button{display:none !important}\
 /* Mobile-only: make the left toolbar compact and slide-out */\
-body.mobile-mode #bottom-toolbar{left:8px !important;padding:6px 4px !important;gap:10px !important;border-radius:10px !important;box-shadow:0 4px 12px rgba(0,0,0,.1) !important;transform:translate(-70%, -50%) !important} \
+body.mobile-mode #bottom-toolbar{left:8px !important;padding:6px 4px !important;gap:10px !important;border-radius:10px !important;box-shadow:0 4px 12px rgba(0,0,0,.1) !important;transform:translate(calc(-100% - 8px), -50%) !important} \
 body.mobile-mode #bottom-toolbar.mobile-open{transform:translate(0, -50%) !important} \
 body.mobile-mode #bottom-toolbar button{padding:6px 8px !important;border-radius:8px !important} \
 body.mobile-mode #bottom-toolbar img{width:18px !important;height:18px !important} \
 /* Mobile-only: small grab tab to open toolbar */\
-body.mobile-mode #mobile-toolbar-tab{position:fixed;left:0;top:50%;transform:translateY(-50%);background:#fff;border:1px solid #ccc;border-right:none;border-radius:0 8px 8px 0;padding:8px 6px;z-index:2001;box-shadow:0 2px 8px rgba(0,0,0,.08);display:flex;align-items:center;justify-content:center;opacity:.95} \
+body.mobile-mode #mobile-toolbar-tab{position:fixed;left:0;top:50%;transform:translateY(-50%);background:#F5C842;border:1px solid #d2a81e;border-right:none;border-radius:0 8px 8px 0;padding:8px 6px;z-index:2001;box-shadow:0 2px 8px rgba(0,0,0,.12);display:flex;align-items:center;justify-content:center;opacity:.97} \
 body.mobile-mode #mobile-toolbar-tab.hidden{display:none} \
-body.mobile-mode #mobile-toolbar-tab span{font-size:12px;color:#666;writing-mode:vertical-rl;transform:rotate(180deg)} \
+body.mobile-mode #mobile-toolbar-tab span{font-size:12px;color:#222;writing-mode:vertical-rl;transform:rotate(180deg);font-weight:600;letter-spacing:.2px} \
+/* Await selection: hide toolbar and tab, and hide canvas to prevent flicker */\
+body.mobile-mode.mobile-await-selection #mobile-toolbar-tab{display:none !important} \
+body.mobile-mode.mobile-await-selection #bottom-toolbar{display:none !important} \
+body.mobile-mode.mobile-await-selection #canvas{visibility:hidden !important} \
+/* Mobile: slightly smaller 'Twoja konfiguracja' / export button */\
+body.mobile-mode #export-config{padding:6px 8px !important;font-size:12px !important} \
 </style>';
                 if(html.includes('</head>')){
                     html = html.replace(/<head[^>]*>/i, function(m){ return m + '\n  ' + shimTag + '\n  ' + hintCss + '\n'; });
@@ -262,7 +268,9 @@ body.mobile-mode #mobile-toolbar-tab span{font-size:12px;color:#666;writing-mode
                         // 3) Delikatny sygnał do aplikacji, że to wariant mobile
                 //    (nie zmieniamy logiki index.html – tylko podpowiedź)
                 html = html.replace(/<body([^>]*)>/i, function(_, attrs){
-                    return '<body'+ (attrs||'') + ' class="mobile-mode">';
+                    // Inject mobile classes and an inline overlay immediately so there is no flash between document.write and JS
+                    return '<body'+ (attrs||'') + ' class="mobile-mode">\n' +
+                           '<div id="mobile-boot-overlay" aria-hidden="true" style="position:fixed;inset:0;background:#fff;z-index:9998;transition:opacity .2s ease;"></div>';
                 });
 
                                 // 4) Podmień cały dokument – uruchomi to oryginalne skrypty w trybie shim
@@ -272,6 +280,8 @@ body.mobile-mode #mobile-toolbar-tab span{font-size:12px;color:#666;writing-mode
 
                                 // 5) Po wstawieniu: doładuj odłożone CDN-y, anty-flash overlay i mobilny komunikat loadera + hint
                                 try {
+                                    // Enter pre-selection state (hide toolbar/tab and canvas) until a model is chosen
+                                    try { document.body.classList.add('mobile-await-selection'); } catch(_){}
                                     // (Removed global mutation of allData categories to avoid breaking exact category matches)
                                     // Dynamic VH fallback for mobile address bar resizing
                                     (function setupVHFallback(){
@@ -326,12 +336,14 @@ body.mobile-mode #mobile-toolbar-tab span{font-size:12px;color:#666;writing-mode
                                         window.__adjustMobileCanvas = schedule;
                                     })();
                                     // Anti-flash overlay: ukryj ewentualny ekran powitalny zanim UI będzie gotowe
-                                    var __mobileOverlay = document.createElement('div');
-                                    __mobileOverlay.id = 'mobile-boot-overlay';
-                                    __mobileOverlay.setAttribute('aria-hidden','true');
-                                    // Keep overlay above app but below any system UI
-                                    __mobileOverlay.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:9998;transition:opacity .2s ease;';
-                                    (document.body || document.documentElement).appendChild(__mobileOverlay);
+                                    var __mobileOverlay = document.getElementById('mobile-boot-overlay');
+                                    if (!__mobileOverlay) {
+                                        __mobileOverlay = document.createElement('div');
+                                        __mobileOverlay.id = 'mobile-boot-overlay';
+                                        __mobileOverlay.setAttribute('aria-hidden','true');
+                                        __mobileOverlay.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:9998;transition:opacity .2s ease;';
+                                        (document.body || document.documentElement).appendChild(__mobileOverlay);
+                                    }
                                     // Doładuj skrypty CDN
                                     var placeholders = document.querySelectorAll('script[data-mobile-defer-src]');
                                     placeholders.forEach(function(ph){
@@ -369,6 +381,8 @@ body.mobile-mode #mobile-toolbar-tab span{font-size:12px;color:#666;writing-mode
                                                                     window.__mobileBootOverlayDone = true;
                                                                 }
                                                             } catch(_){}
+                                                            // Leave pre-selection state: show canvas and toolbar tab
+                                                            try { document.body.classList.remove('mobile-await-selection'); } catch(_){}
                                                             return res;
                                                         }
                                                         finally {
@@ -393,7 +407,7 @@ body.mobile-mode #mobile-toolbar-tab span{font-size:12px;color:#666;writing-mode
                                     })(0);
 
                                     // Mobile-only: create a small slide tab to toggle the left toolbar, and auto-compact it
-                                    (function setupMobileToolbar(){
+                    (function setupMobileToolbar(){
                                         try {
                                             var bar = document.getElementById('bottom-toolbar');
                                             if (!bar) return;
@@ -420,7 +434,9 @@ body.mobile-mode #mobile-toolbar-tab span{font-size:12px;color:#666;writing-mode
                                             // Auto-close on orientation change to reset position
                                             window.addEventListener('orientationchange', function(){ setTimeout(closeBar, 300); }, { passive: true });
                                             // Initially closed
-                                            closeBar();
+                        closeBar();
+                        // Keep toolbar/tab hidden until a model is selected
+                        try { document.body.classList.add('mobile-await-selection'); } catch(_){}
                                         } catch(_){}
                                     })();
 
