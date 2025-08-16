@@ -365,10 +365,7 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                                             try {
                                                 var t = ev.target;
                                                 if (!t) return;
-                                                // Do not override native handler in the mobile panel; it passes the exact model
-                                                var inMobilePanel = t.closest && t.closest('#mobile-right-panel');
-                                                if (inMobilePanel) return;
-                                                var thumb = t.closest && t.closest('#model-thumbnails .thumbnail, .model-thumbnail');
+                                                var thumb = t.closest && t.closest('#mobile-right-panel .thumbnail, #model-thumbnails .thumbnail, .model-thumbnail');
                                                 if (!thumb) return;
                                                 // Try to resolve model from caption text
                                                 var wrap = thumb.parentElement;
@@ -395,31 +392,20 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                                                     var preferNonHooker = /krzes/.test(activeText) && !preferHooker;
                                                     var hookerCands = candidates.filter(function(it){ var cat=lower(String(it.Kategoria||'')); return cat.includes('hooker') || cat.includes('hoker'); });
                                                     var chairCands = candidates.filter(function(it){ return !lower(String(it.Kategoria||'')).includes('hooker'); });
-                                                    var byPref = preferHooker ? hookerCands : (preferNonHooker ? chairCands : candidates);
+                                                    var searchSets = preferHooker ? [hookerCands] : (preferNonHooker ? [chairCands] : [candidates]);
 
-                                                    // 1) Try exact name in preferred set first
-                                                    var exact = byPref.find(function(it){ return lower(it.Nazwa) === lower(name); }) ||
-                                                                candidates.find(function(it){ return lower(it.Nazwa) === lower(name); });
-                                                    if (exact) pick = exact;
+                                                    function findBy(pred){ for (var i=0;i<searchSets.length;i++){ var r=searchSets[i].find(pred); if(r) return r; } return null; }
 
-                                                    // 2) Try normalized exact in preferred set
-                                                    if (!pick) {
-                                                        var nameNorm = lower(norm(name));
-                                                        pick = (byPref.find(function(it){ return lower(norm(it.Nazwa)) === nameNorm; }) ||
-                                                                candidates.find(function(it){ return lower(norm(it.Nazwa)) === nameNorm; }));
-                                                    }
-
-                                                    // 3) Try stripped parentheses in preferred set
-                                                    if (!pick) {
-                                                        var nameStripped = lower(norm(strip(name)));
-                                                        pick = (byPref.find(function(it){ return lower(norm(strip(it.Nazwa))) === nameStripped; }) ||
-                                                                candidates.find(function(it){ return lower(norm(strip(it.Nazwa))) === nameStripped; }));
-                                                    }
-
-                                                    // 4) As a last fallback, try match by thumbnail image file name (only if unique)
+                                                    // 1) Try exact name only within the selected search set
+                                                    pick = findBy(function(it){ return lower(it.Nazwa) === lower(name); });
+                                                    // 2) Try normalized exact
+                                                    if (!pick) { var nameNorm = lower(norm(name)); pick = findBy(function(it){ return lower(norm(it.Nazwa)) === nameNorm; }); }
+                                                    // 3) Try stripped parentheses
+                                                    if (!pick) { var nameStripped = lower(norm(strip(name))); pick = findBy(function(it){ return lower(norm(strip(it.Nazwa))) === nameStripped; }); }
+                                                    // 4) As a last fallback, try match by thumbnail image file name (only within the selected set and only if unique)
                                                     if (!pick && imgFile) {
                                                         var imgLower = imgFile.toLowerCase();
-                                                        var matched = candidates.filter(function(it){ var ob=(it.Obrazek||'').toString().toLowerCase(); var file=ob.split('/').pop(); return file===imgLower; });
+                                                        var matched = (searchSets[0]||[]).filter(function(it){ var ob=(it.Obrazek||'').toString().toLowerCase(); var file=ob.split('/').pop(); return file===imgLower; });
                                                         if (matched.length === 1) pick = matched[0];
                                                     }
                                                 }
@@ -496,6 +482,40 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                                 
                                 // Persist two-column grids and frame sizing after UI rerenders on mobile
                                 try {
+                                    function markHookerCaptions(){
+                                        try {
+                                            var wrappers = document.querySelectorAll('#mobile-right-panel .thumbnail-wrapper');
+                                            wrappers.forEach(function(w){
+                                                try {
+                                                    var cap = w.querySelector('.thumbnail-caption');
+                                                    var img = w.querySelector('img');
+                                                    if (!cap || !img) return;
+                                                    var txt = cap.textContent || '';
+                                                    // If already shows (hooker), skip
+                                                    if (/\(hooker\)/i.test(txt)) return;
+                                                    var imgSrc = img.getAttribute('src')||''; var file='';
+                                                    try { var u=new URL(imgSrc, location.href); file=(u.pathname||'').split('/').pop().toLowerCase(); } catch(_) {}
+                                                    var model = null;
+                                                    if (Array.isArray(window.allData) && file) {
+                                                        var cands = window.allData.filter(function(it){
+                                                            return it && it.Typ==='model' && String(it.Obrazek||'').toLowerCase().split('/').pop()===file;
+                                                        });
+                                                        if (cands.length===1) model=cands[0];
+                                                    }
+                                                    if (model) {
+                                                        var k = String(model.Kategoria||'').toLowerCase();
+                                                        if (k.includes('hooker') || k.includes('hoker')) {
+                                                            cap.textContent = (txt.trim() + ' (hooker)').trim();
+                                                            // also set data-name on button to the exact model name
+                                                            var btn = w.querySelector('.thumbnail');
+                                                            if (btn) btn.setAttribute('data-name', model.Nazwa||'');
+                                                        }
+                                                    }
+                                                } catch(_) {}
+                                            });
+                                        } catch(_) {}
+                                    }
+
                                     var applyAllGrids = function(){
                                         try {
                                             var nodes = document.querySelectorAll('#mobile-right-panel #model-thumbnails, #mobile-right-panel #legs-thumbnails, #mobile-right-panel #material-panel-viewer, #mobile-right-panel .options-grid');
@@ -518,6 +538,8 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                                                 t.style.borderRadius = '10px';
                                                 t.style.boxSizing = 'border-box';
                                             });
+                                            // Mobile-only: append (hooker) to captions of hooker models to disambiguate names
+                                            markHookerCaptions();
                                         } catch(_){ }
                                     };
                                     applyAllGrids();
