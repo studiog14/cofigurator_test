@@ -108,15 +108,9 @@
                 }
             } catch(_){ }
 
-            // Safety: show hint after 8s and one-time auto-reload after 25s even if fetch stalls
+            // Safety: show hint after 8s (no auto-reload here)
             try {
                 setTimeout(function(){ var h=document.getElementById('boot-hint'); if(h) h.style.display='block'; },8000);
-                setTimeout(function(){
-                    if (sessionStorage.getItem('mobileReloadedOnce')==='1') return;
-                    sessionStorage.setItem('mobileReloadedOnce','1');
-                    try { var u=new URL(location.href); u.searchParams.set('r', Date.now().toString()); location.replace(u.toString()); }
-                    catch(_) { location.reload(); }
-                },25000);
             } catch(_){ }
 
             try {
@@ -290,7 +284,7 @@ body.mobile-mode .category-button.active{background:#F5C842;color:#fff;border-co
                                     var lt = document.querySelector('#custom-loader .loading-text');
                                     if (lt) { lt.textContent = 'Inicjalizacja konfiguratora w wersji mobilnej'; }
 
-                                    // Hint po 8s, auto-refresh po 20s (jednorazowo)
+                                    // Hint po 8s (bez auto-refresh)
                                     setTimeout(function(){
                                         var loader = document.getElementById('custom-loader');
                                         if (!loader || loader.style.display==='none' || document.getElementById('mobile-longload-hint')) return;
@@ -300,18 +294,6 @@ body.mobile-mode .category-button.active{background:#F5C842;color:#fff;border-co
                                         hint.textContent = 'Strona ładuje się zbyt długo... Odśwież przeglądarkę/stronę';
                                         try { loader.appendChild(hint); } catch(_){}
                                     }, 8000);
-
-                                    setTimeout(function(){
-                                        var loader = document.getElementById('custom-loader');
-                                        if (!loader || loader.style.display==='none') return;
-                                        if (sessionStorage.getItem('mobileReloadedOnce')==='1') return;
-                                        sessionStorage.setItem('mobileReloadedOnce','1');
-                                        try {
-                                            var url = new URL(location.href);
-                                            url.searchParams.set('r', Date.now().toString());
-                                            location.replace(url.toString());
-                                        } catch(_) { location.reload(); }
-                                    }, 20000);
                                 } catch(_){ }
             } catch (e) {
                 console.error('Mobile loader failed:', e);
