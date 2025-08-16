@@ -158,7 +158,13 @@ body.mobile-mode .welcome,\
 body.mobile-mode #intro,\
 body.mobile-mode .intro,\
 body.mobile-mode #start,\
-body.mobile-mode .start{display:none !important}\
+body.mobile-mode .start,\
+body.mobile-mode [id*="welcome" i],\
+body.mobile-mode [class*="welcome" i],\
+body.mobile-mode [id*="intro" i],\
+body.mobile-mode [class*="intro" i],\
+body.mobile-mode [id*="hero" i],\
+body.mobile-mode [class*="hero" i]{display:none !important}\
 /* Center 3D viewer area on mobile with safe selectors */\
 body.mobile-mode #viewer,\
 body.mobile-mode #viewer-container,\
@@ -174,6 +180,16 @@ body.mobile-mode .viewer canvas,\
 body.mobile-mode .viewer-container canvas,\
 body.mobile-mode #canvas-wrapper canvas,\
 body.mobile-mode .canvas-wrapper canvas{max-width:100%;max-height:100%;height:auto}\
+/* Model thumbnails: two-column tiles on mobile */\
+body.mobile-mode #mobile-right-panel #model-thumbnails,\
+body.mobile-mode #mobile-right-panel .options-grid,\
+body.mobile-mode #mobile-right-panel .thumbnails,\
+body.mobile-mode #mobile-right-panel .thumbnails-grid,\
+body.mobile-mode #model-thumbnails{display:grid !important;grid-template-columns:1fr 1fr !important;gap:10px !important}\
+body.mobile-mode #mobile-right-panel .thumbnail-wrapper,\
+body.mobile-mode #model-thumbnails .thumbnail-wrapper{width:100% !important}\
+body.mobile-mode #mobile-right-panel .thumbnail,\
+body.mobile-mode #model-thumbnails .thumbnail{width:100% !important;height:110px !important}\
 </style>';
                 if(html.includes('</head>')){
                     html = html.replace(/<head[^>]*>/i, function(m){ return m + '\n  ' + shimTag + '\n  ' + hintCss + '\n'; });
@@ -363,6 +379,50 @@ body.mobile-mode .canvas-wrapper canvas{max-width:100%;max-height:100%;height:au
                                             } catch(_){}
                                         }, { passive: true });
                                     })();
+
+                                    // Force two-column grid for model thumbnails on mobile and persist after rerenders
+                                    (function ensureTwoColModelGrid(retries){
+                                        function applyGrid(container){
+                                            if (!container) return;
+                                            container.style.display = 'grid';
+                                            container.style.gridTemplateColumns = '1fr 1fr';
+                                            container.style.gap = '10px';
+                                            try {
+                                                var wraps = container.querySelectorAll('.thumbnail-wrapper');
+                                                wraps.forEach(function(w){ w.style.width = '100%'; });
+                                                var thumbs = container.querySelectorAll('.thumbnail');
+                                                thumbs.forEach(function(t){ t.style.width='100%'; t.style.height='110px'; });
+                                            } catch(_){ }
+                                        }
+                                        try {
+                                            var root = document.getElementById('mobile-right-panel') || document.body;
+                                            // Prefer explicit container IDs/classes first
+                                            var cont = root.querySelector('#model-thumbnails')
+                                                       || root.querySelector('.thumbnails-grid')
+                                                       || root.querySelector('.thumbnails')
+                                                       || root.querySelector('.options-grid');
+                                            // Fallback: the nearest ancestor that contains many .thumbnail-wrapper or .thumbnail
+                                            if (!cont){
+                                                var candidates = root.querySelectorAll('*');
+                                                for (var i=0;i<candidates.length;i++){
+                                                    var el = candidates[i];
+                                                    try {
+                                                        var cnt = (el.querySelectorAll('.thumbnail-wrapper').length || 0) + (el.querySelectorAll('.thumbnail').length || 0);
+                                                        if (cnt >= 4) { cont = el; break; }
+                                                    } catch(_){}
+                                                }
+                                            }
+                                            if (cont){
+                                                applyGrid(cont);
+                                                try {
+                                                    var mo = new MutationObserver(function(){ applyGrid(cont); });
+                                                    mo.observe(cont, { childList: true, subtree: true });
+                                                } catch(_){}
+                                                return;
+                                            }
+                                        } catch(_){ }
+                                        if (retries < 60) setTimeout(function(){ ensureTwoColModelGrid(retries+1); }, 200);
+                                    })(0);
 
                                     // Tekst loadera dla mobile
                                     var lt = document.querySelector('#custom-loader .loading-text');
