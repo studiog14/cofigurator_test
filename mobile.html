@@ -37,11 +37,13 @@
 <body>
         <div id="boot-loader" class="loader">
             <div class="spinner" aria-hidden="true"></div>
-            <div>Ładowanie wersji mobilnej…</div>
+            <div id="boot-msg">Ładowanie wersji mobilnej…</div>
+            <div id="boot-hint" class="muted" style="display:none">Ładowanie trwa dłużej niż zwykle. Odśwież stronę.</div>
         </div>
 
     <script>
         (async function(){
+            console.log('[mobile.html] bootstrap start');
             const container = document.getElementById('boot-loader');
             function showError(msg){
                 if(container){
@@ -50,9 +52,20 @@
                 }
             }
 
+            // Safety: show hint after 8s and one-time auto-reload after 25s even if fetch stalls
+            try {
+                setTimeout(function(){ var h=document.getElementById('boot-hint'); if(h) h.style.display='block'; },8000);
+                setTimeout(function(){
+                    if (sessionStorage.getItem('mobileReloadedOnce')==='1') return;
+                    sessionStorage.setItem('mobileReloadedOnce','1');
+                    try { var u=new URL(location.href); u.searchParams.set('r', Date.now().toString()); location.replace(u.toString()); }
+                    catch(_) { location.reload(); }
+                },25000);
+            } catch(_){ }
+
             try {
                 // Pobierz źródło index.html i przygotuj wersję z shimami dla iOS
-                const res = await fetch('index.html', { credentials: 'same-origin' });
+                const res = await fetch('index.html', { credentials: 'same-origin', cache: 'no-store' });
                 if(!res.ok){ throw new Error('HTTP '+res.status); }
                 let html = await res.text();
 

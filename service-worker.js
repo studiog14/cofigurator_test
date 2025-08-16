@@ -1,9 +1,10 @@
 // Zwiększ wersję przy każdej zmianie - BŁĘDY JS FIX
-const CACHE_NAME = 'v45-mobile-desktop-conditional';
+const CACHE_NAME = 'v46-mobile-desktop-conditional';
 const urlsToCache = [
   './',
   'index.html',
   'manifest.json',
+  'mobile.html',
   'pwa-install.js',
   'icons/FK_logo.png',
   'icons/favicon.png',
@@ -92,8 +93,8 @@ self.addEventListener('fetch', (event) => {
         // Fallback to cache (offline)
         const cached = await caches.match(req);
         if (cached) return cached;
-        // Final fallback to cached index.html if available
-        return caches.match('index.html');
+  // Final fallback to cached HTML if available
+  return (await caches.match('index.html')) || (await caches.match('mobile.html'));
       }
     })());
     return;
