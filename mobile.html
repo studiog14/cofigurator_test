@@ -273,6 +273,47 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                                             window.addEventListener('orientationchange', setVh, { passive: true });
                                         } catch(_) {}
                                     })();
+                                    // Mobile-only: fit 3D canvas to available space (exclude right panel width)
+                                    (function setupMobileCanvasFit(){
+                                        function panelWidth(){
+                                            try {
+                                                var p = document.getElementById('mobile-right-panel');
+                                                if (p && p.offsetWidth) return p.offsetWidth;
+                                                var w = getComputedStyle(document.body).getPropertyValue('--panelW');
+                                                if (w) { var n = parseFloat(w); if (!isNaN(n)) return n; }
+                                            } catch(_) {}
+                                            return 300; // fallback
+                                        }
+                                        var rafId = null;
+                                        function adjust(){
+                                            if (!document.body.classList.contains('mobile-mode')) return;
+                                            try {
+                                                var canvas = document.getElementById('canvas');
+                                                if (!canvas) return;
+                                                var pw = panelWidth();
+                                                var w = Math.max(0, window.innerWidth - pw);
+                                                var h = window.innerHeight;
+                                                // Apply CSS size
+                                                canvas.style.width = w + 'px';
+                                                canvas.style.height = h + 'px';
+                                                // Apply actual GL size
+                                                canvas.width = w;
+                                                canvas.height = h;
+                                                if (window.viewer && viewer.renderManager && viewer.scene && viewer.scene.mainCamera) {
+                                                    try { viewer.renderManager.setSize(w, h, false); } catch(_) {}
+                                                    try { viewer.scene.mainCamera.aspect = (w>0 && h>0) ? (w/h) : viewer.scene.mainCamera.aspect; viewer.scene.mainCamera.updateProjectionMatrix(); } catch(_) {}
+                                                    try { if (viewer.render) viewer.render(); } catch(_) {}
+                                                }
+                                            } catch(_) {}
+                                        }
+                                        function schedule(){ if (rafId) cancelAnimationFrame(rafId); rafId = requestAnimationFrame(adjust); }
+                                        window.addEventListener('resize', schedule, { passive: true });
+                                        window.addEventListener('orientationchange', schedule, { passive: true });
+                                        // Initial attempts until canvas/viewer appear
+                                        var tries = 0; (function tick(){ tries++; adjust(); if (tries < 50 && (!window.viewer || !document.getElementById('canvas'))) setTimeout(tick, 100); })();
+                                        // Expose helper for later calls
+                                        window.__adjustMobileCanvas = schedule;
+                                    })();
                                     // Anti-flash overlay: ukryj ewentualny ekran powitalny zanim UI będzie gotowe
                                     var __mobileOverlay = document.createElement('div');
                                     __mobileOverlay.id = 'mobile-boot-overlay';
@@ -307,7 +348,9 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                                                                     v = Object.assign({}, v, { Kategoria: (k + ' hooker').trim() });
                                                                 }
                                                             } catch(_) {}
-                                                            return await __origLoadModel.call(this, v);
+                                                            var res = await __origLoadModel.call(this, v);
+                                                            try { if (typeof window.__adjustMobileCanvas==='function') window.__adjustMobileCanvas(); } catch(_) {}
+                                                            return res;
                                                         }
                                                         finally {
                                                             try { setTimeout(function(){ var ml2=document.getElementById('model-loader'); if(ml2) ml2.style.display='none'; }, 300); } catch(_){}
