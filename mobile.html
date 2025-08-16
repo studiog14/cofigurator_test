@@ -36,6 +36,17 @@
                                     }
                                     if (!isMobile) { try { window.location.replace('index.html'); return; } catch(_) {} }
                                     document.body.classList.add('mobile-mode');
+                                    // Wyłącz double-tap zoom (mobile/iOS)
+                                    try {
+                                        var lastTouchEnd = 0;
+                                        document.addEventListener('touchend', function(e){
+                                            var now = Date.now();
+                                            if (now - lastTouchEnd <= 300) {
+                                                e.preventDefault();
+                                            }
+                                            lastTouchEnd = now;
+                                        }, { passive: false });
+                                    } catch(_) {}
                                 } catch(_) {}
             });
         })();
@@ -146,10 +157,17 @@ body.mobile-mode .category-button.active{background:#F5C842;color:#fff;border-co
 /* Ensure right panel is wide enough for 2 tiles */\
 body.mobile-mode #mobile-right-panel{width:clamp(260px,38vw,360px);max-width:clamp(260px,38vw,360px)}\
 /* Make welcome overlay flush with the panel edge (match clamp width) */\
-body.mobile-mode #welcome-screen{width:calc(100% - clamp(260px,38vw,360px))}\
+body.mobile-mode #welcome-screen{width:calc(100% - clamp(260px,38vw,360px)) !important}\
 /* Mobile scroll improvements: prevent body rubber-banding and scroll within right panel only */\
 html.mobile-mode, body.mobile-mode{overscroll-behavior-y:contain;overscroll-behavior:contain}\
 body.mobile-mode{overflow:hidden}\
+/* Prefer tap interactions; helps avoid double-tap zoom */\
+body.mobile-mode{touch-action:manipulation}\
+/* Ensure right panel is wide enough for 2 tiles (use shared var to avoid gaps) */\
+body.mobile-mode{--panelW: clamp(260px,38vw,360px)}\
+body.mobile-mode #mobile-right-panel{width:var(--panelW) !important;max-width:var(--panelW) !important;border-left:0 !important;margin-left:-1px !important}\
+/* Override welcome width using the same var to avoid any seam */\
+body.mobile-mode #welcome-screen{width:calc(100% - var(--panelW) + 1px) !important}\
 body.mobile-mode #mobile-right-panel{height:100dvh;max-height:100dvh;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scroll-padding-bottom:96px;padding-bottom:calc(96px + env(safe-area-inset-bottom, 0px))}\
 @supports (height: 100svh){ body.mobile-mode #mobile-right-panel{height:100svh;max-height:100svh} }\
 /* Fallback for older browsers that lack 100dvh: use JS-set --vh */\
@@ -172,6 +190,13 @@ body.mobile-mode #mobile-right-panel .thumbnail-wrapper{width:100%}\
     body.mobile-mode #mobile-right-panel .thumbnail img{max-width:100%;max-height:90px;width:auto;height:auto;object-fit:contain;display:block}\
     /* Ensure caption and price are clearly below the frame */\
     body.mobile-mode #mobile-right-panel .thumbnail-caption{margin-top:8px;font-size:13px} \
+/* Search UI inside the mobile panel */\
+body.mobile-mode #mobile-right-panel #search-container{position:sticky !important;top:0 !important;z-index:1500;background:rgba(255,255,255,0.96);padding:8px 8px;margin:0 0 8px 0;display:flex;align-items:center;gap:8px} \
+body.mobile-mode #mobile-right-panel #search-toggle{transform:none !important;width:40px;height:40px} \
+body.mobile-mode #mobile-right-panel #search-panel{position:static !important;width:100% !important;max-width:100% !important;opacity:1 !important;visibility:visible !important;padding:0 !important;box-shadow:none !important;transform:none !important;background:transparent !important} \
+body.mobile-mode #mobile-right-panel #search-input{margin:0; display:block} \
+body.mobile-mode #mobile-right-panel #search-results{max-height:220px} \
+body.mobile-mode #mobile-right-panel #search-filter-indicator{display:block !important;margin:6px 8px 10px 8px !important} \
 /* Hide legacy intro IDs only on mobile; keep #welcome-screen visible */\
 body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, body.mobile-mode .intro, body.mobile-mode #start, body.mobile-mode .start{display:none !important}\
 </style>';
@@ -332,35 +357,54 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                                                 // Try to resolve model from caption text
                                                 var wrap = thumb.parentElement;
                                                 var cap = wrap && wrap.querySelector && wrap.querySelector('.thumbnail-caption');
-                                                var nameRaw = cap && cap.textContent ? cap.textContent.trim() : '';
-                                                if (!name && thumb.getAttribute) name = thumb.getAttribute('data-name') || '';
+                                                var captionText = cap && cap.textContent ? cap.textContent.trim() : '';
+                                                var dataName = (thumb.getAttribute && thumb.getAttribute('data-name')) || '';
+                                                var nameRaw = dataName || captionText;
+                                                var dataCat = (thumb.getAttribute && thumb.getAttribute('data-kategoria')) || (thumb.dataset && thumb.dataset.kategoria) || '';
+                                                var imgEl = wrap && wrap.querySelector && wrap.querySelector('img');
+                                                var imgSrc = imgEl && imgEl.getAttribute && imgEl.getAttribute('src');
+                                                var imgFile = '';
+                                                try { if (imgSrc) { var u=new URL(imgSrc, location.href); imgFile = (u.pathname||'').split('/').pop(); } } catch(_) {}
                                                 var norm = function(s){ try { return (s||'').normalize('NFD').replace(/\p{Diacritic}/gu,''); } catch(_) { return (s||''); } };
                                                 var strip = function(s){ try { return (typeof window.stripBrackets==='function') ? window.stripBrackets(s) : String(s||'').replace(/\s*\([^)]*\)\s*/g,'').trim(); } catch(_) { return (s||''); } };
                                                 var lower = function(s){ return (s||'').toLowerCase().trim(); };
                                                 var name = nameRaw;
-                                                var isHookerLabel = /hooker/i.test(nameRaw);
+                                                var isHookerLabel = /(hooker|hoker)/i.test(nameRaw) || /(hooker|hoker)/i.test(dataCat);
                                                 var pick = null;
                                                 if (Array.isArray(window.allData)) {
                                                     var candidates = window.allData.filter(function(it){ return it && it.Typ==='model'; });
-                                                    // 1) Try exact name (case-insensitive), without normalizing/stripping
-                                                    var exact = candidates.find(function(it){ return lower(it.Nazwa) === lower(name); });
+                                                    var activeBtn = document.querySelector('.category-button.active');
+                                                    var activeText = activeBtn && activeBtn.textContent ? activeBtn.textContent.toLowerCase() : '';
+                                                    var preferHooker = /(hooker|hoker)/.test(nameRaw) || /(hooker|hoker)/.test(dataCat) || /(hooker|hoker)/.test(activeText);
+                                                    var preferNonHooker = /krzes/.test(activeText) && !preferHooker;
+                                                    var hookerCands = candidates.filter(function(it){ var cat=lower(String(it.Kategoria||'')); return cat.includes('hooker') || cat.includes('hoker'); });
+                                                    var chairCands = candidates.filter(function(it){ return !lower(String(it.Kategoria||'')).includes('hooker'); });
+                                                    var byPref = preferHooker ? hookerCands : (preferNonHooker ? chairCands : candidates);
+
+                                                    // 1) Try exact name in preferred set first
+                                                    var exact = byPref.find(function(it){ return lower(it.Nazwa) === lower(name); }) ||
+                                                                candidates.find(function(it){ return lower(it.Nazwa) === lower(name); });
                                                     if (exact) pick = exact;
-                                                    // 2) If not found, try normalized exact
+
+                                                    // 2) Try normalized exact in preferred set
                                                     if (!pick) {
                                                         var nameNorm = lower(norm(name));
-                                                        pick = candidates.find(function(it){ return lower(norm(it.Nazwa)) === nameNorm; });
+                                                        pick = (byPref.find(function(it){ return lower(norm(it.Nazwa)) === nameNorm; }) ||
+                                                                candidates.find(function(it){ return lower(norm(it.Nazwa)) === nameNorm; }));
                                                     }
-                                                    // 3) If still not, try after stripping parentheses on both sides
+
+                                                    // 3) Try stripped parentheses in preferred set
                                                     if (!pick) {
                                                         var nameStripped = lower(norm(strip(name)));
-                                                        // Prefer hooker category when label suggests hooker
-                                                        var filtered = candidates.filter(function(it){
-                                                            var cat = lower(String(it.Kategoria||''));
-                                                            if (isHookerLabel) return cat.includes('hooker');
-                                                            return true;
-                                                        });
-                                                        pick = filtered.find(function(it){ return lower(norm(strip(it.Nazwa))) === nameStripped; }) ||
-                                                               candidates.find(function(it){ return lower(norm(strip(it.Nazwa))) === nameStripped; });
+                                                        pick = (byPref.find(function(it){ return lower(norm(strip(it.Nazwa))) === nameStripped; }) ||
+                                                                candidates.find(function(it){ return lower(norm(strip(it.Nazwa))) === nameStripped; }));
+                                                    }
+
+                                                    // 4) As a last fallback, try match by thumbnail image file name (only if unique)
+                                                    if (!pick && imgFile) {
+                                                        var imgLower = imgFile.toLowerCase();
+                                                        var matched = candidates.filter(function(it){ var ob=(it.Obrazek||'').toString().toLowerCase(); var file=ob.split('/').pop(); return file===imgLower; });
+                                                        if (matched.length === 1) pick = matched[0];
                                                     }
                                                 }
                                                 if (pick && typeof window.loadModel==='function'){
@@ -372,6 +416,26 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                                             } catch(_){}
                                         }, { passive: true });
                                     })();
+
+                                    // Przenieś desktopowe wyszukiwanie do panelu mobilnego i pokaż je zawsze
+                                    (function moveSearchToMobilePanel(retries){
+                                        try {
+                                            var panel = document.getElementById('mobile-right-panel');
+                                            var search = document.getElementById('search-container');
+                                            if (panel && search && search.parentElement !== panel) {
+                                                panel.insertAdjacentElement('afterbegin', search);
+                                                var indicator = document.getElementById('search-filter-indicator');
+                                                if (indicator && indicator.parentElement !== panel) {
+                                                    panel.insertAdjacentElement('afterbegin', indicator);
+                                                }
+                                            }
+                                            // Wymuś widoczność panelu wyszukiwania na mobile (klasa .active)
+                                            var sp = document.getElementById('search-panel');
+                                            if (sp && !sp.classList.contains('active')) sp.classList.add('active');
+                                            return;
+                                        } catch(_) {}
+                                        if (retries < 50) setTimeout(function(){ moveSearchToMobilePanel(retries+1); }, 200);
+                                    })(0);
 
                                     // Tekst loadera dla mobile
                                     var lt = document.querySelector('#custom-loader .loading-text');
