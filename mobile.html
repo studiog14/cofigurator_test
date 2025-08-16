@@ -56,7 +56,7 @@
         <div id="boot-loader" class="loader">
             <div class="spinner" aria-hidden="true"></div>
             <div id="boot-msg">Trwa uruchamianie konfiguratora…</div>
-            <div id="boot-hint" class="muted" style="display:none">To może potrwać dłuższą chwilę — pobieramy modele i grafiki. Jeśli ekran nie zniknie, odśwież stronę.</div>
+            <div id="boot-hint" class="muted" style="display:none">To może potrwać dłuższą chwilę — pobieramy modele i tekstury. Jeśli ekran nie zniknie, odśwież stronę.</div>
         </div>
 
     <script>
@@ -243,7 +243,7 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                     // 2d) Zmień komunikat loadera i wstrzyknij wskazówkę (CSS-only reveal po 8s)
                     html = html.replace(/<div\s+class=\"loading-text\"([^>]*)>([\s\S]*?)<\/div>/i, function(_, attrs){
                         return '<div class="loading-text"'+attrs+'>Trwa uruchamianie konfiguratora…<\/div>' +
-                               '<div id="mobile-longload-hint" style="margin-top:12px;font-size:14px;color:#666;text-align:center;max-width:320px;opacity:0;animation:mobileHint 0s linear 8s forwards">To może potrwać dłuższą chwilę — pobieramy modele i grafiki. Jeśli ekran nie zniknie, odśwież stronę.<\/div>';
+                               '<div id="mobile-longload-hint" style="margin-top:12px;font-size:14px;color:#666;text-align:center;max-width:320px;opacity:0;animation:mobileHint 0s linear 8s forwards">To może potrwać dłuższą chwilę — pobieramy modele i tekstury. Jeśli ekran nie zniknie, odśwież stronę.<\/div>';
                     });
 
                     // 2e) Doładuj odłożone CDN-y po wstawieniu dokumentu – bez wstrzykiwania dodatkowych <script> w stringu
@@ -261,24 +261,7 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
 
                                 // 5) Po wstawieniu: doładuj odłożone CDN-y, anty-flash overlay i mobilny komunikat loadera + hint
                                 try {
-                                    // Normalize categories so desktop logic (which checks for "hooker") also catches Polish "hoker"
-                                    (function normalizeDataCategories(retries){
-                                        try {
-                                            if (Array.isArray(window.allData)) {
-                                                window.allData.forEach(function(it){
-                                                    try {
-                                                        var k = (it.Kategoria||''); var l = k.toLowerCase();
-                                                        if (l && l.includes('hoker') && !l.includes('hooker')) {
-                                                            // Append a marker so includes('hooker') succeeds without changing display text
-                                                            it.Kategoria = (k + ' hooker').trim();
-                                                        }
-                                                    } catch(_) {}
-                                                });
-                                                return;
-                                            }
-                                        } catch(_) {}
-                                        if (retries < 200) setTimeout(function(){ normalizeDataCategories(retries+1); }, 100);
-                                    })(0);
+                                    // (Removed global mutation of allData categories to avoid breaking exact category matches)
                                     // Dynamic VH fallback for mobile address bar resizing
                                     (function setupVHFallback(){
                                         try {
@@ -315,7 +298,17 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                                                 if (!__origLoadModel.__mobileWrapped) {
                                                     var wrapped = async function(variant){
                                                         try { var ml = document.getElementById('model-loader'); if (ml) ml.style.display = 'flex'; } catch(_){ }
-                                                        try { return await __origLoadModel.call(this, variant); }
+                                                        try {
+                                                            // Normalize only the passed variant so desktop logic recognizing 'hooker' works even if source uses 'hoker'
+                                                            var v = variant || {};
+                                                            try {
+                                                                var k = (v.Kategoria || ''); var l = k.toLowerCase();
+                                                                if (l && l.includes('hoker') && !l.includes('hooker')) {
+                                                                    v = Object.assign({}, v, { Kategoria: (k + ' hooker').trim() });
+                                                                }
+                                                            } catch(_) {}
+                                                            return await __origLoadModel.call(this, v);
+                                                        }
                                                         finally {
                                                             try { setTimeout(function(){ var ml2=document.getElementById('model-loader'); if(ml2) ml2.style.display='none'; }, 300); } catch(_){}
                                                             // After model loads, ensure the mobile panel shows from the top
@@ -372,10 +365,7 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                                             try {
                                                 var t = ev.target;
                                                 if (!t) return;
-                                                // Do not interfere with native clicks inside mobile right panel; let desktop/mobile handlers run
-                                                var inMobilePanel = t.closest && t.closest('#mobile-right-panel');
-                                                if (inMobilePanel) return;
-                                                var thumb = t.closest && t.closest('#model-thumbnails .thumbnail, .model-thumbnail');
+                                                var thumb = t.closest && t.closest('#mobile-right-panel .thumbnail, #model-thumbnails .thumbnail, .model-thumbnail');
                                                 if (!thumb) return;
                                                 // Try to resolve model from caption text
                                                 var wrap = thumb.parentElement;
@@ -471,7 +461,7 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                                         var hint = document.createElement('div');
                                         hint.id = 'mobile-longload-hint';
                                         hint.style.cssText = 'margin-top:12px;font-size:14px;color:#666;text-align:center;max-width:320px;';
-                                        hint.textContent = 'Strona ładuje się zbyt długo... Odśwież przeglądarkę/stronę';
+                                        hint.textContent = 'To może potrwać dłuższą chwilę — pobieramy modele i tekstury. Jeśli ekran nie zniknie, odśwież stronę.';
                                         try { loader.appendChild(hint); } catch(_){}
                                     }, 8000);
 
