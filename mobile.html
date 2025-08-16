@@ -145,6 +145,8 @@
 body.mobile-mode .category-button.active{background:#F5C842;color:#fff;border-color:#F5C842}\
 /* Ensure right panel is wide enough for 2 tiles */\
 body.mobile-mode #mobile-right-panel{width:clamp(260px,38vw,360px);max-width:clamp(260px,38vw,360px)}\
+/* Make welcome overlay flush with the panel edge (match clamp width) */\
+body.mobile-mode #welcome-screen{width:calc(100% - clamp(260px,38vw,360px))}\
 /* Mobile scroll improvements: prevent body rubber-banding and scroll within right panel only */\
 html.mobile-mode, body.mobile-mode{overscroll-behavior-y:contain;overscroll-behavior:contain}\
 body.mobile-mode{overflow:hidden}\
@@ -330,19 +332,35 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                                                 // Try to resolve model from caption text
                                                 var wrap = thumb.parentElement;
                                                 var cap = wrap && wrap.querySelector && wrap.querySelector('.thumbnail-caption');
-                                                var name = cap && cap.textContent ? cap.textContent.trim() : '';
+                                                var nameRaw = cap && cap.textContent ? cap.textContent.trim() : '';
                                                 if (!name && thumb.getAttribute) name = thumb.getAttribute('data-name') || '';
-                                                var norm = function(s){ try { return s.normalize('NFD').replace(/\p{Diacritic}/gu,'').trim(); } catch(_) { return (s||'').trim(); } };
-                                                var strip = function(s){ try { return (typeof window.stripBrackets==='function') ? window.stripBrackets(s) : String(s||'').replace(/\s*\([^)]*\)\s*/g,'').trim(); } catch(_) { return s; } };
-                                                var targetName = norm(strip(name));
+                                                var norm = function(s){ try { return (s||'').normalize('NFD').replace(/\p{Diacritic}/gu,''); } catch(_) { return (s||''); } };
+                                                var strip = function(s){ try { return (typeof window.stripBrackets==='function') ? window.stripBrackets(s) : String(s||'').replace(/\s*\([^)]*\)\s*/g,'').trim(); } catch(_) { return (s||''); } };
+                                                var lower = function(s){ return (s||'').toLowerCase().trim(); };
+                                                var name = nameRaw;
+                                                var isHookerLabel = /hooker/i.test(nameRaw);
                                                 var pick = null;
                                                 if (Array.isArray(window.allData)) {
-                                                    for (var i=0;i<window.allData.length;i++){
-                                                        var it = window.allData[i];
-                                                        if (it && it.Typ==='model'){
-                                                            var n = norm(strip(it.Nazwa||''));
-                                                            if (n && n.toLowerCase()===targetName.toLowerCase()) { pick = it; break; }
-                                                        }
+                                                    var candidates = window.allData.filter(function(it){ return it && it.Typ==='model'; });
+                                                    // 1) Try exact name (case-insensitive), without normalizing/stripping
+                                                    var exact = candidates.find(function(it){ return lower(it.Nazwa) === lower(name); });
+                                                    if (exact) pick = exact;
+                                                    // 2) If not found, try normalized exact
+                                                    if (!pick) {
+                                                        var nameNorm = lower(norm(name));
+                                                        pick = candidates.find(function(it){ return lower(norm(it.Nazwa)) === nameNorm; });
+                                                    }
+                                                    // 3) If still not, try after stripping parentheses on both sides
+                                                    if (!pick) {
+                                                        var nameStripped = lower(norm(strip(name)));
+                                                        // Prefer hooker category when label suggests hooker
+                                                        var filtered = candidates.filter(function(it){
+                                                            var cat = lower(String(it.Kategoria||''));
+                                                            if (isHookerLabel) return cat.includes('hooker');
+                                                            return true;
+                                                        });
+                                                        pick = filtered.find(function(it){ return lower(norm(strip(it.Nazwa))) === nameStripped; }) ||
+                                                               candidates.find(function(it){ return lower(norm(strip(it.Nazwa))) === nameStripped; });
                                                     }
                                                 }
                                                 if (pick && typeof window.loadModel==='function'){
