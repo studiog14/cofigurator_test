@@ -7,7 +7,7 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="format-detection" content="telephone=no" />
-    <title>Konfigurator krzeseł – Mobile</title>
+    <title>Konfigurator krzeseł</title>
     <link rel="manifest" href="manifest.json" />
     <link rel="apple-touch-icon" href="icons/favicon.png" />
     <link rel="icon" href="favicon.png" />
@@ -37,8 +37,8 @@
 <body>
         <div id="boot-loader" class="loader">
             <div class="spinner" aria-hidden="true"></div>
-            <div id="boot-msg">Inicjalizacja konfiguratora w wersji mobilnej</div>
-            <div id="boot-hint" class="muted" style="display:none">Strona ładuje się zbyt długo... Odśwież przeglądarkę/stronę</div>
+            <div id="boot-msg">Trwa uruchamianie konfiguratora…</div>
+            <div id="boot-hint" class="muted" style="display:none">To może potrwać dłuższą chwilę — pobieramy modele i grafiki. Jeśli ekran nie zniknie, odśwież stronę.</div>
         </div>
 
     <script>
@@ -184,10 +184,10 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                 html = html.replace(/emailjs\.init\(([^)]*)\);/i,
                     '(function initEmail(){ if (window.emailjs&&emailjs.init){ try{ emailjs.init($1); }catch(_){ } } else { setTimeout(initEmail,200); } })();');
 
-                    // 2d) Zmień komunikat loadera i wstrzyknij wskazówkę (CSS-only reveal po 8s)
+            // 2d) Zmień komunikat loadera i wstrzyknij wskazówkę (CSS-only reveal po 8s)
                     html = html.replace(/<div\s+class=\"loading-text\"([^>]*)>([\s\S]*?)<\/div>/i, function(_, attrs){
-                        return '<div class="loading-text"'+attrs+'>Inicjalizacja konfiguratora w wersji mobilnej<\/div>' +
-                               '<div id="mobile-longload-hint" style="margin-top:12px;font-size:14px;color:#666;text-align:center;max-width:320px;opacity:0;animation:mobileHint 0s linear 8s forwards">Strona ładuje się zbyt długo... Odśwież przeglądarkę/stronę<\/div>';
+                return '<div class="loading-text"'+attrs+'>Trwa uruchamianie konfiguratora…<\/div>' +
+                       '<div id="mobile-longload-hint" style="margin-top:12px;font-size:14px;color:#666;text-align:center;max-width:320px;opacity:0;animation:mobileHint 0s linear 8s forwards">To może potrwać dłuższą chwilę — pobieramy modele i grafiki. Jeśli ekran nie zniknie, odśwież stronę.<\/div>';
                     });
 
                     // 2e) Doładuj odłożone CDN-y po wstawieniu dokumentu – bez wstrzykiwania dodatkowych <script> w stringu
@@ -297,7 +297,7 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
 
                                     // Tekst loadera dla mobile
                                     var lt = document.querySelector('#custom-loader .loading-text');
-                                    if (lt) { lt.textContent = 'Inicjalizacja konfiguratora w wersji mobilnej'; }
+                                    if (lt) { lt.textContent = 'Trwa uruchamianie konfiguratora…'; }
 
                                     // Hint po 8s, auto-refresh po 20s (jednorazowo)
                                     setTimeout(function(){
@@ -306,7 +306,7 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                                         var hint = document.createElement('div');
                                         hint.id = 'mobile-longload-hint';
                                         hint.style.cssText = 'margin-top:12px;font-size:14px;color:#666;text-align:center;max-width:320px;';
-                                        hint.textContent = 'Strona ładuje się zbyt długo... Odśwież przeglądarkę/stronę';
+                                        hint.textContent = 'To może potrwać dłuższą chwilę — pobieramy modele i grafiki. Jeśli ekran nie zniknie, odśwież stronę.';
                                         try { loader.appendChild(hint); } catch(_){}
                                     }, 8000);
 
