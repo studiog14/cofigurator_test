@@ -148,7 +148,8 @@ body.mobile-mode #mobile-right-panel{width:clamp(260px,38vw,360px);max-width:cla
 /* Mobile scroll improvements: prevent body rubber-banding and scroll within right panel only */\
 html.mobile-mode, body.mobile-mode{overscroll-behavior-y:contain;overscroll-behavior:contain}\
 body.mobile-mode{overflow:hidden}\
-body.mobile-mode #mobile-right-panel{height:100dvh;max-height:100dvh;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:calc(24px + env(safe-area-inset-bottom, 0px))}\
+body.mobile-mode #mobile-right-panel{height:100dvh;max-height:100dvh;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scroll-padding-bottom:96px;padding-bottom:calc(96px + env(safe-area-inset-bottom, 0px))}\
+@supports (height: 100svh){ body.mobile-mode #mobile-right-panel{height:100svh;max-height:100svh} }\
 /* Fallback for older browsers that lack 100dvh: use JS-set --vh */\
 @supports not (height: 100dvh){ body.mobile-mode #mobile-right-panel{height:calc(var(--vh, 1vh) * 100);max-height:calc(var(--vh, 1vh) * 100)} }\
 /* Categories: two per row without changing button look */\
@@ -160,6 +161,11 @@ body.mobile-mode #mobile-right-panel #model-thumbnails,\
 body.mobile-mode #mobile-right-panel #legs-thumbnails,\
 body.mobile-mode #mobile-right-panel #material-panel-viewer,\
 body.mobile-mode #mobile-right-panel .options-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}\
+/* Bottom spacer so the last row name/price is never clipped by browser UI */\
+body.mobile-mode #mobile-right-panel #model-thumbnails::after,\
+body.mobile-mode #mobile-right-panel #legs-thumbnails::after,\
+body.mobile-mode #mobile-right-panel #material-panel-viewer::after,\
+body.mobile-mode #mobile-right-panel .options-grid::after{content:"";display:block;height:88px}\
 body.mobile-mode #mobile-right-panel .thumbnail-wrapper{width:100%}\
     /* Frame-sized tile: fixed height so image never overlaps caption/price */\
     body.mobile-mode #mobile-right-panel .thumbnail{width:100%;height:120px;display:flex;align-items:center;justify-content:center;padding:8px;background:#fff;border:1px solid #e5e5e5;border-radius:10px;box-sizing:border-box} \
@@ -388,6 +394,7 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                                                 el.style.gridTemplateColumns = '1fr 1fr';
                                                 el.style.gap = '10px';
                                                 el.style.marginTop = '8px';
+                                                el.style.scrollPaddingBottom = '96px';
                                             });
                                             // Ensure tiles keep fixed frame and captions below
                                             var tiles = document.querySelectorAll('#mobile-right-panel .thumbnail');
