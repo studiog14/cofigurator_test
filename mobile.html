@@ -365,7 +365,10 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                                             try {
                                                 var t = ev.target;
                                                 if (!t) return;
-                                                var thumb = t.closest && t.closest('#mobile-right-panel .thumbnail, #model-thumbnails .thumbnail, .model-thumbnail');
+                                                // Do not override native handler in the mobile panel; it passes the exact model
+                                                var inMobilePanel = t.closest && t.closest('#mobile-right-panel');
+                                                if (inMobilePanel) return;
+                                                var thumb = t.closest && t.closest('#model-thumbnails .thumbnail, .model-thumbnail');
                                                 if (!thumb) return;
                                                 // Try to resolve model from caption text
                                                 var wrap = thumb.parentElement;
