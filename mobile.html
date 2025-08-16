@@ -77,7 +77,13 @@
 
                 // 1) Wstrzyknij es-module-shims w <head> (lub zaraz po <meta charset>)
                 const shimTag = '<script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1/dist/es-module-shims.min.js"></' + 'script>';
-                const hintCss = '<style id="mobile-hint-style">@keyframes mobileHint{to{opacity:1}}</style>';
+                const hintCss = '<style id="mobile-hint-style">\
+@keyframes mobileHint{to{opacity:1}}\
+body.mobile-mode #welcome-screen{display:none !important}\
+body.mobile-mode #app{visibility:visible !important}\
+body.mobile-mode #mobile-right-panel{display:block !important}\
+body.mobile-mode .category-button.active{background:#F5C842;color:#fff;border-color:#F5C842}\
+</style>';
                 if(html.includes('</head>')){
                     html = html.replace(/<head[^>]*>/i, function(m){ return m + '\n  ' + shimTag + '\n  ' + hintCss + '\n'; });
                 } else {
@@ -99,6 +105,8 @@
                         patched = patched.replace(/closeBtn\.addEventListener\(/g, 'closeBtn && closeBtn.addEventListener(');
                         patched = patched.replace(/emailModal\.addEventListener\(/g, 'emailModal && emailModal.addEventListener(');
                         patched = patched.replace(/emailForm\.addEventListener\(/g, 'emailForm && emailForm.addEventListener(');
+                        // Po inic Viewer: jeśli wybrano model przed inicjalizacją, załaduj go automatycznie
+                        patched = patched.replace(/window\\.viewer\s*\=\s*viewer\s*;/, function(m){ return m + "\ntry{ if(window.__pendingMobileVariant){ loadModel(window.__pendingMobileVariant); window.__pendingMobileVariant=null; } }catch(_){}\n"; });
                             return '<script'+attrs+'>'+patched+'<\/script>';
                         } catch(e) {
                             return '<script'+attrs+'>'+code+'<\/script>';
@@ -144,6 +152,66 @@
                                         (ph.parentNode || document.head || document.documentElement).insertBefore(s, ph);
                                         ph.parentNode && ph.parentNode.removeChild(ph);
                                     });
+
+                                    // Mobile-only: wrap loadModel to show/hide the model loader
+                                    (function hookLoadModel(retries){
+                                        try {
+                                            if (typeof window.loadModel === 'function') {
+                                                var __origLoadModel = window.loadModel;
+                                                if (!__origLoadModel.__mobileWrapped) {
+                                                    var wrapped = async function(variant){
+                                                        try { var ml = document.getElementById('model-loader'); if (ml) ml.style.display = 'flex'; } catch(_){}
+                                                        try { return await __origLoadModel.call(this, variant); }
+                                                        finally { try { setTimeout(function(){ var ml2=document.getElementById('model-loader'); if(ml2) ml2.style.display='none'; }, 300); } catch(_){} }
+                                                    };
+                                                    wrapped.__mobileWrapped = true;
+                                                    window.loadModel = wrapped;
+                                                }
+                                                return;
+                                            }
+                                        } catch(_) {}
+                                        if (retries < 100) setTimeout(function(){ hookLoadModel(retries+1); }, 100);
+                                    })(0);
+
+                                    // Mobile category buttons: ensure active state mirrors desktop behavior
+                                    (function attachCategoryActiveSync(retries){
+                                        try {
+                                            var container = document.getElementById('mobile-right-panel') || document.getElementById('mobile-category-buttons-container');
+                                            if (container) {
+                                                container.addEventListener('click', function(e){
+                                                    var btn = e.target && e.target.closest && e.target.closest('.category-button');
+                                                    if (!btn) return;
+                                                    var cat = btn.dataset && (btn.dataset.category || btn.textContent && btn.textContent.trim());
+                                                    try {
+                                                        var scope = container.querySelectorAll('.category-button');
+                                                        scope.forEach(function(b){ b.classList.remove('active'); });
+                                                        btn.classList.add('active');
+                                                    } catch(_){}
+                                                    try {
+                                                        if (typeof window.renderMobileRightPanelList === 'function' && cat) {
+                                                            window.renderMobileRightPanelList(cat);
+                                                        }
+                                                    } catch(_){}
+                                                }, { passive: true });
+                                                return;
+                                            }
+                                        } catch(_) {}
+                                        if (retries < 50) setTimeout(function(){ attachCategoryActiveSync(retries+1); }, 200);
+                                    })(0);
+
+                                    // Ensure mobile list is rendered ASAP to avoid any flash of welcome UI
+                                    (function ensureMobileList(retries){
+                                        try {
+                                            var right = document.getElementById('mobile-right-panel');
+                                            if (right) right.style.display = 'block';
+                                            if (typeof window.ensureConfigInMobilePanel === 'function') window.ensureConfigInMobilePanel();
+                                            if (typeof window.renderMobileRightPanelList === 'function') {
+                                                window.renderMobileRightPanelList('Wszystkie');
+                                                return;
+                                            }
+                                        } catch(_) {}
+                                        if (retries < 80) setTimeout(function(){ ensureMobileList(retries+1); }, 100);
+                                    })(0);
 
                                     // Tekst loadera dla mobile
                                     var lt = document.querySelector('#custom-loader .loading-text');
