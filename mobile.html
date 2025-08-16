@@ -149,8 +149,8 @@ body.mobile-mode #mobile-right-panel .thumbnail-wrapper{width:100%}\
     body.mobile-mode #mobile-right-panel .thumbnail img{max-width:100%;max-height:90px;width:auto;height:auto;object-fit:contain;display:block}\
     /* Ensure caption and price are clearly below the frame */\
     body.mobile-mode #mobile-right-panel .thumbnail-caption{margin-top:8px;font-size:13px} \
-/* Hide intro/welcome flash only on mobile */\
-    body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, body.mobile-mode .intro, body.mobile-mode #start, body.mobile-mode .start, body.mobile-mode #welcome-screen{display:none !important}\
+/* Hide legacy intro IDs only on mobile; keep #welcome-screen visible */\
+body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, body.mobile-mode .intro, body.mobile-mode #start, body.mobile-mode .start{display:none !important}\
 </style>';
                 if(html.includes('</head>')){
                     html = html.replace(/<head[^>]*>/i, function(m){ return m + '\n  ' + shimTag + '\n  ' + hintCss + '\n'; });
