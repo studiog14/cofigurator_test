@@ -55,7 +55,7 @@
 <body>
         <div id="boot-loader" class="loader">
             <div class="spinner" aria-hidden="true"></div>
-            <div id="boot-msg">Trwa ładowanie konfiguratora</div>
+            <div id="boot-msg">Ładowanie konfiguratora</div>
             <div id="boot-hint" class="muted" style="display:none">To może potrwać dłuższą chwilę — pobieramy modele i tekstury. Jeśli ekran nie zniknie, odśwież stronę.</div>
         </div>
 
@@ -80,7 +80,7 @@
                 const HR_FLAG = 'MOBILE_HARD_RESET_DONE_v1';
                 const alreadyDone = (window.name === HR_FLAG);
                 if (!alreadyDone) {
-                    try { var m = document.getElementById('boot-msg'); if (m) m.textContent = 'Czyszczenie pamięci podręcznej aplikacji…'; } catch(_){ }
+                    try { var m = document.getElementById('boot-msg'); if (m) m.textContent = 'Czyszczenie cache…'; } catch(_){ }
                     // Unregister all service workers
                     try {
                         if ('serviceWorker' in navigator && navigator.serviceWorker.getRegistrations) {
@@ -138,6 +138,8 @@
 
             try {
                 // Pobierz źródło index.html i przygotuj wersję z shimami dla iOS
+                // Etap 2: Ładowanie konfiguratora
+                try { var bm = document.getElementById('boot-msg'); if (bm) bm.textContent = 'Ładowanie konfiguratora'; } catch(_){}
                 const res = await fetch('index.html', { credentials: 'same-origin', cache: 'no-store' });
                 if(!res.ok){ throw new Error('HTTP '+res.status); }
                 let html = await res.text();
@@ -283,7 +285,7 @@ body.mobile-mode #material-panel-viewer .thumbnail img{width:64px !important;hei
 
                     // 2d) Zmień komunikat loadera i wstrzyknij wskazówkę (CSS-only reveal po 8s)
                     html = html.replace(/<div\s+class=\"loading-text\"([^>]*)>([\s\S]*?)<\/div>/i, function(_, attrs){
-                        return '<div class="loading-text"'+attrs+'>Trwa ładowanie konfiguratora<\/div>' +
+                        return '<div class="loading-text"'+attrs+'>Trwa uruchamianie konfiguratora<\/div>' +
                                '<div id="mobile-longload-hint" style="margin-top:12px;font-size:14px;color:#666;text-align:center;max-width:320px;opacity:0;animation:mobileHint 0s linear 8s forwards">To może potrwać dłuższą chwilę — pobieramy modele i tekstury. Jeśli ekran nie zniknie, odśwież stronę.<\/div>';
                     });
 
@@ -649,8 +651,9 @@ body.mobile-mode #material-panel-viewer .thumbnail img{width:64px !important;hei
                                     })(0);
 
                                     // Tekst loadera dla mobile
+                                    // Etap 3: Trwa uruchamianie konfiguratora (na loaderze aplikacji)
                                     var lt = document.querySelector('#custom-loader .loading-text');
-                                    if (lt) { lt.textContent = 'Trwa ładowanie konfiguratora'; }
+                                    if (lt) { lt.textContent = 'Trwa uruchamianie konfiguratora'; }
 
                                     // Hint po 8s, auto-refresh po 20s (jednorazowo)
                                     setTimeout(function(){
