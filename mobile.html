@@ -108,15 +108,9 @@
                 }
             } catch(_){ }
 
-            // Safety: show hint after 8s and one-time auto-reload after 25s even if fetch stalls
+            // Safety: show hint after 8s (no auto-reload timers on mobile)
             try {
                 setTimeout(function(){ var h=document.getElementById('boot-hint'); if(h) h.style.display='block'; },8000);
-                setTimeout(function(){
-                    if (sessionStorage.getItem('mobileReloadedOnce')==='1') return;
-                    sessionStorage.setItem('mobileReloadedOnce','1');
-                    try { var u=new URL(location.href); u.searchParams.set('r', Date.now().toString()); location.replace(u.toString()); }
-                    catch(_) { location.reload(); }
-                },25000);
             } catch(_){ }
 
             try {
@@ -141,13 +135,16 @@ body.mobile-mode .category-button.active{background:#F5C842;color:#fff;border-co
 body.mobile-mode #mobile-right-panel{width:clamp(260px,38vw,360px);max-width:clamp(260px,38vw,360px)}\
 /* Categories: two per row without changing button look */\
 body.mobile-mode #mobile-category-buttons-container,\
-body.mobile-mode #category-buttons-container{display:grid;grid-template-columns:1fr 1fr;gap:8px}\
+body.mobile-mode #category-buttons-container{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}\
+body.mobile-mode #mobile-category-buttons-container{margin-bottom:10px}\
 /* Model thumbnails: two columns inside right panel */\
 body.mobile-mode #mobile-right-panel #model-thumbnails,\
-body.mobile-mode #mobile-right-panel .options-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}\
+body.mobile-mode #mobile-right-panel .options-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}\
 body.mobile-mode #mobile-right-panel .thumbnail-wrapper{width:100%}\
 body.mobile-mode #mobile-right-panel .thumbnail{width:100%} \
-body.mobile-mode #mobile-right-panel .thumbnail img{width:100%;height:auto;max-height:100px;object-fit:contain}\
+body.mobile-mode #mobile-right-panel .thumbnail img{width:100%;height:auto;max-height:90px;object-fit:contain}\
+/* Hide intro/welcome flash only on mobile */\
+body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, body.mobile-mode .intro, body.mobile-mode #start, body.mobile-mode .start{display:none !important}\
 </style>';
                 if(html.includes('</head>')){
                     html = html.replace(/<head[^>]*>/i, function(m){ return m + '\n  ' + shimTag + '\n  ' + hintCss + '\n'; });
@@ -241,7 +238,7 @@ body.mobile-mode #mobile-right-panel .thumbnail img{width:100%;height:auto;max-h
                                     // Mobile category buttons: ensure active state mirrors desktop behavior
                                     (function attachCategoryActiveSync(retries){
                                         try {
-                                            var container = document.getElementById('mobile-right-panel') || document.getElementById('mobile-category-buttons-container');
+                                            var container = document.getElementById('mobile-right-panel') || document.getElementById('mobile-category-buttons-container') || document.getElementById('category-buttons-container');
                                             if (container) {
                                                 container.addEventListener('click', function(e){
                                                     var btn = e.target && e.target.closest && e.target.closest('.category-button');
@@ -313,17 +310,7 @@ body.mobile-mode #mobile-right-panel .thumbnail img{width:100%;height:auto;max-h
                                         try { loader.appendChild(hint); } catch(_){}
                                     }, 8000);
 
-                                    setTimeout(function(){
-                                        var loader = document.getElementById('custom-loader');
-                                        if (!loader || loader.style.display==='none') return;
-                                        if (sessionStorage.getItem('mobileReloadedOnce')==='1') return;
-                                        sessionStorage.setItem('mobileReloadedOnce','1');
-                                        try {
-                                            var url = new URL(location.href);
-                                            url.searchParams.set('r', Date.now().toString());
-                                            location.replace(url.toString());
-                                        } catch(_) { location.reload(); }
-                                    }, 20000);
+                                    // Removed auto-refresh timer on mobile
                                 } catch(_){ }
                                 
                                 // Persist two-column model grid after UI rerenders on mobile
@@ -336,6 +323,7 @@ body.mobile-mode #mobile-right-panel .thumbnail img{width:100%;height:auto;max-h
                         thumbsContainer.style.display = 'grid';
                         thumbsContainer.style.gridTemplateColumns = '1fr 1fr';
                         thumbsContainer.style.gap = '10px';
+                        thumbsContainer.style.marginTop = '8px';
                                             } catch(_){}
                                         });
                     mo.observe(thumbsContainer, { childList: true, subtree: true });
