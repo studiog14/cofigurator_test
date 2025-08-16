@@ -37,8 +37,8 @@
 <body>
         <div id="boot-loader" class="loader">
             <div class="spinner" aria-hidden="true"></div>
-            <div id="boot-msg">Inicjalizacja konfiguratora w wersji mobilnej</div>
-            <div id="boot-hint" class="muted" style="display:none">Strona ładuje się zbyt długo... Odśwież przeglądarkę/stronę</div>
+            <div id="boot-msg">Trwa uruchamianie konfiguratora…</div>
+            <div id="boot-hint" class="muted" style="display:none">To może potrwać dłuższą chwilę — pobieramy modele i grafiki. Jeśli ekran nie zniknie, odśwież stronę.</div>
         </div>
 
     <script>
@@ -186,8 +186,8 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
 
                     // 2d) Zmień komunikat loadera i wstrzyknij wskazówkę (CSS-only reveal po 8s)
                     html = html.replace(/<div\s+class=\"loading-text\"([^>]*)>([\s\S]*?)<\/div>/i, function(_, attrs){
-                        return '<div class="loading-text"'+attrs+'>Inicjalizacja konfiguratora w wersji mobilnej<\/div>' +
-                               '<div id="mobile-longload-hint" style="margin-top:12px;font-size:14px;color:#666;text-align:center;max-width:320px;opacity:0;animation:mobileHint 0s linear 8s forwards">Strona ładuje się zbyt długo... Odśwież przeglądarkę/stronę<\/div>';
+                        return '<div class="loading-text"'+attrs+'>Trwa uruchamianie konfiguratora…<\/div>' +
+                               '<div id="mobile-longload-hint" style="margin-top:12px;font-size:14px;color:#666;text-align:center;max-width:320px;opacity:0;animation:mobileHint 0s linear 8s forwards">To może potrwać dłuższą chwilę — pobieramy modele i grafiki. Jeśli ekran nie zniknie, odśwież stronę.<\/div>';
                     });
 
                     // 2e) Doładuj odłożone CDN-y po wstawieniu dokumentu – bez wstrzykiwania dodatkowych <script> w stringu
@@ -203,8 +203,14 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                 document.write(html);
                 document.close();
 
-                                // 5) Po wstawieniu: doładuj odłożone CDN-y i ustaw mobilny komunikat loadera + hint i auto-refresh
+                                // 5) Po wstawieniu: doładuj odłożone CDN-y, anty-flash overlay i mobilny komunikat loadera + hint
                                 try {
+                                    // Anti-flash overlay: ukryj ewentualny ekran powitalny zanim UI będzie gotowe
+                                    var __mobileOverlay = document.createElement('div');
+                                    __mobileOverlay.id = 'mobile-boot-overlay';
+                                    __mobileOverlay.setAttribute('aria-hidden','true');
+                                    __mobileOverlay.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:2147483647;transition:opacity .25s ease;';
+                                    (document.body || document.documentElement).appendChild(__mobileOverlay);
                                     // Doładuj skrypty CDN
                                     var placeholders = document.querySelectorAll('script[data-mobile-defer-src]');
                                     placeholders.forEach(function(ph){
@@ -297,7 +303,7 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
 
                                     // Tekst loadera dla mobile
                                     var lt = document.querySelector('#custom-loader .loading-text');
-                                    if (lt) { lt.textContent = 'Inicjalizacja konfiguratora w wersji mobilnej'; }
+                                    if (lt) { lt.textContent = 'Trwa uruchamianie konfiguratora…'; }
 
                                     // Hint po 8s, auto-refresh po 20s (jednorazowo)
                                     setTimeout(function(){
@@ -311,6 +317,29 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                                     }, 8000);
 
                                     // Removed auto-refresh timer on mobile
+                                    
+                                    // Usuń overlay gdy UI będzie gotowe
+                                    try {
+                                        var removeOverlay = function(){
+                                            var panel = document.getElementById('mobile-right-panel');
+                                            var loaded = panel && panel.children && panel.children.length > 0;
+                                            var app = document.getElementById('app');
+                                            var appVisible = app && app.classList && app.classList.contains('visible');
+                                            var loader = document.getElementById('custom-loader');
+                                            var loaderHidden = loader && (loader.style.display==='none' || loader.getAttribute('aria-hidden')==='true');
+                                            if (loaded || appVisible || loaderHidden) {
+                                                __mobileOverlay.style.opacity = '0';
+                                                setTimeout(function(){ try { __mobileOverlay.remove(); } catch(_){} }, 250);
+                                                return true;
+                                            }
+                                            return false;
+                                        };
+                                        if (!removeOverlay()) {
+                                            setTimeout(removeOverlay, 500);
+                                            setTimeout(removeOverlay, 1000);
+                                            setTimeout(removeOverlay, 2000);
+                                        }
+                                    } catch(_){ }
                                 } catch(_){ }
                                 
                                 // Persist two-column model grid after UI rerenders on mobile
