@@ -189,6 +189,9 @@ body.mobile-mode #mobile-right-panel #model-thumbnails,
 body.mobile-mode #mobile-right-panel #legs-thumbnails,
 body.mobile-mode #mobile-right-panel #material-panel-viewer,
 body.mobile-mode #mobile-right-panel .options-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+/* Default right-panel thumbnails to unified size */
+body.mobile-mode #mobile-right-panel .thumbnail{width:80px !important;height:80px !important;margin:0 auto !important}
+body.mobile-mode #mobile-right-panel .thumbnail img{width:64px !important;height:64px !important}
 /* Bottom spacer at the end of the panel (not between lists) */
 body.mobile-mode #mobile-right-panel::after{content:"";display:block;height:96px}
 body.mobile-mode #mobile-right-panel .thumbnail-wrapper{width:100%}
@@ -244,6 +247,11 @@ body.mobile-mode #part-tabs img{width:36px !important;height:36px !important;obj
 body.mobile-mode #material-panel-viewer{grid-template-columns:repeat(auto-fill,minmax(80px,1fr)) !important}
 body.mobile-mode #material-panel-viewer .thumbnail{width:80px !important;height:80px !important;display:flex !important;align-items:center !important;justify-content:center !important;margin:0 auto !important}
 body.mobile-mode #material-panel-viewer .thumbnail img{width:64px !important;height:64px !important;object-fit:contain !important;border-radius:8px !important}
+/* Unify chair and legs icons to same size as materials/collections */
+body.mobile-mode #mobile-right-panel #model-thumbnails .thumbnail,
+body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail{width:80px !important;height:80px !important;display:flex !important;align-items:center !important;justify-content:center !important;margin:0 auto !important}
+body.mobile-mode #mobile-right-panel #model-thumbnails .thumbnail img,
+body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail img{width:64px !important;height:64px !important;object-fit:contain !important}
 </style>`;
                 if(html.includes('</head>')){
                     html = html.replace(/<head[^>]*>/i, function(m){ return m + '\n  ' + shimTag + '\n  ' + hintCss + '\n'; });
@@ -758,7 +766,7 @@ body.mobile-mode #material-panel-viewer .thumbnail img{width:64px !important;hei
                                             // Ensure tiles keep fixed frame and captions below
                                             var tiles = document.querySelectorAll('#mobile-right-panel .thumbnail');
                                             tiles.forEach(function(t){
-                                                t.style.height = '120px';
+                                                t.style.height = '80px';
                                                 t.style.display = 'flex';
                                                 t.style.alignItems = 'center';
                                                 t.style.justifyContent = 'center';
