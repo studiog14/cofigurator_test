@@ -270,9 +270,19 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                                                 var __origLoadModel = window.loadModel;
                                                 if (!__origLoadModel.__mobileWrapped) {
                                                     var wrapped = async function(variant){
-                                                        try { var ml = document.getElementById('model-loader'); if (ml) ml.style.display = 'flex'; } catch(_){}
+                                                        try { var ml = document.getElementById('model-loader'); if (ml) ml.style.display = 'flex'; } catch(_){ }
                                                         try { return await __origLoadModel.call(this, variant); }
-                                                        finally { try { setTimeout(function(){ var ml2=document.getElementById('model-loader'); if(ml2) ml2.style.display='none'; }, 300); } catch(_){} }
+                                                        finally {
+                                                            try { setTimeout(function(){ var ml2=document.getElementById('model-loader'); if(ml2) ml2.style.display='none'; }, 300); } catch(_){}
+                                                            // After model loads, ensure the mobile panel shows from the top
+                                                            try {
+                                                                var panel = document.getElementById('mobile-right-panel');
+                                                                if (panel) {
+                                                                    panel.scrollTop = 0;
+                                                                    if (panel.scrollTo) panel.scrollTo({ top: 0, behavior: 'auto' });
+                                                                }
+                                                            } catch(_){}
+                                                        }
                                                     };
                                                     wrapped.__mobileWrapped = true;
                                                     window.loadModel = wrapped;
@@ -300,6 +310,9 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                                                     try {
                                                         if (typeof window.renderMobileRightPanelList === 'function' && cat) {
                                                             window.renderMobileRightPanelList(cat);
+                                                            // Show list from the top after changing category
+                                                            var panel = document.getElementById('mobile-right-panel');
+                                                            if (panel) { panel.scrollTop = 0; if (panel.scrollTo) panel.scrollTo({ top: 0, behavior: 'auto' }); }
                                                         }
                                                     } catch(_){}
                                                 }, { passive: true });
@@ -338,6 +351,8 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
                                                 if (pick && typeof window.loadModel==='function'){
                                                     var ml = document.getElementById('model-loader'); if (ml) ml.style.display='flex';
                                                     window.loadModel(pick);
+                                                    // Also nudge panel to the top shortly after selection
+                                                    setTimeout(function(){ try { var panel=document.getElementById('mobile-right-panel'); if(panel){ panel.scrollTop=0; if(panel.scrollTo) panel.scrollTo({top:0, behavior:'auto'}); } } catch(_){} }, 200);
                                                 }
                                             } catch(_){}
                                         }, { passive: true });
