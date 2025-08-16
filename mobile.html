@@ -37,8 +37,8 @@
 <body>
         <div id="boot-loader" class="loader">
             <div class="spinner" aria-hidden="true"></div>
-            <div id="boot-msg">Ładowanie wersji mobilnej…</div>
-            <div id="boot-hint" class="muted" style="display:none">Ładowanie trwa dłużej niż zwykle. Odśwież stronę.</div>
+            <div id="boot-msg">Inicjalizacja konfiguratora w wersji mobilnej</div>
+            <div id="boot-hint" class="muted" style="display:none">Strona ładuje się zbyt długo... Odśwież przeglądarkę/stronę</div>
         </div>
 
     <script>
@@ -140,7 +140,7 @@
 
                                     // Tekst loadera dla mobile
                                     var lt = document.querySelector('#custom-loader .loading-text');
-                                    if (lt) { lt.textContent = 'Inicjalizacja konfiguratora – ładowanie wersji mobilnej…'; }
+                                    if (lt) { lt.textContent = 'Inicjalizacja konfiguratora w wersji mobilnej'; }
 
                                     // Hint po 8s, auto-refresh po 20s (jednorazowo)
                                     setTimeout(function(){
@@ -149,7 +149,7 @@
                                         var hint = document.createElement('div');
                                         hint.id = 'mobile-longload-hint';
                                         hint.style.cssText = 'margin-top:12px;font-size:14px;color:#666;text-align:center;max-width:320px;';
-                                        hint.textContent = 'Ładowanie trwa dłużej niż zwykle. Odśwież stronę.';
+                                        hint.textContent = 'Strona ładuje się zbyt długo... Odśwież przeglądarkę/stronę';
                                         try { loader.appendChild(hint); } catch(_){}
                                     }, 8000);
 
