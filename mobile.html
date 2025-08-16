@@ -44,10 +44,10 @@
     <script>
         (async function(){
             console.log('[mobile.html] bootstrap start');
-            const container = document.getElementById('boot-loader');
+            const bootContainer = document.getElementById('boot-loader');
             function showError(msg){
-                if(container){
-                    container.innerHTML = '<div class="error">'+ (msg||'Błąd ładowania') +'</div>' +
+                if(bootContainer){
+                    bootContainer.innerHTML = '<div class="error">'+ (msg||'Błąd ładowania') +'</div>' +
                         '<div class="muted">Spróbuj ponownie, lub otwórz wersję standardową: <a href="index.html">index.html</a></div>';
                 }
             }
@@ -108,9 +108,15 @@
                 }
             } catch(_){ }
 
-            // Safety: show hint after 8s (no auto-reload here)
+            // Safety: show hint after 8s and one-time auto-reload after 25s even if fetch stalls
             try {
                 setTimeout(function(){ var h=document.getElementById('boot-hint'); if(h) h.style.display='block'; },8000);
+                setTimeout(function(){
+                    if (sessionStorage.getItem('mobileReloadedOnce')==='1') return;
+                    sessionStorage.setItem('mobileReloadedOnce','1');
+                    try { var u=new URL(location.href); u.searchParams.set('r', Date.now().toString()); location.replace(u.toString()); }
+                    catch(_) { location.reload(); }
+                },25000);
             } catch(_){ }
 
             try {
@@ -129,67 +135,19 @@
                 const shimTag = '<script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1/dist/es-module-shims.min.js"></' + 'script>';
                 const hintCss = '<style id="mobile-hint-style">\
 @keyframes mobileHint{to{opacity:1}}\
-/* Active state (mobile) */\
+/* Active category state on mobile same as desktop */\
 body.mobile-mode .category-button.active{background:#F5C842;color:#fff;border-color:#F5C842}\
-/* Narrow the mobile side panel more to give space to 3D */\
-body.mobile-mode #mobile-right-panel{width:clamp(200px,34vw,300px) !important;max-width:clamp(200px,34vw,300px) !important}\
-/* Two category buttons per row on mobile (persistent) */\
-body.mobile-mode #mobile-category-buttons-container{display:grid !important;grid-template-columns:1fr 1fr !important;gap:8px !important}\
-body.mobile-mode #mobile-category-buttons-container .category-button{width:100% !important;box-sizing:border-box}\
-/* Fallback common class names inside right panel */\
-body.mobile-mode #mobile-right-panel .category-buttons,\
-body.mobile-mode #mobile-right-panel .categories{display:grid !important;grid-template-columns:1fr 1fr !important;gap:8px !important}\
-body.mobile-mode #mobile-right-panel .category-buttons .category-button,\
-body.mobile-mode #mobile-right-panel .categories .category-button{width:100% !important;box-sizing:border-box}\
-/* Make category buttons look like tiles (kafelki) on mobile */\
-body.mobile-mode .category-button{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:86px;padding:10px;border:1px solid #e8e8e8;border-radius:12px;background:#fff;gap:8px}\
-body.mobile-mode .category-button img,\
-body.mobile-mode .category-button svg{max-width:64px;max-height:64px;object-fit:contain}\
-body.mobile-mode .category-button .label,\
-body.mobile-mode .category-button span{font-size:14px;line-height:1.2;text-align:center}\
-/* Welcome overlay/readability on mobile */\
-body.mobile-mode #welcome,\
-body.mobile-mode #welcome-overlay,\
-body.mobile-mode .welcome,\
-body.mobile-mode .welcome-overlay{max-width:min(92vw,560px);padding:16px;overflow-y:auto;max-height:80vh;word-break:break-word;overflow-wrap:anywhere}\
-/* Hide big intro/welcome on mobile to avoid initial flash */\
-body.mobile-mode #welcome,\
-body.mobile-mode .welcome,\
-body.mobile-mode #intro,\
-body.mobile-mode .intro,\
-body.mobile-mode #start,\
-body.mobile-mode .start,\
-body.mobile-mode [id*="welcome" i],\
-body.mobile-mode [class*="welcome" i],\
-body.mobile-mode [id*="intro" i],\
-body.mobile-mode [class*="intro" i],\
-body.mobile-mode [id*="hero" i],\
-body.mobile-mode [class*="hero" i]{display:none !important}\
-/* Center 3D viewer area on mobile with safe selectors */\
-body.mobile-mode #viewer,\
-body.mobile-mode #viewer-container,\
-body.mobile-mode .viewer,\
-body.mobile-mode .viewer-container,\
-body.mobile-mode #three-wrapper,\
-body.mobile-mode .three-wrapper,\
-body.mobile-mode #canvas-wrapper,\
-body.mobile-mode .canvas-wrapper{display:flex !important;align-items:center !important;justify-content:center !important;overflow:hidden}\
-body.mobile-mode #viewer canvas,\
-body.mobile-mode #viewer-container canvas,\
-body.mobile-mode .viewer canvas,\
-body.mobile-mode .viewer-container canvas,\
-body.mobile-mode #canvas-wrapper canvas,\
-body.mobile-mode .canvas-wrapper canvas{max-width:100%;max-height:100%;height:auto}\
-/* Model thumbnails: two-column tiles on mobile */\
+/* Ensure right panel is wide enough for 2 tiles */\
+body.mobile-mode #mobile-right-panel{width:clamp(260px,38vw,360px);max-width:clamp(260px,38vw,360px)}\
+/* Categories: two per row without changing button look */\
+body.mobile-mode #mobile-category-buttons-container,\
+body.mobile-mode #category-buttons-container{display:grid;grid-template-columns:1fr 1fr;gap:8px}\
+/* Model thumbnails: two columns inside right panel */\
 body.mobile-mode #mobile-right-panel #model-thumbnails,\
-body.mobile-mode #mobile-right-panel .options-grid,\
-body.mobile-mode #mobile-right-panel .thumbnails,\
-body.mobile-mode #mobile-right-panel .thumbnails-grid,\
-body.mobile-mode #model-thumbnails{display:grid !important;grid-template-columns:1fr 1fr !important;gap:10px !important}\
-body.mobile-mode #mobile-right-panel .thumbnail-wrapper,\
-body.mobile-mode #model-thumbnails .thumbnail-wrapper{width:100% !important}\
-body.mobile-mode #mobile-right-panel .thumbnail,\
-body.mobile-mode #model-thumbnails .thumbnail{width:100% !important;height:110px !important}\
+body.mobile-mode #mobile-right-panel .options-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}\
+body.mobile-mode #mobile-right-panel .thumbnail-wrapper{width:100%}\
+body.mobile-mode #mobile-right-panel .thumbnail{width:100%} \
+body.mobile-mode #mobile-right-panel .thumbnail img{width:100%;height:auto;max-height:100px;object-fit:contain}\
 </style>';
                 if(html.includes('</head>')){
                     html = html.replace(/<head[^>]*>/i, function(m){ return m + '\n  ' + shimTag + '\n  ' + hintCss + '\n'; });
@@ -306,46 +264,6 @@ body.mobile-mode #model-thumbnails .thumbnail{width:100% !important;height:110px
                                         if (retries < 50) setTimeout(function(){ attachCategoryActiveSync(retries+1); }, 200);
                                     })(0);
 
-                                    // Ensure two-per-row layout for category buttons even if container IDs differ
-                                    (function ensureTwoColCategoryLayout(retries){
-                                        function applyTwoCol(container){
-                                            if (!container) return;
-                                            container.style.display = 'grid';
-                                            container.style.gridTemplateColumns = '1fr 1fr';
-                                            container.style.gap = '8px';
-                                            // Also make children stretch nicely
-                                            try {
-                                                var kids = container.querySelectorAll('.category-button');
-                                                kids.forEach(function(k){ k.style.width='100%'; k.style.boxSizing='border-box'; });
-                                            } catch(_){}
-                                        }
-                                        try {
-                                            var panel = document.getElementById('mobile-right-panel') || document.body;
-                                            // Find a container that has at least two .category-button descendants
-                                            var candidates = panel.querySelectorAll('*');
-                                            var found = null;
-                                            for (var i=0;i<candidates.length;i++){
-                                                var el = candidates[i];
-                                                try {
-                                                    var count = el.querySelectorAll && el.querySelectorAll('.category-button').length;
-                                                    if (count >= 2) { found = el; break; }
-                                                } catch(_){}
-                                            }
-                                            if (found) {
-                                                applyTwoCol(found);
-                                                // Persist with MutationObserver
-                                                try {
-                                                    var mo = new MutationObserver(function(muts){
-                                                        applyTwoCol(found);
-                                                    });
-                                                    mo.observe(found, { childList: true, subtree: true });
-                                                } catch(_){}
-                                                return;
-                                            }
-                                        } catch(_){}
-                                        if (retries < 50) setTimeout(function(){ ensureTwoColCategoryLayout(retries+1); }, 200);
-                                    })(0);
-
                                     // Mobile click delegation fallback: trigger loadModel when thumbnail clicked even if original handler fails
                                     (function attachMobileThumbFallback(){
                                         document.addEventListener('click', function(ev){
@@ -380,55 +298,11 @@ body.mobile-mode #model-thumbnails .thumbnail{width:100% !important;height:110px
                                         }, { passive: true });
                                     })();
 
-                                    // Force two-column grid for model thumbnails on mobile and persist after rerenders
-                                    (function ensureTwoColModelGrid(retries){
-                                        function applyGrid(container){
-                                            if (!container) return;
-                                            container.style.display = 'grid';
-                                            container.style.gridTemplateColumns = '1fr 1fr';
-                                            container.style.gap = '10px';
-                                            try {
-                                                var wraps = container.querySelectorAll('.thumbnail-wrapper');
-                                                wraps.forEach(function(w){ w.style.width = '100%'; });
-                                                var thumbs = container.querySelectorAll('.thumbnail');
-                                                thumbs.forEach(function(t){ t.style.width='100%'; t.style.height='110px'; });
-                                            } catch(_){ }
-                                        }
-                                        try {
-                                            var root = document.getElementById('mobile-right-panel') || document.body;
-                                            // Prefer explicit container IDs/classes first
-                                            var cont = root.querySelector('#model-thumbnails')
-                                                       || root.querySelector('.thumbnails-grid')
-                                                       || root.querySelector('.thumbnails')
-                                                       || root.querySelector('.options-grid');
-                                            // Fallback: the nearest ancestor that contains many .thumbnail-wrapper or .thumbnail
-                                            if (!cont){
-                                                var candidates = root.querySelectorAll('*');
-                                                for (var i=0;i<candidates.length;i++){
-                                                    var el = candidates[i];
-                                                    try {
-                                                        var cnt = (el.querySelectorAll('.thumbnail-wrapper').length || 0) + (el.querySelectorAll('.thumbnail').length || 0);
-                                                        if (cnt >= 4) { cont = el; break; }
-                                                    } catch(_){}
-                                                }
-                                            }
-                                            if (cont){
-                                                applyGrid(cont);
-                                                try {
-                                                    var mo = new MutationObserver(function(){ applyGrid(cont); });
-                                                    mo.observe(cont, { childList: true, subtree: true });
-                                                } catch(_){}
-                                                return;
-                                            }
-                                        } catch(_){ }
-                                        if (retries < 60) setTimeout(function(){ ensureTwoColModelGrid(retries+1); }, 200);
-                                    })(0);
-
                                     // Tekst loadera dla mobile
                                     var lt = document.querySelector('#custom-loader .loading-text');
                                     if (lt) { lt.textContent = 'Inicjalizacja konfiguratora w wersji mobilnej'; }
 
-                                    // Hint po 8s (bez auto-refresh)
+                                    // Hint po 8s, auto-refresh po 20s (jednorazowo)
                                     setTimeout(function(){
                                         var loader = document.getElementById('custom-loader');
                                         if (!loader || loader.style.display==='none' || document.getElementById('mobile-longload-hint')) return;
@@ -438,7 +312,35 @@ body.mobile-mode #model-thumbnails .thumbnail{width:100% !important;height:110px
                                         hint.textContent = 'Strona ładuje się zbyt długo... Odśwież przeglądarkę/stronę';
                                         try { loader.appendChild(hint); } catch(_){}
                                     }, 8000);
+
+                                    setTimeout(function(){
+                                        var loader = document.getElementById('custom-loader');
+                                        if (!loader || loader.style.display==='none') return;
+                                        if (sessionStorage.getItem('mobileReloadedOnce')==='1') return;
+                                        sessionStorage.setItem('mobileReloadedOnce','1');
+                                        try {
+                                            var url = new URL(location.href);
+                                            url.searchParams.set('r', Date.now().toString());
+                                            location.replace(url.toString());
+                                        } catch(_) { location.reload(); }
+                                    }, 20000);
                                 } catch(_){ }
+                                
+                                // Persist two-column model grid after UI rerenders on mobile
+                                try {
+                    var rightPanel = document.getElementById('mobile-right-panel') || document.body;
+                    var thumbsContainer = rightPanel.querySelector('#model-thumbnails') || rightPanel.querySelector('.options-grid');
+                    if (thumbsContainer) {
+                                        var mo = new MutationObserver(function(){
+                                            try {
+                        thumbsContainer.style.display = 'grid';
+                        thumbsContainer.style.gridTemplateColumns = '1fr 1fr';
+                        thumbsContainer.style.gap = '10px';
+                                            } catch(_){}
+                                        });
+                    mo.observe(thumbsContainer, { childList: true, subtree: true });
+                                    }
+                                } catch(_){}
             } catch (e) {
                 console.error('Mobile loader failed:', e);
                 showError('Nie udało się wczytać aplikacji mobilnej.');
