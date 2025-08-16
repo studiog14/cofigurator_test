@@ -77,11 +77,12 @@
 
                 // 1) Wstrzyknij es-module-shims w <head> (lub zaraz po <meta charset>)
                 const shimTag = '<script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1/dist/es-module-shims.min.js"></' + 'script>';
+                const hintCss = '<style id="mobile-hint-style">@keyframes mobileHint{to{opacity:1}}</style>';
                 if(html.includes('</head>')){
-                    html = html.replace(/<head[^>]*>/i, function(m){ return m + '\n  ' + shimTag + '\n'; });
+                    html = html.replace(/<head[^>]*>/i, function(m){ return m + '\n  ' + shimTag + '\n  ' + hintCss + '\n'; });
                 } else {
                     // awaryjnie dodaj na początku
-                    html = shimTag + '\n' + html;
+                    html = shimTag + '\n' + hintCss + '\n' + html;
                 }
 
                 // 2) Konwersja import map i modułów na wariant shim
@@ -113,7 +114,13 @@
                 html = html.replace(/emailjs\.init\(([^)]*)\);/i,
                     '(function initEmail(){ if (window.emailjs&&emailjs.init){ try{ emailjs.init($1); }catch(_){ } } else { setTimeout(initEmail,200); } })();');
 
-                // 2d) Doładuj odłożone CDN-y po wstawieniu dokumentu – bez wstrzykiwania dodatkowych <script> w stringu
+                    // 2d) Zmień komunikat loadera i wstrzyknij wskazówkę (CSS-only reveal po 8s)
+                    html = html.replace(/<div\s+class=\"loading-text\"([^>]*)>([\s\S]*?)<\/div>/i, function(_, attrs){
+                        return '<div class="loading-text"'+attrs+'>Inicjalizacja konfiguratora w wersji mobilnej<\/div>' +
+                               '<div id="mobile-longload-hint" style="margin-top:12px;font-size:14px;color:#666;text-align:center;max-width:320px;opacity:0;animation:mobileHint 0s linear 8s forwards">Strona ładuje się zbyt długo... Odśwież przeglądarkę/stronę<\/div>';
+                    });
+
+                    // 2e) Doładuj odłożone CDN-y po wstawieniu dokumentu – bez wstrzykiwania dodatkowych <script> w stringu
 
                         // 3) Delikatny sygnał do aplikacji, że to wariant mobile
                 //    (nie zmieniamy logiki index.html – tylko podpowiedź)
