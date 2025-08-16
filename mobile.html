@@ -145,6 +145,12 @@
 body.mobile-mode .category-button.active{background:#F5C842;color:#fff;border-color:#F5C842}\
 /* Ensure right panel is wide enough for 2 tiles */\
 body.mobile-mode #mobile-right-panel{width:clamp(260px,38vw,360px);max-width:clamp(260px,38vw,360px)}\
+/* Mobile scroll improvements: prevent body rubber-banding and scroll within right panel only */\
+html.mobile-mode, body.mobile-mode{overscroll-behavior-y:contain;overscroll-behavior:contain}\
+body.mobile-mode{overflow:hidden}\
+body.mobile-mode #mobile-right-panel{height:100dvh;max-height:100dvh;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:calc(24px + env(safe-area-inset-bottom, 0px))}\
+/* Fallback for older browsers that lack 100dvh: use JS-set --vh */\
+@supports not (height: 100dvh){ body.mobile-mode #mobile-right-panel{height:calc(var(--vh, 1vh) * 100);max-height:calc(var(--vh, 1vh) * 100)} }\
 /* Categories: two per row without changing button look */\
 body.mobile-mode #mobile-category-buttons-container,\
 body.mobile-mode #category-buttons-container{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}\
@@ -223,6 +229,17 @@ body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, b
 
                                 // 5) Po wstawieniu: doładuj odłożone CDN-y, anty-flash overlay i mobilny komunikat loadera + hint
                                 try {
+                                    // Dynamic VH fallback for mobile address bar resizing
+                                    (function setupVHFallback(){
+                                        try {
+                                            var setVh = function(){
+                                                try { document.documentElement.style.setProperty('--vh', (window.innerHeight * 0.01) + 'px'); } catch(_) {}
+                                            };
+                                            setVh();
+                                            window.addEventListener('resize', setVh, { passive: true });
+                                            window.addEventListener('orientationchange', setVh, { passive: true });
+                                        } catch(_) {}
+                                    })();
                                     // Anti-flash overlay: ukryj ewentualny ekran powitalny zanim UI będzie gotowe
                                     var __mobileOverlay = document.createElement('div');
                                     __mobileOverlay.id = 'mobile-boot-overlay';
