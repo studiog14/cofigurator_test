@@ -201,6 +201,14 @@ body.mobile-mode #mobile-right-panel .thumbnail{width:100%;height:120px;display:
 body.mobile-mode #mobile-right-panel .thumbnail img{max-width:100%;max-height:90px;width:auto;height:auto;object-fit:contain;display:block}
 /* Ensure caption and price are clearly below the frame */
 body.mobile-mode #mobile-right-panel .thumbnail-caption{margin-top:8px;font-size:13px}
+    /* Mobile-only proportional font scaling (relative to category/chair sizes) */
+    body.mobile-mode{--panelFontBase:12px;--captionFont:13px}
+    body.mobile-mode #welcome-screen h1{font-size:calc(var(--panelFontBase) * 1.8) !important}
+    body.mobile-mode #welcome-screen p{font-size:calc(var(--panelFontBase) * 1.1) !important}
+    body.mobile-mode .loading-text{font-size:calc(var(--panelFontBase) * 1.1) !important}
+    body.mobile-mode #boot-loader #boot-msg{font-size:calc(var(--panelFontBase) * 1.1) !important}
+    body.mobile-mode #mobile-longload-hint{font-size:calc(var(--panelFontBase) * 1.0) !important}
+    body.mobile-mode .muted{font-size:calc(var(--panelFontBase) * 1.1) !important}
 /* Search UI inside the mobile panel */
 body.mobile-mode #mobile-right-panel #search-container{position:sticky !important;top:0 !important;z-index:1500;background:rgba(255,255,255,0.96);padding:8px 8px;margin:0 0 8px 0;display:flex;align-items:center;gap:8px}
 body.mobile-mode #mobile-right-panel #search-toggle{transform:none !important;width:40px;height:40px}
@@ -521,7 +529,7 @@ body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail img{width:64px 
                                         } catch(_){}
                                     })();
 
-                                    // Mobile category buttons: ensure active state mirrors desktop behavior
+                                    // Mobile category buttons: let desktop handlers toggle active; only persist 'Promocje' pill styling
                                     (function attachCategoryActiveSync(retries){
                                         function markPromotionsPill(root){
                                             try {
@@ -542,29 +550,9 @@ body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail img{width:64px 
                                                 container.addEventListener('click', function(e){
                                                     var btn = e.target && e.target.closest && e.target.closest('.category-button');
                                                     if (!btn) return;
-                                                    var cat = btn.dataset && (btn.dataset.category || btn.textContent && btn.textContent.trim());
-                                                    try {
-                                                        // after the first real click, don't force default category anymore
-                                                        window.__mobileCategoryPickedOnce = true;
-                                                        // toggle active correctly
-                                                        var scope = container.querySelectorAll('.category-button');
-                                                        scope.forEach(function(b){ b.classList.remove('active'); });
-                                                        btn.classList.add('active');
-                                                        try {
-                                                            var label = (btn.textContent||'').trim().toLowerCase();
-                                                            // ensure only Promocje has promotion class
-                                                            scope.forEach(function(b){ var l=(b.textContent||'').trim().toLowerCase(); if(l!=='promocje'){ b.classList.remove('promotion'); } });
-                                                            if (label === 'promocje') btn.classList.add('promotion');
-                                                        } catch(_){ }
-                                                    } catch(_){}
-                                                    try {
-                                                        if (typeof window.renderMobileRightPanelList === 'function' && cat) {
-                                                            window.renderMobileRightPanelList(cat);
-                                                            // Show list from the top after changing category
-                                                            var panel = document.getElementById('mobile-right-panel');
-                                                            if (panel) { panel.scrollTop = 0; if (panel.scrollTo) panel.scrollTo({ top: 0, behavior: 'auto' }); }
-                                                        }
-                                                    } catch(_){}
+                                                    try { window.__mobileCategoryPickedOnce = true; } catch(_){}
+                                                    // Re-apply promotion styling after desktop code updates DOM
+                                                    setTimeout(function(){ try { markPromotionsPill(container); } catch(_){ } }, 50);
                                                 }, { passive: true });
                                                 // Observe for re-renders and keep the 'Promocje' pill styled
                                                 var moCats = new MutationObserver(function(){ try { markPromotionsPill(container); } catch(_){} });
