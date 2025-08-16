@@ -28,11 +28,10 @@
     </script>
 </head>
 <body>
-    <div id="boot-loader" class="loader">
-        <div class="spinner" aria-hidden="true"></div>
-        <div>Ładowanie wersji mobilnej…</div>
-        <div class="muted">Jeśli trwa zbyt długo, odśwież stronę.</div>
-    </div>
+        <div id="boot-loader" class="loader">
+            <div class="spinner" aria-hidden="true"></div>
+            <div>Ładowanie wersji mobilnej…</div>
+        </div>
 
     <script>
         (async function(){
@@ -94,7 +93,52 @@
                         }
                     });
 
-                // 3) Delikatny sygnał do aplikacji, że to wariant mobile
+                        // 2c) Wstrzyknij skrypt mobilny: zmiana tekstu głównego loadera i opóźniona podpowiedź odświeżenia
+                        const mobileHelperScript = `
+                            <script>(function(){
+                                document.addEventListener('DOMContentLoaded', function(){
+                                    try {
+                                        var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+                                        if (!isMobile) return;
+                                        // Uaktualnij tekst głównego loadera
+                                        var lt = document.querySelector('#custom-loader .loading-text');
+                                        if (lt) { lt.textContent = 'Inicjalizacja konfiguratora – ładowanie wersji mobilnej…'; }
+                                        // Pokaż delikatną sugestię dopiero po dłuższym czasie
+                                        function showHint(){
+                                            var loader = document.getElementById('custom-loader');
+                                            if (!loader || loader.style.display==='none') return;
+                                            if (document.getElementById('mobile-longload-hint')) return;
+                                            var hint = document.createElement('div');
+                                            hint.id = 'mobile-longload-hint';
+                                            hint.style.cssText = 'margin-top:12px;font-size:14px;color:#666;text-align:center;max-width:320px;';
+                                            hint.textContent = 'Ładowanie trwa dłużej niż zwykle. Odśwież stronę.';
+                                            try { loader.appendChild(hint); } catch(_){}
+                                        }
+                                        setTimeout(showHint, 8000);
+
+                                        // Automatyczne odświeżenie po dłuższym czasie, jeśli główny loader nadal widoczny
+                                        function maybeAutoReload(){
+                                            try {
+                                                var loader = document.getElementById('custom-loader');
+                                                if (!loader || loader.style.display==='none') return; // załadowało
+                                                if (sessionStorage.getItem('mobileReloadedOnce')==='1') return; // unikaj pętli
+                                                sessionStorage.setItem('mobileReloadedOnce','1');
+                                                var url = new URL(location.href);
+                                                url.searchParams.set('r', Date.now().toString());
+                                                location.replace(url.toString());
+                                            } catch(_) { location.reload(); }
+                                        }
+                                        setTimeout(maybeAutoReload, 20000);
+                                    } catch(_){}
+                                });
+                            })();<\/script>`;
+                        if (html.includes('</head>')) {
+                            html = html.replace(/<\/head>/i, mobileHelperScript + '\n</head>');
+                        } else {
+                            html = mobileHelperScript + html;
+                        }
+
+                        // 3) Delikatny sygnał do aplikacji, że to wariant mobile
                 //    (nie zmieniamy logiki index.html – tylko podpowiedź)
                 html = html.replace(/<body([^>]*)>/i, function(_, attrs){
                     return '<body'+ (attrs||'') + ' class="mobile-mode">';
