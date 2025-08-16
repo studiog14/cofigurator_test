@@ -523,20 +523,37 @@ body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail img{width:64px 
 
                                     // Mobile category buttons: ensure active state mirrors desktop behavior
                                     (function attachCategoryActiveSync(retries){
+                                        function markPromotionsPill(root){
+                                            try {
+                                                var container = root || document;
+                                                var btns = container.querySelectorAll('.category-button');
+                                                if (!btns || !btns.length) return;
+                                                Array.from(btns).forEach(function(b){
+                                                    var lbl = (b.textContent||'').trim().toLowerCase();
+                                                    if (lbl === 'promocje') b.classList.add('promotion');
+                                                });
+                                            } catch(_){}
+                                        }
                                         try {
                                             var container = document.getElementById('mobile-right-panel') || document.getElementById('mobile-category-buttons-container') || document.getElementById('category-buttons-container');
                                             if (container) {
+                                                // keep the 'Promocje' pill styled on initial render
+                                                markPromotionsPill(container);
                                                 container.addEventListener('click', function(e){
                                                     var btn = e.target && e.target.closest && e.target.closest('.category-button');
                                                     if (!btn) return;
                                                     var cat = btn.dataset && (btn.dataset.category || btn.textContent && btn.textContent.trim());
                                                     try {
+                                                        // after the first real click, don't force default category anymore
+                                                        window.__mobileCategoryPickedOnce = true;
+                                                        // toggle active correctly
                                                         var scope = container.querySelectorAll('.category-button');
                                                         scope.forEach(function(b){ b.classList.remove('active'); });
                                                         btn.classList.add('active');
                                                         try {
                                                             var label = (btn.textContent||'').trim().toLowerCase();
-                                                            scope.forEach(function(b){ if((b.textContent||'').trim().toLowerCase()!=='promocje'){ b.classList.remove('promotion'); } });
+                                                            // ensure only Promocje has promotion class
+                                                            scope.forEach(function(b){ var l=(b.textContent||'').trim().toLowerCase(); if(l!=='promocje'){ b.classList.remove('promotion'); } });
                                                             if (label === 'promocje') btn.classList.add('promotion');
                                                         } catch(_){ }
                                                     } catch(_){}
@@ -549,15 +566,19 @@ body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail img{width:64px 
                                                         }
                                                     } catch(_){}
                                                 }, { passive: true });
+                                                // Observe for re-renders and keep the 'Promocje' pill styled
+                                                var moCats = new MutationObserver(function(){ try { markPromotionsPill(container); } catch(_){} });
+                                                moCats.observe(container, { childList: true, subtree: true });
                                                 return;
                                             }
                                         } catch(_) {}
                                         if (retries < 50) setTimeout(function(){ attachCategoryActiveSync(retries+1); }, 200);
                                     })(0);
 
-                                    // Mobile: default to 'Promocje' category on first load and style the pill in red
+                                    // Mobile: default to 'Promocje' category on first load (until user picks something), and style its pill in red
                                     (function ensurePromotionsDefault(retries){
                                         try {
+                                            if (window.__mobileCategoryPickedOnce) return; // user already chose
                                             // If function exists, render the promotions list in the right panel
                                             if (typeof window.renderMobileRightPanelList === 'function') {
                                                 window.renderMobileRightPanelList('Promocje');
@@ -567,10 +588,15 @@ body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail img{width:64px 
                                             var btns = cont.querySelectorAll('.category-button');
                                             if (btns && btns.length) {
                                                 var promoBtn = Array.from(btns).find(function(b){ return (b.textContent||'').trim().toLowerCase()==='promocje'; });
+                                                // If any active exists already, don't override user/UI choice
+                                                var anyActive = Array.from(btns).some(function(b){ return b.classList.contains('active'); });
                                                 if (promoBtn) {
-                                                    btns.forEach(function(b){ b.classList.remove('active'); });
-                                                    promoBtn.classList.add('active');
+                                                    // keep the red border regardless of active
                                                     promoBtn.classList.add('promotion');
+                                                    if (!anyActive) {
+                                                        btns.forEach(function(b){ b.classList.remove('active'); });
+                                                        promoBtn.classList.add('active');
+                                                    }
                                                     return; // success
                                                 }
                                             }
