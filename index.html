@@ -6363,27 +6363,31 @@ updateSummary();
         native.addEventListener('input', () => setThumbByValue(parseFloat(native.value)));
       }
 
-      // Zamknij panel jasności po kliknięciu poza nim
-      document.addEventListener('click', (e) => {
+    // Zamknij panel jasności po kliknięciu poza nim (capture to prevent other closers)
+    document.addEventListener('click', (e) => {
         const brightnessPanel = document.getElementById('brightness-panel');
         const hdrToggle = document.getElementById('hdr-toggle');
         
         if (brightnessPanel && !brightnessPanel.contains(e.target) && e.target !== hdrToggle && !hdrToggle.contains(e.target)) {
           brightnessPanel.classList.add('hidden');
           brightnessPanel.style.display = 'none';
+      // Zatrzymaj propagację, żeby nie zamykać całego UI tym samym tapnięciem
+      e.stopPropagation();
         }
-      });
+    }, { capture: true });
 
-      // Mobile: also close on touchstart outside for faster response
-      document.addEventListener('touchstart', (e) => {
+    // Mobile: also close on touchstart outside for faster response (capture + non-passive)
+    document.addEventListener('touchstart', (e) => {
         const brightnessPanel = document.getElementById('brightness-panel');
         const hdrToggle = document.getElementById('hdr-toggle');
         if (!brightnessPanel) return;
         if (!brightnessPanel.contains(e.target) && e.target !== hdrToggle && !hdrToggle.contains(e.target)) {
           brightnessPanel.classList.add('hidden');
           brightnessPanel.style.display = 'none';
+      // Zatrzymaj propagację, żeby nie zamykać całego UI tym samym tapnięciem
+      e.stopPropagation();
         }
-      }, { passive: true });
+    }, { passive: false, capture: true });
 
       // Panel wymiarów
       document.getElementById('dimensions-show')?.addEventListener('click', (e) => {
