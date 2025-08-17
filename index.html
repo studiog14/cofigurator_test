@@ -1652,8 +1652,8 @@
       #brightness-slider-mobile { display: block; }
     }
 
-    /* Overlay to capture first outside tap on mobile and close only the brightness slider */
-    #brightness-dismiss-layer { position: fixed; inset: 0; background: transparent; z-index: 1004; display: none; }
+  /* Overlay to capture first outside tap on mobile and close only the brightness slider */
+  #brightness-dismiss-layer { position: fixed; inset: 0; background: transparent; z-index: 1004; display: none; pointer-events: auto; }
     @media (max-width: 820px) {
       #brightness-dismiss-layer.mobile-active { display: block; }
     }
@@ -2911,8 +2911,6 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
 
   <!-- Dolny panel UI -->
   <div id="bottom-toolbar" style="display: none;">
-  <!-- Mobile dismiss layer for brightness panel -->
-  <div id="brightness-dismiss-layer" aria-hidden="true"></div>
 
     <!-- Przycisk HDR -->
     <button id="hdr-toggle" title="Zmień HDR">
@@ -6175,11 +6173,40 @@ updateSummary();
         });
       });
 
+      // Ensure one global body-level dismiss layer exists
+      function ensureBrightnessDismissLayer() {
+        let el = document.getElementById('brightness-dismiss-layer');
+        if (!el) {
+          el = document.createElement('div');
+          el.id = 'brightness-dismiss-layer';
+          el.setAttribute('aria-hidden', 'true');
+          document.body.appendChild(el);
+        } else if (el.parentElement !== document.body) {
+          document.body.appendChild(el);
+        }
+        if (!el._handlerBound) {
+          const handler = (evt) => {
+            const panel = document.getElementById('brightness-panel');
+            if (!panel) return;
+            const isVisible = panel.style.display !== 'none' && !panel.classList.contains('hidden');
+            if (!isVisible) return;
+            panel.classList.add('hidden');
+            panel.style.display = 'none';
+            el.classList.remove('mobile-active');
+            evt.stopPropagation();
+          };
+          el.addEventListener('click', handler);
+          el.addEventListener('touchstart', handler, { passive: false });
+          el._handlerBound = true;
+        }
+        return el;
+      }
+
       // Modyfikacja przycisku HDR żeby pokazywał panel jasności
       document.getElementById('hdr-toggle')?.addEventListener('click', (e) => {
         e.stopPropagation();
         const panel = document.getElementById('brightness-panel');
-        const dismiss = document.getElementById('brightness-dismiss-layer');
+        const dismiss = ensureBrightnessDismissLayer();
         panel.classList.toggle('hidden');
         panel.style.display = panel.classList.contains('hidden') ? 'none' : 'block';
         
