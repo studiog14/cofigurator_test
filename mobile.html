@@ -172,13 +172,16 @@ html.mobile-mode, body.mobile-mode, body.mobile-mode #welcome-screen, body.mobil
 /* Prefer tap interactions; helps avoid double-tap zoom */
 body.mobile-mode{touch-action:manipulation}
 /* Ensure right panel is wide enough for 2 tiles (use shared var to avoid gaps) */
-    body.mobile-mode{--panelW: clamp(260px,38vw,360px)}
+    body.mobile-mode{--panelW: clamp(240px,36vw,320px)}
     /* Panel uses border-box so its width includes padding; this keeps the welcome width exact */
     body.mobile-mode #mobile-right-panel{width:var(--panelW) !important;max-width:var(--panelW) !important;border-left:0 !important;box-shadow:none !important;margin-left:0 !important;box-sizing:border-box !important}
     /* Ensure no edge styling on welcome */
-    body.mobile-mode #welcome-screen{border-right:0 !important;box-shadow:none !important}
+    body.mobile-mode #welcome-screen{border-right:0 !important;box-shadow:none !important;padding-bottom:calc(96px + env(safe-area-inset-bottom, 0px)) !important}
     /* Hide the "Kontynuuj" button on mobile */
     body.mobile-mode #welcome-continue-btn{display:none !important}
+    /* Hide install button when installed (standalone/PWA) */
+    @media all and (display-mode: standalone){ body.mobile-mode #welcome-install-btn{ display:none !important } }
+    body.mobile-mode.pwa-installed #welcome-install-btn{ display:none !important }
 body.mobile-mode #mobile-right-panel{height:100dvh;max-height:100dvh;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scroll-padding-bottom:96px;padding-bottom:calc(96px + env(safe-area-inset-bottom, 0px))}
 @supports (height: 100svh){ body.mobile-mode #mobile-right-panel{height:100svh;max-height:100svh} }
 /* Fallback for older browsers that lack 100dvh: use JS-set --vh */
@@ -191,7 +194,9 @@ body.mobile-mode #mobile-category-buttons-container{margin-bottom:10px}
 body.mobile-mode #mobile-right-panel #model-thumbnails,
 body.mobile-mode #mobile-right-panel #legs-thumbnails,
 body.mobile-mode #mobile-right-panel #material-panel-viewer,
-body.mobile-mode #mobile-right-panel .options-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+body.mobile-mode #mobile-right-panel .options-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+/* Force two columns for runtime-created grid (renderMobileRightPanelList) */
+body.mobile-mode #mobile-right-panel > div[style*="display: grid"]{grid-template-columns:1fr 1fr !important;gap:8px !important}
 /* Default right-panel thumbnails to unified size */
 body.mobile-mode #mobile-right-panel .thumbnail{width:80px !important;height:80px !important;margin:0 auto !important}
 body.mobile-mode #mobile-right-panel .thumbnail img{width:64px !important;height:64px !important}
@@ -212,6 +217,9 @@ body.mobile-mode #mobile-right-panel .thumbnail-caption{margin-top:8px;font-size
     body.mobile-mode #boot-loader #boot-msg{font-size:calc(var(--panelFontBase) * 1.1) !important}
     body.mobile-mode #mobile-longload-hint{font-size:calc(var(--panelFontBase) * 1.0) !important}
     body.mobile-mode .muted{font-size:calc(var(--panelFontBase) * 1.1) !important}
+/* PWA-only refresh button */
+body.mobile-mode.pwa-installed #pwa-refresh-btn{position:fixed;right:12px;bottom:12px;z-index:2200;background:#F5C842;border:1px solid #d2a81e;color:#222;font-weight:600;border-radius:12px;padding:8px 10px;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+body.mobile-mode.pwa-installed #pwa-refresh-btn:active{transform:translateY(1px)}
 /* Search UI inside the mobile panel */
 body.mobile-mode #mobile-right-panel #search-container{position:sticky !important;top:0 !important;z-index:1500;background:rgba(255,255,255,0.96);padding:8px 8px;margin:0 0 8px 0;display:flex;align-items:center;gap:8px}
 body.mobile-mode #mobile-right-panel #search-toggle{transform:none !important;width:40px;height:40px}
@@ -389,6 +397,47 @@ body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail img{width:64px 
                                         __mobileOverlay.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:9998;transition:opacity .2s ease;';
                                         (document.body || document.documentElement).appendChild(__mobileOverlay);
                                     }
+                                    // Detect PWA install and manage install/refresh controls (mobile only)
+                                    (function setupPWAControls(){
+                                        try {
+                                            var isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+                                            if (isStandalone) { document.body.classList.add('pwa-installed'); }
+                                            // Hide install button if installed
+                                            try {
+                                                if (document.body.classList.contains('pwa-installed')) {
+                                                    var installBtn = document.getElementById('welcome-install-btn');
+                                                    if (installBtn) installBtn.style.display = 'none';
+                                                }
+                                            } catch(_){ }
+                                            // Add refresh button only in installed mode
+                                            if (document.body.classList.contains('pwa-installed')) {
+                                                if (!document.getElementById('pwa-refresh-btn')){
+                                                    var r = document.createElement('button');
+                                                    r.id = 'pwa-refresh-btn';
+                                                    r.type = 'button';
+                                                    r.textContent = 'Odśwież';
+                                                    r.addEventListener('click', function(){ try { location.reload(); } catch(_) { location.href = location.href; } });
+                                                    document.body.appendChild(r);
+                                                }
+                                            }
+                                        } catch(_){ }
+                                    })();
+                                    // Ensure two-column grid after desktop render mutates DOM
+                                    (function enforceTwoColumns(){
+                                        try {
+                                            var container = document.getElementById('mobile-right-panel');
+                                            if (!container) return;
+                                            var apply = function(){
+                                                try {
+                                                    var grids = container.querySelectorAll(':scope > div[style*="display: grid"]');
+                                                    grids.forEach(function(g){ g.style.gridTemplateColumns = '1fr 1fr'; g.style.gap = '8px'; });
+                                                } catch(_){}
+                                            };
+                                            apply();
+                                            var mo = new MutationObserver(function(){ apply(); });
+                                            mo.observe(container, { childList:true, subtree:true });
+                                        } catch(_){ }
+                                    })();
                                     // Doładuj skrypty CDN
                                     var placeholders = document.querySelectorAll('script[data-mobile-defer-src]');
                                     placeholders.forEach(function(ph){
