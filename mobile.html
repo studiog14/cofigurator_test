@@ -260,6 +260,9 @@ body.mobile-mode #mobile-right-panel #model-thumbnails .thumbnail,
 body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail{width:80px !important;height:80px !important;display:flex !important;align-items:center !important;justify-content:center !important;margin:0 auto !important}
 body.mobile-mode #mobile-right-panel #model-thumbnails .thumbnail img,
 body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail img{width:64px !important;height:64px !important;object-fit:contain !important}
+/* Welcome: hide only the continue button; keep install unless PWA is installed */
+body.mobile-mode #welcome-continue-btn{display:none !important}
+body.mobile-mode.pwa-installed #welcome-install-btn{display:none !important}
 </style>`;
                 if(html.includes('</head>')){
                     html = html.replace(/<head[^>]*>/i, function(m){ return m + '\n  ' + shimTag + '\n  ' + hintCss + '\n'; });
@@ -798,6 +801,46 @@ body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail img{width:64px 
                                     var mo = new MutationObserver(function(){ applyAllGrids(); });
                                     mo.observe(document.body, { childList: true, subtree: true });
                                 } catch(_){ }
+
+                                // Hide 'Wybierz model' / 'Wybierz krzesło' headers on mobile; keep desktop intact
+                                (function hidePickHeaders(){
+                                    function hideNow(root){
+                                        try {
+                                            var hs = (root||document).querySelectorAll('h3');
+                                            hs.forEach(function(h){
+                                                try {
+                                                    var t = (h.textContent||'').trim().toLowerCase();
+                                                    if (t === 'wybierz model:' || t === 'wybierz krzesło:') {
+                                                        h.style.display = 'none';
+                                                    }
+                                                } catch(_) {}
+                                            });
+                                        } catch(_) {}
+                                    }
+                                    hideNow();
+                                    try {
+                                        var mo = new MutationObserver(function(m){ hideNow(); });
+                                        mo.observe(document.body, { childList:true, subtree:true });
+                                    } catch(_) {}
+                                })();
+
+                                // Detect if running as installed PWA and toggle class to hide install button
+                                (function detectPWAInstalled(){
+                                    function update(){
+                                        try {
+                                            var installed = false;
+                                            try { installed = installed || window.matchMedia('(display-mode: standalone)').matches; } catch(_){}
+                                            try { installed = installed || window.matchMedia('(display-mode: fullscreen)').matches; } catch(_){}
+                                            try { installed = installed || window.matchMedia('(display-mode: minimal-ui)').matches; } catch(_){}
+                                            try { installed = installed || (window.navigator && window.navigator.standalone === true); } catch(_){}
+                                            document.body.classList.toggle('pwa-installed', !!installed);
+                                        } catch(_){}
+                                    }
+                                    update();
+                                    try { window.addEventListener('load', update, { passive:true }); } catch(_){}
+                                    try { window.matchMedia('(display-mode: standalone)').addEventListener('change', update); } catch(_){}
+                                    try { window.matchMedia('(display-mode: fullscreen)').addEventListener('change', update); } catch(_){}
+                                })();
             } catch (e) {
                 console.error('Mobile loader failed:', e);
                 showError('Nie udało się wczytać aplikacji mobilnej.');
