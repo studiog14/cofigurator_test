@@ -1575,7 +1575,7 @@
       box-shadow: 0 2px 6px rgba(0,0,0,0.3) !important;
       margin: 0 !important;
       position: relative !important;
-      left: 4px !important; /* Zwiększone przesunięcie w prawo */
+  left: 4px !important; /* Zwiększone przesunięcie w prawo (desktop) */
     }
 
     #brightness-panel #brightness-slider::-moz-range-thumb {
@@ -1600,6 +1600,23 @@
       background-color: #F5C842 !important;
       border: 3px solid #fff !important;
       box-shadow: 0 2px 8px rgba(0,0,0,0.4) !important;
+    }
+
+    /* 📱 Mobile-only fix: center yellow thumb on the black track */
+    @media (max-width: 820px) {
+      /* Do not push the thumb to the right on mobile */
+      #brightness-panel input[type="range"]::-webkit-slider-thumb,
+      #brightness-panel #brightness-slider::-webkit-slider-thumb {
+        left: 0 !important; /* cancel desktop offset */
+      }
+      /* Ensure track and thumb visually align on narrow mobile UI */
+      #brightness-panel #brightness-slider {
+        width: 8px !important;   /* keep narrow track */
+      }
+      #brightness-panel #brightness-slider::-webkit-slider-runnable-track,
+      #brightness-panel #brightness-slider::-moz-range-track {
+        width: 8px !important;
+      }
     }
 
     /* Mozilla specific track styling */
@@ -3645,6 +3662,15 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
       setTimeout(() => {
         renderPromotions();
       }, 50);
+      
+      // GATE: mark that user picked a category on any category-button click to avoid auto-overrides
+      try {
+        document.addEventListener('click', (ev) => {
+          const btn = ev.target && ev.target.closest && ev.target.closest('.category-button');
+          if (!btn) return;
+          try { window.__userCategoryPicked = true; } catch(_){}
+        }, { passive: true });
+      } catch(_){}
       
       // Pokaż welcome screen z odpowiednią zawartością
       const welcomeScreen = document.getElementById('welcome-screen');
@@ -7161,6 +7187,7 @@ function setDefaultMaterialsFromSheet() {
           allButton.textContent = 'Wszystkie';
           allButton.style.cssText = 'padding: 8px 16px; border: 2px solid #F5C842; background: white; color: #333; border-radius: 20px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; text-transform: capitalize;';
           allButton.onclick = () => {
+            try { window.__userCategoryPicked = true; } catch(_){}
             // Reset wyszukiwania przy kliknięciu w kategorię
             if (currentSearchFilter) {
               console.log('🔄 Resetowanie wyszukiwania przy przełączeniu na kategorię "Wszystkie"');
@@ -7218,6 +7245,7 @@ function setDefaultMaterialsFromSheet() {
             promoButton.textContent = '🔥 Promocje';
             promoButton.style.cssText = 'padding: 8px 16px; border: 2px solid #FF6B6B; background: white; color: #FF6B6B; border-radius: 20px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; text-transform: capitalize;';
             promoButton.onclick = () => {
+              try { window.__userCategoryPicked = true; } catch(_){}
               // Reset wyszukiwania przy kliknięciu w kategorię
               if (currentSearchFilter) {
                 console.log('🔄 Resetowanie wyszukiwania przy przełączeniu na kategorię "Promocje"');
@@ -7279,6 +7307,7 @@ function setDefaultMaterialsFromSheet() {
             bestsellerButton.textContent = '⭐ Bestsellery';
             bestsellerButton.style.cssText = 'padding: 8px 16px; border: 2px solid #f5c842; background: white; color: #333; border-radius: 20px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; text-transform: capitalize;';
             bestsellerButton.onclick = () => {
+              try { window.__userCategoryPicked = true; } catch(_){}
               // Reset wyszukiwania przy kliknięciu w kategorię
               if (currentSearchFilter) {
                 console.log('🔄 Resetowanie wyszukiwania przy przełączeniu na kategorię "Bestsellery"');
@@ -7354,6 +7383,7 @@ function setDefaultMaterialsFromSheet() {
           // }
           
           button.onclick = () => {
+            try { window.__userCategoryPicked = true; } catch(_){}
             // Reset filtra wyszukiwania jeśli jest aktywny
             if (currentSearchFilter) {
               setSearchFilter('');
@@ -7541,7 +7571,9 @@ function setDefaultMaterialsFromSheet() {
       }
 
       // Funkcja renderująca promocje na starcie
-      function renderPromotions() {
+    function renderPromotions() {
+  // If user already interacted with categories, don't override their choice
+  try { if (window.__userCategoryPicked) { console.log('renderPromotions skipped: user picked a category'); return; } } catch(_){}
   console.log('🎉 renderPromotions called, allData length:', (allData ? allData.length : 0));
         
         if (!allData || !Array.isArray(allData) || allData.length === 0) {
@@ -7568,11 +7600,13 @@ function setDefaultMaterialsFromSheet() {
           
           // Aktywuj przycisk "Promocje" zamiast "Wszystkie" 
           setTimeout(() => {
+            if (window.__userCategoryPicked) { return; }
             console.log('🎉 Looking for .category-button.promotion...');
             const promoButton = document.querySelector('.category-button.promotion');
             console.log('🎉 Found promotion button:', promoButton ? 'YES' : 'NO');
             
             if (promoButton) {
+              if (window.__userCategoryPicked) { return; }
               console.log('🎉 Activating promotion button');
               document.querySelectorAll('.category-button').forEach(btn => {
                 btn.classList.remove('active');
@@ -7591,8 +7625,10 @@ function setDefaultMaterialsFromSheet() {
           renderAllModels();
           // Aktywuj przycisk "Wszystkie" jeśli nie ma promocji
           setTimeout(() => {
+            if (window.__userCategoryPicked) { return; }
             const allButton = document.querySelector('.category-button.special-category');
             if (allButton) {
+              if (window.__userCategoryPicked) { return; }
               document.querySelectorAll('.category-button').forEach(btn => {
                 btn.classList.remove('active');
                 btn.style.background = 'white';
@@ -7679,6 +7715,7 @@ function setDefaultMaterialsFromSheet() {
         allButton.textContent = 'Wszystkie';
         allButton.style.cssText = 'margin: 5px; padding: 8px 15px; border: 2px solid #F5C842; background: #F5C842; color: #333; border-radius: 8px; font-weight: bold; cursor: pointer;';
         allButton.onclick = () => {
+            try { window.__userCategoryPicked = true; } catch(_){}
           document.querySelectorAll('#mobile-category-buttons-container .category-button').forEach(btn => {
             btn.classList.remove('active');
             btn.style.background = '#fff';
@@ -7706,6 +7743,7 @@ function setDefaultMaterialsFromSheet() {
           promoButton.textContent = '🔥 Promocje';
           promoButton.style.cssText = 'margin: 5px; padding: 8px 15px; border: 2px solid #FF6B6B; background: #fff; color: #FF6B6B; border-radius: 8px; font-weight: bold; cursor: pointer;';
           promoButton.onclick = () => {
+            try { window.__userCategoryPicked = true; } catch(_){}
             document.querySelectorAll('#mobile-category-buttons-container .category-button').forEach(btn => {
               btn.classList.remove('active');
               btn.style.background = '#fff';
@@ -7733,6 +7771,7 @@ function setDefaultMaterialsFromSheet() {
           bestsellerButton.textContent = '⭐ Bestsellery';
           bestsellerButton.style.cssText = 'margin: 5px; padding: 8px 15px; border: 2px solid #f5c842; background: #fff; color: #333; border-radius: 8px; font-weight: bold; cursor: pointer;';
           bestsellerButton.onclick = () => {
+            try { window.__userCategoryPicked = true; } catch(_){}
             document.querySelectorAll('#mobile-category-buttons-container .category-button').forEach(btn => {
               btn.classList.remove('active');
               btn.style.background = '#fff';
@@ -7761,6 +7800,7 @@ function setDefaultMaterialsFromSheet() {
           button.style.cssText = 'margin: 5px; padding: 8px 15px; border: 2px solid #F5C842; background: #fff; color: #333; border-radius: 8px; font-weight: bold; cursor: pointer;';
           
           button.onclick = () => {
+            try { window.__userCategoryPicked = true; } catch(_){}
             document.querySelectorAll('#mobile-category-buttons-container .category-button').forEach(btn => {
               btn.classList.remove('active');
               btn.style.background = '#fff';
@@ -8187,6 +8227,7 @@ function setDefaultMaterialsFromSheet() {
         allButton.textContent = 'Wszystkie';
         allButton.style.cssText = 'margin: 5px; padding: 10px 18px; border: 2px solid #F5C842; background: #F5C842; color: #333; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 14px;';
         allButton.onclick = () => {
+          try { window.__userCategoryPicked = true; } catch(_){}
           document.querySelectorAll('#mobile-main-category-buttons .category-button').forEach(btn => {
             btn.classList.remove('active');
             btn.style.background = '#fff';
@@ -8207,6 +8248,7 @@ function setDefaultMaterialsFromSheet() {
           button.style.cssText = 'margin: 5px; padding: 10px 18px; border: 2px solid #F5C842; background: #fff; color: #333; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 14px;';
           
           button.onclick = () => {
+            try { window.__userCategoryPicked = true; } catch(_){}
             document.querySelectorAll('#mobile-main-category-buttons .category-button').forEach(btn => {
               btn.classList.remove('active');
               btn.style.background = '#fff';
