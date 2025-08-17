@@ -433,6 +433,28 @@ body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail img{width:64px 
                                         } catch(_){}
                                     })();
 
+                                    // Switch category to 'Wszystkie' when user searches
+                                    (function forceAllOnSearch(){
+                                        try {
+                                            var input = document.getElementById('search-input');
+                                            if (!input) return;
+                                            var toAll = function(){
+                                                try {
+                                                    if (typeof window.renderMobileRightPanelList==='function') window.renderMobileRightPanelList('Wszystkie');
+                                                    // Also update active state immediately
+                                                    var right = document.getElementById('mobile-right-panel');
+                                                    if (right){
+                                                        var btns = right.querySelectorAll('.category-button');
+                                                        btns.forEach(function(b){ b.classList.toggle('active', (b.textContent||'').trim().toLowerCase()==='wszystkie'); });
+                                                    }
+                                                } catch(_){ }
+                                            };
+                                            input.addEventListener('input', toAll, { passive:true });
+                                            var clearBtn = document.getElementById('clear-search-filter');
+                                            if (clearBtn) clearBtn.addEventListener('click', toAll, { passive:true });
+                                        } catch(_){ }
+                                    })();
+
                                     // Wrap desktop renderMobileRightPanelList to apply mobile fixes after it renders
                                     (function wrapRenderList(retries){
                                         try {
@@ -446,19 +468,21 @@ body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail img{width:64px 
                                                     if (right){
                                                         // 1) Remove "Wybierz model:" header
                                                         try { Array.from(right.querySelectorAll('h3')).forEach(function(h){ if ((h.textContent||'').trim().toLowerCase().startsWith('wybierz model')) h.remove(); }); } catch(_){ }
-                                                        // 2) Move search into top of right panel (sticky)
+                                                        // 2) Place search right under categories (no forced open)
                                                         try {
                                                             var sc = document.getElementById('search-container');
-                                                            if (sc && sc.parentElement !== right){ right.insertBefore(sc, right.firstChild); sc.style.display = 'flex'; }
+                                                            var catsBlk = right.querySelector('#category-buttons');
+                                                            if (sc && catsBlk) {
+                                                                catsBlk.insertAdjacentElement('afterend', sc);
+                                                                sc.style.display = '';
+                                                            }
                                                         } catch(_){ }
-                                                        // 3) Ensure active category matches selectedCategory immediately
+                                                        // 3) Ensure active category matches selectedCategory immediately, without forcing defaults
                                                         try {
-                                                            if (selectedCategory){
-                                                                var btns = right.querySelectorAll('.category-button');
-                                                                if (btns && btns.length){
-                                                                    var match = Array.from(btns).find(function(b){ return (b.textContent||'').trim().toLowerCase() === String(selectedCategory).toLowerCase(); });
-                                                                    if (match){ btns.forEach(function(b){ b.classList.remove('active'); }); match.classList.add('active'); }
-                                                                }
+                                                            var btns = right.querySelectorAll('.category-button');
+                                                            if (selectedCategory && btns && btns.length){
+                                                                var match = Array.from(btns).find(function(b){ return (b.textContent||'').trim().toLowerCase() === String(selectedCategory).toLowerCase(); });
+                                                                if (match){ btns.forEach(function(b){ b.classList.remove('active'); }); match.classList.add('active'); }
                                                             }
                                                         } catch(_){ }
                                                         // 4) Persist promotions pill red style
@@ -470,30 +494,25 @@ body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail img{width:64px 
                                                 return res;
                                             };
                                             wrapped.__mobileWrapped = true;
-                                                // Post-sync once more in case desktop toggled later
+                                                // Post-sync once more, but only if a clear selection exists
                                                 setTimeout(function(){
                                                     try {
                                                         var right2 = document.getElementById('mobile-right-panel');
                                                         if (!right2) return;
                                                         var btns2 = right2.querySelectorAll('.category-button');
                                                         if (!btns2 || !btns2.length) return;
-                                                        var sel = selectedCategory;
-                                                        if (!sel) {
-                                                            var active = right2.querySelector('.category-button.active');
-                                                            sel = active ? active.textContent.trim() : (btns2[0] && btns2[0].textContent.trim());
-                                                        }
-                                                        if (sel) {
-                                                            var match2 = Array.from(btns2).find(function(b){ return (b.textContent||'').trim().toLowerCase() === String(sel).toLowerCase(); });
-                                                            if (match2){ btns2.forEach(function(b){ b.classList.remove('active'); }); match2.classList.add('active'); }
-                                                        }
-                                                    } catch(_){}
+                                                        var sel = selectedCategory || (right2.querySelector('.category-button.active') && right2.querySelector('.category-button.active').textContent.trim());
+                                                        if (!sel) return;
+                                                        var match2 = Array.from(btns2).find(function(b){ return (b.textContent||'').trim().toLowerCase() === String(sel).toLowerCase(); });
+                                                        if (match2){ btns2.forEach(function(b){ b.classList.remove('active'); }); match2.classList.add('active'); }
+                                                    } catch(_){ }
                                                 }, 60);
                                             window.renderMobileRightPanelList = wrapped;
                                             return;
                                         } catch(_){ if (retries < 50) setTimeout(function(){ wrapRenderList(retries+1); }, 200); }
                                     })(0);
 
-                                    // Persistent mobile fixes: remove header, ensure search is in the right panel and visible
+                                    // Persistent mobile fixes: remove header, keep search under categories (toggle behavior)
                                     (function persistPanelFixes(retries){
                                         try {
                                             var right = document.getElementById('mobile-right-panel');
@@ -515,46 +534,15 @@ body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail img{width:64px 
                                                     if (hr && hr.parentElement === right) { hr.remove(); }
                                                 } catch(_){}
                                                 try {
-                                                    // Move search container to top and make it visible
+                                                    // Move search under categories and keep default desktop toggle
                                                     var sc = document.getElementById('search-container');
-                                                    if (sc && sc.parentElement !== right) {
-                                                        right.insertBefore(sc, right.firstChild);
+                                                    var catsBlk = right.querySelector('#category-buttons');
+                                                    if (sc && catsBlk && sc.parentElement !== catsBlk.parentElement) {
+                                                        catsBlk.insertAdjacentElement('afterend', sc);
                                                     }
-                                                    if (sc) { sc.style.display = 'flex'; }
-                                                    var sp = document.getElementById('search-panel');
-                                                    if (sp) {
-                                                        sp.style.opacity = '1'; sp.style.visibility = 'visible'; sp.style.transform = 'none'; sp.style.position = 'static'; sp.style.maxWidth = '100%';
-                                                    }
-                                                    // Fallback: if no desktop search exists, inject a simple inline search
-                                                    if (!sc && !document.getElementById('mobile-inline-search')){
-                                                        var wrap = document.createElement('div');
-                                                        wrap.id = 'mobile-inline-search';
-                                                        wrap.style.cssText = 'position:sticky;top:0;z-index:1500;background:rgba(255,255,255,0.96);padding:8px 8px;margin:0 0 8px 0;display:flex;gap:8px;align-items:center;border-bottom:1px solid #eee;';
-                                                        var input = document.createElement('input');
-                                                        input.type='search';
-                                                        input.placeholder='Szukaj modeli…';
-                                                        input.style.cssText='flex:1;border:2px solid #F5C842;border-radius:8px;padding:10px 12px;font-size:14px;outline:none;';
-                                                        wrap.appendChild(input);
-                                                        right.insertBefore(wrap, right.firstChild);
-                                                        var filter = function(){
-                                                            try {
-                                                                var q=(input.value||'').trim().toLowerCase();
-                                                                var items = right.querySelectorAll('.thumbnail-wrapper');
-                                                                items.forEach(function(w){
-                                                                    try{
-                                                                        var cap = w.querySelector('.thumbnail-caption');
-                                                                        var txt = (cap && cap.textContent || '').toLowerCase();
-                                                                        w.style.display = (!q || txt.indexOf(q)!==-1) ? '' : 'none';
-                                                                    }catch(_){}
-                                                                });
-                                                            } catch(_){ }
-                                                        };
-                                                        input.addEventListener('input', filter, { passive:true });
-                                                        // Reapply filter on list re-render
-                                                        var mof = new MutationObserver(function(){ filter(); });
-                                                        mof.observe(right, { childList:true, subtree:true });
-                                                    }
-                                                } catch(_){}
+                                                    if (sc) sc.style.display = '';
+                                                    // Do not force #search-panel visible; keep desktop behavior
+                                                } catch(_){ }
                                             }
                                             apply();
                                             var mo = new MutationObserver(function(){ apply(); });
