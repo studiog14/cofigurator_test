@@ -182,8 +182,8 @@ body.mobile-mode #mobile-right-panel{height:100dvh;max-height:100dvh;overflow:au
 @supports not (height: 100dvh){ body.mobile-mode #mobile-right-panel{height:calc(var(--vh, 1vh) * 100);max-height:calc(var(--vh, 1vh) * 100)} }
 /* Categories: two per row without changing button look */
 body.mobile-mode #mobile-category-buttons-container,
-body.mobile-mode #category-buttons-container{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 10px 0}
-/* Normalize category button internal margins for even edges */
+body.mobile-mode #category-buttons-container{display:grid !important;grid-template-columns:1fr 1fr !important;gap:8px !important;margin:0 0 10px 0 !important}
+/* Normalize category button internal margins for even edges; fill each grid cell width */
 body.mobile-mode .category-button{margin:0 !important;width:100%}
 body.mobile-mode #mobile-category-buttons-container{margin-bottom:10px}
 /* Model thumbnails: two columns inside right panel */
@@ -195,7 +195,9 @@ body.mobile-mode #mobile-right-panel .options-grid,
 body.mobile-mode #model-thumbnails,
 body.mobile-mode #legs-thumbnails,
 body.mobile-mode #material-panel-viewer,
-body.mobile-mode .options-grid{display:grid !important;grid-template-columns:1fr 1fr !important;gap:8px !important;margin-top:8px}
+body.mobile-mode .options-grid,
+body.mobile-mode #mobile-right-panel [id*='thumbnails'],
+body.mobile-mode [id*='thumbnails']{display:grid !important;grid-template-columns:1fr 1fr !important;gap:8px !important;margin-top:8px}
 /* Default right-panel thumbnails to unified size */
 body.mobile-mode #mobile-right-panel .thumbnail{width:80px !important;height:80px !important;margin:0 auto !important}
 body.mobile-mode #mobile-right-panel .thumbnail img{width:64px !important;height:64px !important}
@@ -780,25 +782,45 @@ body.mobile-mode.pwa-installed #welcome-install-btn{display:none !important}
 
                                     var applyAllGrids = function(){
                                         try {
-                                            var nodes = document.querySelectorAll('#mobile-right-panel #model-thumbnails, #mobile-right-panel #legs-thumbnails, #mobile-right-panel #material-panel-viewer, #mobile-right-panel .options-grid');
+                                            // Enforce 2-col grids for thumbnails and options
+                                            var nodes = document.querySelectorAll(
+                                                '#mobile-model-thumbnails, #mobile-main-model-thumbnails, #mobile-legs-thumbnails,'+
+                                                ' #mobile-right-panel #model-thumbnails, #mobile-right-panel #legs-thumbnails, #mobile-right-panel #material-panel-viewer, #mobile-right-panel .options-grid,'+
+                                                ' #model-thumbnails, #legs-thumbnails, #material-panel-viewer, .options-grid,'+
+                                                ' [id*="thumbnails"]'
+                                            );
                                             nodes.forEach(function(el){
-                                                el.style.display = 'grid';
-                                                el.style.gridTemplateColumns = '1fr 1fr';
-                                                el.style.gap = '8px';
-                                                el.style.marginTop = '8px';
+                                                try {
+                                                    el.style.setProperty('display','grid','important');
+                                                    el.style.setProperty('grid-template-columns','1fr 1fr','important');
+                                                    el.style.setProperty('gap','8px','important');
+                                                    el.style.setProperty('margin-top','8px','important');
+                                                } catch(_){}
+                                            });
+                                            // Enforce 2-col grid for category buttons containers
+                                            var catNodes = document.querySelectorAll('#mobile-category-buttons-container, #category-buttons-container');
+                                            catNodes.forEach(function(el){
+                                                try {
+                                                    el.style.setProperty('display','grid','important');
+                                                    el.style.setProperty('grid-template-columns','1fr 1fr','important');
+                                                    el.style.setProperty('gap','8px','important');
+                                                    el.style.setProperty('margin','0 0 10px 0','important');
+                                                } catch(_){}
                                             });
                                             // Ensure tiles keep fixed frame and captions below
-                                            var tiles = document.querySelectorAll('#mobile-right-panel .thumbnail');
+                                            var tiles = document.querySelectorAll('#mobile-right-panel .thumbnail, [id*="thumbnails"] .thumbnail');
                                             tiles.forEach(function(t){
-                                                t.style.height = '80px';
-                                                t.style.display = 'flex';
-                                                t.style.alignItems = 'center';
-                                                t.style.justifyContent = 'center';
-                                                t.style.padding = '6px';
-                                                t.style.background = '#fff';
-                                                t.style.border = '1px solid #e5e5e5';
-                                                t.style.borderRadius = '10px';
-                                                t.style.boxSizing = 'border-box';
+                                                try {
+                                                    t.style.height = '80px';
+                                                    t.style.display = 'flex';
+                                                    t.style.alignItems = 'center';
+                                                    t.style.justifyContent = 'center';
+                                                    t.style.padding = '6px';
+                                                    t.style.background = '#fff';
+                                                    t.style.border = '1px solid #e5e5e5';
+                                                    t.style.borderRadius = '10px';
+                                                    t.style.boxSizing = 'border-box';
+                                                } catch(_){}
                                             });
                                             // Mobile-only: append (hooker) to captions of hooker models to disambiguate names
                                             markHookerCaptions();
