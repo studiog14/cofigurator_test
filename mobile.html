@@ -448,6 +448,73 @@ body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail img{width:64px 
                                         ph.parentNode && ph.parentNode.removeChild(ph);
                                     });
 
+                                    // Robust PWA detection/hiding of install UI
+                                    (function robustPWAInstallHiding(){
+                                        try {
+                                            function markInstalled(){ try { document.body.classList.add('pwa-installed'); } catch(_){} }
+                                            // Detect installed via display-mode or iOS standalone
+                                            try { if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) markInstalled(); } catch(_){}
+                                            try { if (window.navigator && window.navigator.standalone === true) markInstalled(); } catch(_){}
+                                            // Listen for appinstalled
+                                            try { window.addEventListener('appinstalled', function(){ markInstalled(); hideNow(); }, { passive:true }); } catch(_){}
+                                            function hideNow(){
+                                                try {
+                                                    var b = document.getElementById('welcome-install-btn');
+                                                    if (b) b.style.display = 'none';
+                                                } catch(_){}
+                                            }
+                                            // Hide immediately if already installed
+                                            if (document.body.classList.contains('pwa-installed')) hideNow();
+                                            // Keep hiding if external code tries to re-show
+                                            try {
+                                                var mo = new MutationObserver(function(){ if (document.body.classList.contains('pwa-installed')) hideNow(); });
+                                                mo.observe(document.documentElement || document.body, { childList:true, subtree:true, attributes:true, attributeFilter:['style','class'] });
+                                            } catch(_){}
+                                        } catch(_){}
+                                    })();
+
+                                    // Wrap desktop renderMobileRightPanelList to apply mobile fixes after it renders
+                                    (function wrapRenderList(retries){
+                                        try {
+                                            if (typeof window.renderMobileRightPanelList !== 'function') throw 'no fn yet';
+                                            if (window.renderMobileRightPanelList.__mobileWrapped) return;
+                                            var __orig = window.renderMobileRightPanelList;
+                                            var wrapped = function(selectedCategory){
+                                                var res = __orig.apply(this, arguments);
+                                                try {
+                                                    var right = document.getElementById('mobile-right-panel');
+                                                    if (right){
+                                                        // 1) Remove "Wybierz model:" header
+                                                        try { Array.from(right.querySelectorAll('h3')).forEach(function(h){ if ((h.textContent||'').trim().toLowerCase().startsWith('wybierz model')) h.remove(); }); } catch(_){ }
+                                                        // 2) Move search into top of right panel (sticky)
+                                                        try {
+                                                            var sc = document.getElementById('search-container');
+                                                            if (sc && sc.parentElement !== right){ right.insertBefore(sc, right.firstChild); sc.style.display = 'flex'; }
+                                                        } catch(_){ }
+                                                        // 3) Ensure active category matches selectedCategory immediately
+                                                        try {
+                                                            if (selectedCategory){
+                                                                var btns = right.querySelectorAll('.category-button');
+                                                                if (btns && btns.length){
+                                                                    var match = Array.from(btns).find(function(b){ return (b.textContent||'').trim().toLowerCase() === String(selectedCategory).toLowerCase(); });
+                                                                    if (match){ btns.forEach(function(b){ b.classList.remove('active'); }); match.classList.add('active'); }
+                                                                }
+                                                            }
+                                                        } catch(_){ }
+                                                        // 4) Persist promotions pill red style
+                                                        try { Array.from(right.querySelectorAll('.category-button')).forEach(function(b){ var t=(b.textContent||'').trim().toLowerCase(); if (t==='promocje') b.classList.add('promotion'); }); } catch(_){ }
+                                                        // 5) Force two columns for top-level auto grid
+                                                        try { var grids = right.querySelectorAll(':scope > div[style*="display: grid"]'); grids.forEach(function(g){ g.style.gridTemplateColumns='1fr 1fr'; g.style.gap='8px'; }); } catch(_){ }
+                                                    }
+                                                } catch(_){ }
+                                                return res;
+                                            };
+                                            wrapped.__mobileWrapped = true;
+                                            window.renderMobileRightPanelList = wrapped;
+                                            return;
+                                        } catch(_){ if (retries < 50) setTimeout(function(){ wrapRenderList(retries+1); }, 200); }
+                                    })(0);
+
                                     // Mobile-only: wrap loadModel to show/hide the model loader
                                     (function hookLoadModel(retries){
                                         try {
