@@ -161,7 +161,7 @@ body.mobile-mode .category-button.active{background:#F5C842;color:#fff;border-co
 body.mobile-mode .category-button.promotion{border-color:#FF6B6B;color:#FF6B6B}
 body.mobile-mode .category-button.promotion.active{background:#FF6B6B !important;border-color:#FF6B6B !important;color:#fff !important}
 /* Ensure right panel is wide enough for 2 tiles (narrower on mobile) */
-body.mobile-mode #mobile-right-panel{width:clamp(240px,34vw,320px);max-width:clamp(240px,34vw,320px)}
+body.mobile-mode #mobile-right-panel{width:clamp(220px,32vw,300px);max-width:clamp(220px,32vw,300px)}
 /* Make welcome overlay flush with the panel edge (match panel width var) */
 body.mobile-mode #welcome-screen{width:calc(100% - var(--panelW)) !important}
 /* Mobile scroll improvements: prevent body rubber-banding and scroll within right panel only */
@@ -172,7 +172,7 @@ html.mobile-mode, body.mobile-mode, body.mobile-mode #welcome-screen, body.mobil
 /* Prefer tap interactions; helps avoid double-tap zoom */
 body.mobile-mode{touch-action:manipulation}
 /* Ensure right panel is wide enough for 2 tiles (use shared var to avoid gaps) */
-body.mobile-mode{--panelW: clamp(240px,34vw,320px)}
+body.mobile-mode{--panelW: clamp(220px,32vw,300px)}
 body.mobile-mode #mobile-right-panel{width:var(--panelW) !important;max-width:var(--panelW) !important;border-left:0 !important;box-shadow:none !important;margin-left:-2px !important}
 /* Override welcome width using the same var to avoid any seam; also ensure no edge styling */
 body.mobile-mode #welcome-screen{width:calc(100% - var(--panelW) + 2px) !important;border-right:0 !important;box-shadow:none !important}
@@ -191,6 +191,8 @@ body.mobile-mode #mobile-category-buttons-container,
 body.mobile-mode #mobile-category-buttons-container,
 body.mobile-mode #category-buttons-container,
 body.mobile-mode #special-categories-container{display:grid !important;grid-template-columns:1fr 1fr !important;gap:8px !important;margin:0 0 10px 0}
+/* Make each category pill fill its grid track with no extra margins */
+body.mobile-mode .category-button{width:100% !important;box-sizing:border-box !important;margin:0 !important}
 body.mobile-mode #mobile-category-buttons-container{margin-bottom:10px}
 /* Model thumbnails: two columns inside right panel */
 body.mobile-mode #mobile-right-panel #model-thumbnails,
@@ -575,7 +577,13 @@ body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail img{width:64px 
                                                 container.addEventListener('click', function(e){
                                                     var btn = e.target && e.target.closest && e.target.closest('.category-button');
                                                     if (!btn) return;
-                                                    try { window.__mobileCategoryPickedOnce = true; } catch(_){}
+                                                    try { window.__mobileCategoryPickedOnce = true; } catch(_){ }
+                                                    // Actively switch the active state on mobile to match clicked
+                                                    try {
+                                                        var all = container.querySelectorAll('.category-button');
+                                                        all.forEach(function(b){ b.classList.remove('active'); });
+                                                        btn.classList.add('active');
+                                                    } catch(_){ }
                                                     // Re-apply promotion styling after desktop code updates DOM
                                                     setTimeout(function(){ try { markPromotionsPill(container); } catch(_){ } }, 50);
                                                 }, { passive: true });
@@ -795,25 +803,25 @@ body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail img{width:64px 
 
                                     var applyAllGrids = function(){
                                         try {
-                                            var nodes = document.querySelectorAll('#mobile-right-panel #model-thumbnails, #mobile-right-panel #legs-thumbnails, #mobile-right-panel #material-panel-viewer, #mobile-right-panel .options-grid');
+                                            var nodes = document.querySelectorAll('#mobile-right-panel #model-thumbnails, #mobile-right-panel #legs-thumbnails, #mobile-right-panel #material-panel-viewer, #mobile-right-panel .options-grid, #model-thumbnails, #legs-thumbnails, #material-panel-viewer, .options-grid');
                                             nodes.forEach(function(el){
-                                                el.style.display = 'grid';
-                                                el.style.gridTemplateColumns = '1fr 1fr';
-                                                el.style.gap = '8px';
-                                                el.style.marginTop = '8px';
+                                                el.style.setProperty('display','grid','important');
+                                                el.style.setProperty('grid-template-columns','1fr 1fr','important');
+                                                el.style.setProperty('gap','8px','important');
+                                                el.style.setProperty('margin-top','8px');
                                             });
                                             // Ensure tiles keep fixed frame and captions below
                                             var tiles = document.querySelectorAll('#mobile-right-panel .thumbnail');
                                             tiles.forEach(function(t){
-                                                t.style.height = '80px';
-                                                t.style.display = 'flex';
-                                                t.style.alignItems = 'center';
-                                                t.style.justifyContent = 'center';
-                                                t.style.padding = '8px';
-                                                t.style.background = '#fff';
-                                                t.style.border = '1px solid #e5e5e5';
-                                                t.style.borderRadius = '10px';
-                                                t.style.boxSizing = 'border-box';
+                                                t.style.setProperty('height','120px','important');
+                                                t.style.setProperty('display','flex','important');
+                                                t.style.setProperty('align-items','center','important');
+                                                t.style.setProperty('justify-content','center','important');
+                                                t.style.setProperty('padding','8px','important');
+                                                t.style.setProperty('background','#fff','important');
+                                                t.style.setProperty('border','1px solid #e5e5e5','important');
+                                                t.style.setProperty('border-radius','10px','important');
+                                                t.style.setProperty('box-sizing','border-box','important');
                                             });
                                             // Mobile-only: append (hooker) to captions of hooker models to disambiguate names
                                             markHookerCaptions();
