@@ -1,32 +1,79 @@
 <!DOCTYPE html>
 <html lang="pl">
-                                                    try {
-                                                    // Move desktop search right UNDER categories, replacing the 'Wybierz model' area
-                                                    var sc = document.getElementById('search-container');
-                                                    var cats = right.querySelector('#category-buttons');
-                                                    if (sc && cats) {
-                                                        if (sc.parentElement !== right && sc.parentElement !== cats.parentElement) {
-                                                            // Prefer to insert after categories block
-                                                            cats.insertAdjacentElement('afterend', sc);
-                                                        } else if (sc.parentElement === right) {
-                                                            cats.insertAdjacentElement('afterend', sc);
-                                                        }
-                                                        // Keep desktop toggle behavior: don’t force open/visible styles
-                                                        sc.style.display = '';
-                                                    } else if (sc) {
-                                                        // Fallback: place inside model-section top if categories not found
-                                                        var modelSec = right.querySelector('#model-section');
-                                                        if (modelSec && sc.parentElement !== modelSec) {
-                                                            modelSec.insertBefore(sc, modelSec.firstChild);
-                                                        }
-                                                    }
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="format-detection" content="telephone=no" />
+    <title>Konfigurator krzeseł – Mobile</title>
+    <link rel="manifest" href="manifest.json" />
+    <link rel="apple-touch-icon" href="icons/favicon.png" />
+    <link rel="icon" href="favicon.png" />
+    <style>
+        html,body{height:100%;margin:0}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:#fff;color:#222}
+        .loader{display:flex;align-items:center;justify-content:center;flex-direction:column;height:100vh;gap:12px}
+        .spinner{width:40px;height:40px;border:3px solid #eee;border-top:3px solid #333;border-radius:50%;animation:spin 1s linear infinite}
+        @keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
+        .muted{color:#666;font-size:14px}
+        .error{color:#b00020}
+    </style>
     <script>
-        (async function(){
+        (function(){
             // Minimal mobile-mode hint for CSS before app scripts run
             document.addEventListener('DOMContentLoaded', function(){
-                // Early mobile hint only; real DOM moves happen later once SPA renders
-                try { document.body.classList.add('mobile-mode'); } catch(_){ }
+                                try {
+                                    var ua = navigator.userAgent || '';
+                                    var isAndroid = /Android/i.test(ua);
+                                    var isIOS = /iPhone|iPad|iPod/i.test(ua) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+                                    // Jeśli to nie jest urządzenie mobilne, przełącz na wersję desktop bez dotykania index.html
+                                    var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+                                    // Na Androidzie przekieruj prosto do hostowanej wersji (bez iOS shims)
+                                    if (isAndroid) {
+                                        try { window.location.replace('https://studiog14.github.io/cofigurator_test/'); return; } catch(_) { }
+                                    }
+                                    if (!isMobile) { try { window.location.replace('index.html'); return; } catch(_) {} }
+                                    document.body.classList.add('mobile-mode');
+                                    // Wyłącz double-tap zoom (mobile/iOS)
+                                    try {
+                                        var lastTouchEnd = 0;
+                                        document.addEventListener('touchend', function(e){
+                                            var now = Date.now();
+                                            if (now - lastTouchEnd <= 300) {
+                                                e.preventDefault();
+                                            }
+                                            lastTouchEnd = now;
+                                        }, { passive: false });
+                                    } catch(_) {}
+                                } catch(_) {}
             });
+        })();
+    </script>
+</head>
+<body>
+        <div id="boot-loader" class="loader">
+            <div class="spinner" aria-hidden="true"></div>
+            <div id="boot-msg">Ładowanie konfiguratora</div>
+            <div id="boot-hint" class="muted" style="display:none">To może potrwać dłuższą chwilę — pobieramy modele i tekstury. Jeśli ekran nie zniknie, odśwież stronę.</div>
+        </div>
+
+    <script>
+        (async function(){
+            console.log('[mobile.html] bootstrap start');
+            // Early guard: if Android slipped past the DOMContentLoaded redirect, bail out
+            try {
+                var __ua = navigator.userAgent || '';
+                if (/Android/i.test(__ua)) { window.location.replace('https://studiog14.github.io/cofigurator_test/'); return; }
+            } catch(_) {}
+            const bootContainer = document.getElementById('boot-loader');
+            function showError(msg){
+                if(bootContainer){
+                    bootContainer.innerHTML = '<div class="error">'+ (msg||'Błąd ładowania') +'</div>' +
+                        '<div class="muted">Spróbuj ponownie, lub otwórz wersję standardową: <a href="index.html">index.html</a></div>';
+                }
+            }
 
             // Hard reset cache/storage on mobile (one-time per tab) before loading the app
             try {
@@ -115,8 +162,8 @@ body.mobile-mode .category-button.promotion{border-color:#FF6B6B;color:#FF6B6B}
 body.mobile-mode .category-button.promotion.active{background:#FF6B6B !important;border-color:#FF6B6B !important;color:#fff !important}
 /* Ensure right panel is wide enough for 2 tiles */
 body.mobile-mode #mobile-right-panel{width:clamp(260px,38vw,360px);max-width:clamp(260px,38vw,360px)}
-    /* Make welcome overlay flush with the panel edge (use the same variable as the panel) */
-    body.mobile-mode #welcome-screen{width:calc(100% - var(--panelW)) !important}
+/* Make welcome overlay flush with the panel edge (match clamp width) */
+body.mobile-mode #welcome-screen{width:calc(100% - clamp(260px,38vw,360px)) !important}
 /* Mobile scroll improvements: prevent body rubber-banding and scroll within right panel only */
 html.mobile-mode, body.mobile-mode{overscroll-behavior-y:contain;overscroll-behavior:contain}
 body.mobile-mode{overflow:hidden}
@@ -125,20 +172,10 @@ html.mobile-mode, body.mobile-mode, body.mobile-mode #welcome-screen, body.mobil
 /* Prefer tap interactions; helps avoid double-tap zoom */
 body.mobile-mode{touch-action:manipulation}
 /* Ensure right panel is wide enough for 2 tiles (use shared var to avoid gaps) */
-    body.mobile-mode{--panelW: clamp(240px,36vw,320px)}
-    /* Panel uses border-box so its width includes padding; this keeps the welcome width exact */
-    body.mobile-mode #mobile-right-panel{width:var(--panelW) !important;max-width:var(--panelW) !important;border-left:0 !important;box-shadow:none !important;margin-left:0 !important;box-sizing:border-box !important}
-    /* Ensure no edge styling on welcome */
-    body.mobile-mode #welcome-screen{border-right:0 !important;box-shadow:none !important;padding-bottom:calc(96px + env(safe-area-inset-bottom, 0px)) !important}
-    /* Hide the "Kontynuuj" button on mobile */
-    body.mobile-mode #welcome-continue-btn{display:none !important}
-        /* Hide install UI when installed (standalone/PWA) */
-        @media all and (display-mode: standalone){
-            body.mobile-mode #welcome-install-btn{ display:none !important }
-            body.mobile-mode #pwa-install-container{ display:none !important }
-        }
-        body.mobile-mode.pwa-installed #welcome-install-btn{ display:none !important }
-        body.mobile-mode.pwa-installed #pwa-install-container{ display:none !important }
+body.mobile-mode{--panelW: clamp(260px,38vw,360px)}
+body.mobile-mode #mobile-right-panel{width:var(--panelW) !important;max-width:var(--panelW) !important;border-left:0 !important;box-shadow:none !important;margin-left:-2px !important}
+/* Override welcome width using the same var to avoid any seam; also ensure no edge styling */
+body.mobile-mode #welcome-screen{width:calc(100% - var(--panelW) + 2px) !important;border-right:0 !important;box-shadow:none !important}
 body.mobile-mode #mobile-right-panel{height:100dvh;max-height:100dvh;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scroll-padding-bottom:96px;padding-bottom:calc(96px + env(safe-area-inset-bottom, 0px))}
 @supports (height: 100svh){ body.mobile-mode #mobile-right-panel{height:100svh;max-height:100svh} }
 /* Fallback for older browsers that lack 100dvh: use JS-set --vh */
@@ -151,9 +188,7 @@ body.mobile-mode #mobile-category-buttons-container{margin-bottom:10px}
 body.mobile-mode #mobile-right-panel #model-thumbnails,
 body.mobile-mode #mobile-right-panel #legs-thumbnails,
 body.mobile-mode #mobile-right-panel #material-panel-viewer,
-body.mobile-mode #mobile-right-panel .options-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
-/* Force two columns for runtime-created grid (renderMobileRightPanelList) */
-body.mobile-mode #mobile-right-panel > div[style*="display: grid"]{grid-template-columns:1fr 1fr !important;gap:8px !important}
+body.mobile-mode #mobile-right-panel .options-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
 /* Default right-panel thumbnails to unified size */
 body.mobile-mode #mobile-right-panel .thumbnail{width:80px !important;height:80px !important;margin:0 auto !important}
 body.mobile-mode #mobile-right-panel .thumbnail img{width:64px !important;height:64px !important}
@@ -174,16 +209,13 @@ body.mobile-mode #mobile-right-panel .thumbnail-caption{margin-top:8px;font-size
     body.mobile-mode #boot-loader #boot-msg{font-size:calc(var(--panelFontBase) * 1.1) !important}
     body.mobile-mode #mobile-longload-hint{font-size:calc(var(--panelFontBase) * 1.0) !important}
     body.mobile-mode .muted{font-size:calc(var(--panelFontBase) * 1.1) !important}
-/* PWA-only refresh button */
-body.mobile-mode.pwa-installed #pwa-refresh-btn{position:fixed;right:12px;bottom:12px;z-index:2200;background:#F5C842;border:1px solid #d2a81e;color:#222;font-weight:600;border-radius:12px;padding:8px 10px;box-shadow:0 2px 8px rgba(0,0,0,.15)}
-body.mobile-mode.pwa-installed #pwa-refresh-btn:active{transform:translateY(1px)}
 /* Search UI inside the mobile panel */
-body.mobile-mode #mobile-right-panel #search-container{position:static;background:transparent;padding:0;margin:0 0 8px 0}
-body.mobile-mode #mobile-right-panel #search-toggle{transform:none;width:40px;height:40px}
-body.mobile-mode #mobile-right-panel #search-panel{max-width:100%}
-body.mobile-mode #mobile-right-panel #search-input{margin:0}
+body.mobile-mode #mobile-right-panel #search-container{position:sticky !important;top:0 !important;z-index:1500;background:rgba(255,255,255,0.96);padding:8px 8px;margin:0 0 8px 0;display:flex;align-items:center;gap:8px}
+body.mobile-mode #mobile-right-panel #search-toggle{transform:none !important;width:40px;height:40px}
+body.mobile-mode #mobile-right-panel #search-panel{position:static !important;width:100% !important;max-width:100% !important;opacity:1 !important;visibility:visible !important;padding:0 !important;box-shadow:none !important;transform:none !important;background:transparent !important}
+body.mobile-mode #mobile-right-panel #search-input{margin:0; display:block}
 body.mobile-mode #mobile-right-panel #search-results{max-height:220px}
-body.mobile-mode #mobile-right-panel #search-filter-indicator{margin:6px 8px 10px 8px !important}
+body.mobile-mode #mobile-right-panel #search-filter-indicator{display:block !important;margin:6px 8px 10px 8px !important}
 /* Hide legacy intro IDs only on mobile; keep #welcome-screen visible */
 body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, body.mobile-mode .intro, body.mobile-mode #start, body.mobile-mode .start{display:none !important}
 /* Mobile-only: hide QR button in the floating toolbar */
@@ -252,25 +284,25 @@ body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail img{width:64px 
                         patched = patched.replace(/emailForm\.addEventListener\(/g, 'emailForm && emailForm.addEventListener(');
                         // Po inic Viewer: jeśli wybrano model przed inicjalizacją, załaduj go automatycznie
                         patched = patched.replace(/window\\.viewer\s*\=\s*viewer\s*;/, function(m){ return m + "\ntry{ if(window.__pendingMobileVariant){ loadModel(window.__pendingMobileVariant); window.__pendingMobileVariant=null; } }catch(_){}\n"; });
-                            return '<script'+attrs+'>'+patched+'</'+'script>';
+                            return '<script'+attrs+'>'+patched+'<\/script>';
                         } catch(e) {
-                            return '<script'+attrs+'>'+code+'</'+'script>';
+                            return '<script'+attrs+'>'+code+'<\/script>';
                         }
                     });
 
                 // 2c) Odłóż ładowanie zewnętrznych CDN scriptów na później, aby uniknąć parser-blocking via document.write
                 html = html.replace(/<script\s+src="https:\/\/cdn\.jsdelivr\.net\/npm\/qrcodejs\/qrcode\.min\.js"[^>]*><\/script>/gi,
-                    '<script data-mobile-defer-src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></'+'script>');
+                    '<script data-mobile-defer-src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"><\\/script>');
                 html = html.replace(/<script\s+src="https:\/\/cdn\.emailjs\.com\/dist\/email\.min\.js"[^>]*><\/script>/gi,
-                    '<script data-mobile-defer-src="https://cdn.emailjs.com/dist/email.min.js"></'+'script>');
+                    '<script data-mobile-defer-src="https://cdn.emailjs.com/dist/email.min.js"><\\/script>');
                 // Zabezpiecz emailjs.init tak, aby poczekał na bibliotekę
                 html = html.replace(/emailjs\.init\(([^)]*)\);/i,
                     '(function initEmail(){ if (window.emailjs&&emailjs.init){ try{ emailjs.init($1); }catch(_){ } } else { setTimeout(initEmail,200); } })();');
 
                     // 2d) Zmień komunikat loadera i wstrzyknij wskazówkę (CSS-only reveal po 8s)
                     html = html.replace(/<div\s+class=\"loading-text\"([^>]*)>([\s\S]*?)<\/div>/i, function(_, attrs){
-               return '<div class="loading-text"'+attrs+'>Trwa uruchamianie konfiguratora</'+'div>' +
-                   '<div id="mobile-longload-hint" style="margin-top:12px;font-size:14px;color:#666;text-align:center;max-width:320px;opacity:0;animation:mobileHint 0s linear 8s forwards">To może potrwać dłuższą chwilę — pobieramy modele i tekstury. Jeśli ekran nie zniknie, odśwież stronę.</'+'div>';
+                        return '<div class="loading-text"'+attrs+'>Trwa uruchamianie konfiguratora<\/div>' +
+                               '<div id="mobile-longload-hint" style="margin-top:12px;font-size:14px;color:#666;text-align:center;max-width:320px;opacity:0;animation:mobileHint 0s linear 8s forwards">To może potrwać dłuższą chwilę — pobieramy modele i tekstury. Jeśli ekran nie zniknie, odśwież stronę.<\/div>';
                     });
 
                     // 2e) Doładuj odłożone CDN-y po wstawieniu dokumentu – bez wstrzykiwania dodatkowych <script> w stringu
@@ -351,215 +383,18 @@ body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail img{width:64px 
                                         __mobileOverlay = document.createElement('div');
                                         __mobileOverlay.id = 'mobile-boot-overlay';
                                         __mobileOverlay.setAttribute('aria-hidden','true');
-                                        // Cover only the canvas/left area; do not block category panel on the right
-                                        __mobileOverlay.style.cssText = 'position:fixed;top:0;left:0;width:calc(100% - var(--panelW));height:100%;background:#fff;z-index:9998;transition:opacity .2s ease;pointer-events:none;';
+                                        __mobileOverlay.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:9998;transition:opacity .2s ease;';
                                         (document.body || document.documentElement).appendChild(__mobileOverlay);
                                     }
-                                    // Detect PWA install and manage install/refresh controls (mobile only)
-                                    (function setupPWAControls(){
-                                        try {
-                                            var isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
-                                            if (isStandalone) { document.body.classList.add('pwa-installed'); }
-                                            // Hide install button if installed
-                                            try {
-                                                if (document.body.classList.contains('pwa-installed')) {
-                                                    var installBtn = document.getElementById('welcome-install-btn');
-                                                    if (installBtn) installBtn.style.display = 'none';
-                                                }
-                                            } catch(_){ }
-                                            // Add refresh button only in installed mode
-                                            if (document.body.classList.contains('pwa-installed')) {
-                                                if (!document.getElementById('pwa-refresh-btn')){
-                                                    var r = document.createElement('button');
-                                                    r.id = 'pwa-refresh-btn';
-                                                    r.type = 'button';
-                                                    r.textContent = 'Odśwież';
-                                                    r.addEventListener('click', function(){ try { location.reload(); } catch(_) { location.href = location.href; } });
-                                                    document.body.appendChild(r);
-                                                }
-                                            }
-                                        } catch(_){ }
-                                    })();
-                                    // Ensure two-column grid after desktop render mutates DOM
-                                    (function enforceTwoColumns(){
-                                        try {
-                                            var container = document.getElementById('mobile-right-panel');
-                                            if (!container) return;
-                                            var apply = function(){
-                                                try {
-                                                    var grids = container.querySelectorAll(':scope > div[style*="display: grid"]');
-                                                    grids.forEach(function(g){ g.style.gridTemplateColumns = '1fr 1fr'; g.style.gap = '8px'; });
-                                                } catch(_){}
-                                            };
-                                            apply();
-                                            var mo = new MutationObserver(function(){ apply(); });
-                                            mo.observe(container, { childList:true, subtree:true });
-                                        } catch(_){ }
-                                    })();
                                     // Doładuj skrypty CDN
                                     var placeholders = document.querySelectorAll('script[data-mobile-defer-src]');
                                     placeholders.forEach(function(ph){
-                                        try {
-                                            var s = document.createElement('script');
-                                            s.src = ph.getAttribute('data-mobile-defer-src');
-                                            s.async = true;
-                                            document.head ? document.head.appendChild(s) : (document.documentElement || document.body).appendChild(s);
-                                            ph.remove();
-                                        } catch(_){ }
+                                        var s = document.createElement('script');
+                                        s.src = ph.getAttribute('data-mobile-defer-src');
+                                        s.defer = true;
+                                        (ph.parentNode || document.head || document.documentElement).insertBefore(s, ph);
+                                        ph.parentNode && ph.parentNode.removeChild(ph);
                                     });
-
-                                    // Robust PWA detection/hiding of install UI
-                                    (function robustPWAInstallHiding(){
-                                        try {
-                                            function markInstalled(){ try { document.body.classList.add('pwa-installed'); } catch(_){} }
-                                            // Detect installed via display-mode or iOS standalone
-                                            try { if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) markInstalled(); } catch(_){}
-                                            try { if (window.navigator && window.navigator.standalone === true) markInstalled(); } catch(_){}
-                                            // Listen for appinstalled
-                                            try { window.addEventListener('appinstalled', function(){ markInstalled(); hideNow(); }, { passive:true }); } catch(_){}
-                        function hideNow(){
-                                                try {
-                            var b = document.getElementById('welcome-install-btn');
-                            if (b) b.style.display = 'none';
-                            var c = document.getElementById('pwa-install-container');
-                            if (c) c.style.display = 'none';
-                                                } catch(_){}
-                                            }
-                                            // Hide immediately if already installed
-                                            if (document.body.classList.contains('pwa-installed')) hideNow();
-                                            // Keep hiding if external code tries to re-show
-                                            try {
-                                                var mo = new MutationObserver(function(){ if (document.body.classList.contains('pwa-installed')) hideNow(); });
-                                                mo.observe(document.documentElement || document.body, { childList:true, subtree:true, attributes:true, attributeFilter:['style','class'] });
-                                            } catch(_){}
-                                        } catch(_){}
-                                    })();
-
-                                    // Switch category to 'Wszystkie' when user searches
-                                    (function forceAllOnSearch(){
-                                        try {
-                                            var input = document.getElementById('search-input');
-                                            if (!input) return;
-                                            var toAll = function(){
-                                                try {
-                                                    if (typeof window.renderMobileRightPanelList==='function') window.renderMobileRightPanelList('Wszystkie');
-                                                    // Also update active state immediately
-                                                    var right = document.getElementById('mobile-right-panel');
-                                                    if (right){
-                                                        var btns = right.querySelectorAll('.category-button');
-                                                        btns.forEach(function(b){ b.classList.toggle('active', (b.textContent||'').trim().toLowerCase()==='wszystkie'); });
-                                                    }
-                                                } catch(_){ }
-                                            };
-                                            input.addEventListener('input', toAll, { passive:true });
-                                            var clearBtn = document.getElementById('clear-search-filter');
-                                            if (clearBtn) clearBtn.addEventListener('click', toAll, { passive:true });
-                                        } catch(_){ }
-                                    })();
-
-                                    // Wrap desktop renderMobileRightPanelList to apply mobile fixes after it renders
-                                    (function wrapRenderList(retries){
-                                        try {
-                                            if (typeof window.renderMobileRightPanelList !== 'function') throw 'no fn yet';
-                                            if (window.renderMobileRightPanelList.__mobileWrapped) return;
-                                            var __orig = window.renderMobileRightPanelList;
-                                            var wrapped = function(selectedCategory){
-                                                var res = __orig.apply(this, arguments);
-                                                try {
-                                                    var right = document.getElementById('mobile-right-panel');
-                                                    if (right){
-                                                        // 1) Remove "Wybierz model:" header
-                                                        try { Array.from(right.querySelectorAll('h3')).forEach(function(h){ if ((h.textContent||'').trim().toLowerCase().startsWith('wybierz model')) h.remove(); }); } catch(_){ }
-                                                        // 2) Place search right under categories (no forced open)
-                                                        try {
-                                                            var sc = document.getElementById('search-container');
-                                                            var catsBlk = right.querySelector('#category-buttons');
-                                                            if (sc && catsBlk) {
-                                                                catsBlk.insertAdjacentElement('afterend', sc);
-                                                                sc.style.display = '';
-                                                            }
-                                                        } catch(_){ }
-                                                        // 3) Ensure active category matches selectedCategory immediately, without forcing defaults
-                                                        try {
-                                                            var btns = right.querySelectorAll('.category-button');
-                                                            if (selectedCategory && btns && btns.length){
-                                                                var match = Array.from(btns).find(function(b){ return (b.textContent||'').trim().toLowerCase() === String(selectedCategory).toLowerCase(); });
-                                                                if (match){ btns.forEach(function(b){ b.classList.remove('active'); }); match.classList.add('active'); }
-                                                            }
-                                                        } catch(_){ }
-                                                        // 4) Persist promotions pill red style
-                                                        try { Array.from(right.querySelectorAll('.category-button')).forEach(function(b){ var t=(b.textContent||'').trim().toLowerCase(); if (t==='promocje') b.classList.add('promotion'); }); } catch(_){ }
-                                                        // 5) Force two columns for top-level auto grid
-                                                        try { var grids = right.querySelectorAll(':scope > div[style*="display: grid"]'); grids.forEach(function(g){ g.style.gridTemplateColumns='1fr 1fr'; g.style.gap='8px'; }); } catch(_){ }
-                                                    }
-                                                } catch(_){ }
-                                                return res;
-                                            };
-                                            wrapped.__mobileWrapped = true;
-                                                // Post-sync once more, but only if a clear selection exists
-                                                setTimeout(function(){
-                                                    try {
-                                                        var right2 = document.getElementById('mobile-right-panel');
-                                                        if (!right2) return;
-                                                        var btns2 = right2.querySelectorAll('.category-button');
-                                                        if (!btns2 || !btns2.length) return;
-                                                        var sel = selectedCategory || (right2.querySelector('.category-button.active') && right2.querySelector('.category-button.active').textContent.trim());
-                                                        if (!sel) return;
-                                                        var match2 = Array.from(btns2).find(function(b){ return (b.textContent||'').trim().toLowerCase() === String(sel).toLowerCase(); });
-                                                        if (match2){ btns2.forEach(function(b){ b.classList.remove('active'); }); match2.classList.add('active'); }
-                                                    } catch(_){ }
-                                                }, 60);
-                                            window.renderMobileRightPanelList = wrapped;
-                                            return;
-                                        } catch(_){ if (retries < 50) setTimeout(function(){ wrapRenderList(retries+1); }, 200); }
-                                    })(0);
-
-                                    // Persistent mobile fixes: remove header, keep search under categories (toggle behavior)
-                                    (function persistPanelFixes(retries){
-                                        try {
-                                            var right = document.getElementById('mobile-right-panel');
-                                            if (!right) throw 'no panel';
-                                            function apply(){
-                                                try {
-                                                    // Remove "Wybierz model:" header and its block spacing
-                                                    Array.from(right.querySelectorAll('h3')).forEach(function(h){
-                                                        var t=(h.textContent||'').trim().toLowerCase();
-                                                        if (t.indexOf('wybierz model')===0) {
-                                                            // hide whole selection-section container if present
-                                                            var sec = h.closest('.selection-section');
-                                                            if (sec) sec.style.display='none';
-                                                            h.remove();
-                                                        }
-                                                    });
-                                                    // Remove top separator HR above categories to fit search closer
-                                                    var hr = right.querySelector('hr');
-                                                    if (hr && hr.parentElement === right) { hr.remove(); }
-                                                } catch(_){}
-                                                try {
-                                                    // Move search under categories and keep default desktop toggle
-                                                    var sc = document.getElementById('search-container');
-                                                    var catsBlk = right.querySelector('#category-buttons');
-                                                    if (sc && catsBlk) {
-                                                        if (sc.parentElement !== catsBlk.parentElement) catsBlk.insertAdjacentElement('afterend', sc);
-                                                        sc.style.display = '';
-                                                    } else if (!sc) {
-                                                        // If search not yet in DOM, retry shortly (SPA might render it later)
-                                                        setTimeout(function(){
-                                                            try {
-                                                                var sc2 = document.getElementById('search-container');
-                                                                var cats2 = document.getElementById('category-buttons');
-                                                                if (sc2 && cats2) { cats2.insertAdjacentElement('afterend', sc2); sc2.style.display=''; }
-                                                            } catch(_){}
-                                                        }, 150);
-                                                    }
-                                                    // Do not force #search-panel visible; keep desktop behavior
-                                                } catch(_){ }
-                                            }
-                                            apply();
-                                            var mo = new MutationObserver(function(){ apply(); });
-                                            mo.observe(right, { childList:true, subtree:true });
-                                        } catch(_){ if (retries < 50) setTimeout(function(){ persistPanelFixes(retries+1); }, 200); }
-                                    })(0);
 
                                     // Mobile-only: wrap loadModel to show/hide the model loader
                                     (function hookLoadModel(retries){
@@ -716,22 +551,8 @@ body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail img{width:64px 
                                                     var btn = e.target && e.target.closest && e.target.closest('.category-button');
                                                     if (!btn) return;
                                                     try { window.__mobileCategoryPickedOnce = true; } catch(_){}
-                                                    // Trigger re-render for selected category if API exists
-                                                    try {
-                                                        var label = (btn.textContent||'').trim();
-                                                        if (typeof window.renderMobileRightPanelList==='function') window.renderMobileRightPanelList(label);
-                                                    } catch(_){}
                                                     // Re-apply promotion styling after desktop code updates DOM
-                                                    setTimeout(function(){ try { markPromotionsPill(container); } catch(_){ } }, 30);
-                                                    // Fallback: if desktop didn't set .active yet, enforce it on the clicked button
-                                                    setTimeout(function(){ try {
-                                                        var scope = container.querySelectorAll('.category-button');
-                                                        var currentActive = container.querySelector('.category-button.active');
-                                                        if (!currentActive || !currentActive.isSameNode(btn)) {
-                                                            scope.forEach(function(b){ b.classList.remove('active'); });
-                                                            btn.classList.add('active');
-                                                        }
-                                                    } catch(_){ } }, 40);
+                                                    setTimeout(function(){ try { markPromotionsPill(container); } catch(_){ } }, 50);
                                                 }, { passive: true });
                                                 // Observe for re-renders and keep the 'Promocje' pill styled
                                                 var moCats = new MutationObserver(function(){ try { markPromotionsPill(container); } catch(_){} });
@@ -742,7 +563,34 @@ body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail img{width:64px 
                                         if (retries < 50) setTimeout(function(){ attachCategoryActiveSync(retries+1); }, 200);
                                     })(0);
 
-                                    // Mobile: desktop already sets default category; avoid re-forcing it here to prevent flicker
+                                    // Mobile: default to 'Promocje' category on first load (until user picks something), and style its pill in red
+                                    (function ensurePromotionsDefault(retries){
+                                        try {
+                                            if (window.__mobileCategoryPickedOnce) return; // user already chose
+                                            // If function exists, render the promotions list in the right panel
+                                            if (typeof window.renderMobileRightPanelList === 'function') {
+                                                window.renderMobileRightPanelList('Promocje');
+                                            }
+                                            // Mark the Promocje button as active + promotion for red style
+                                            var cont = document.getElementById('mobile-right-panel') || document;
+                                            var btns = cont.querySelectorAll('.category-button');
+                                            if (btns && btns.length) {
+                                                var promoBtn = Array.from(btns).find(function(b){ return (b.textContent||'').trim().toLowerCase()==='promocje'; });
+                                                // If any active exists already, don't override user/UI choice
+                                                var anyActive = Array.from(btns).some(function(b){ return b.classList.contains('active'); });
+                                                if (promoBtn) {
+                                                    // keep the red border regardless of active
+                                                    promoBtn.classList.add('promotion');
+                                                    if (!anyActive) {
+                                                        btns.forEach(function(b){ b.classList.remove('active'); });
+                                                        promoBtn.classList.add('active');
+                                                    }
+                                                    return; // success
+                                                }
+                                            }
+                                        } catch(_) {}
+                                        if (retries < 50) setTimeout(function(){ ensurePromotionsDefault(retries+1); }, 200);
+                                    })(0);
 
                                     // Mobile click delegation fallback: trigger loadModel when thumbnail clicked even if original handler fails
                                     (function attachMobileThumbFallback(){
