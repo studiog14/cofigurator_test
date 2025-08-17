@@ -1658,6 +1658,26 @@
       #brightness-dismiss-layer.mobile-active { display: block; }
     }
 
+    /* 📱 Center popups on mobile only */
+    @media (max-width: 820px) {
+      #dimension-overlay {
+        left: 50% !important;
+        top: 50% !important;
+        transform: translate(-50%, -50%) !important;
+        width: 90vw !important;
+        max-width: 360px !important;
+        z-index: 2100 !important;
+      }
+
+      #ar-popup {
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) !important;
+        width: 90vw !important;
+        max-width: 360px !important;
+      }
+    }
+
     #hdr-panel {
       position: absolute;
       bottom: 100%;
@@ -6161,7 +6181,9 @@ updateSummary();
           e.stopPropagation();
         });
 
-        document.addEventListener('click', () => {
+        document.addEventListener('click', (e) => {
+          // If brightness just closed, ignore this global click
+          if (window.__justClosedBrightness && Date.now() - window.__justClosedBrightness < 120) return;
           hdrPanel?.classList.add('hidden');
           if (hdrPanel) hdrPanel.style.display = 'none';
         });
@@ -6184,6 +6206,10 @@ updateSummary();
         } else if (el.parentElement !== document.body) {
           document.body.appendChild(el);
         }
+        // Helper: mark that brightness was just closed (used to ignore global click handlers briefly)
+        function __setJustClosedBrightness() {
+          try { window.__justClosedBrightness = Date.now(); } catch(_) {}
+        }
         if (!el._handlerBound) {
           const handler = (evt) => {
             const panel = document.getElementById('brightness-panel');
@@ -6193,6 +6219,7 @@ updateSummary();
             panel.classList.add('hidden');
             panel.style.display = 'none';
             el.classList.remove('mobile-active');
+            __setJustClosedBrightness();
             evt.stopPropagation();
           };
           el.addEventListener('click', handler);
@@ -6406,7 +6433,7 @@ updateSummary();
       }
 
       // Zamknij panel jasności po kliknięciu poza nim (capture to prevent other closers)
-      document.addEventListener('click', (e) => {
+    document.addEventListener('click', (e) => {
         const brightnessPanel = document.getElementById('brightness-panel');
         const hdrToggle = document.getElementById('hdr-toggle');
         const dismiss = document.getElementById('brightness-dismiss-layer');
@@ -6421,13 +6448,14 @@ updateSummary();
           brightnessPanel.style.display = 'none';
           // Disable dismiss layer after first outside tap
           if (dismiss) dismiss.classList.remove('mobile-active');
+      try { window.__justClosedBrightness = Date.now(); } catch(_) {}
           // Zatrzymaj propagację, żeby nie zamykać całego UI tym samym tapnięciem
           e.stopPropagation();
         }
       }, { capture: true });
 
       // Mobile: also close on touchstart outside for faster response (capture + non-passive)
-      document.addEventListener('touchstart', (e) => {
+    document.addEventListener('touchstart', (e) => {
         const brightnessPanel = document.getElementById('brightness-panel');
         const hdrToggle = document.getElementById('hdr-toggle');
         const dismiss = document.getElementById('brightness-dismiss-layer');
@@ -6439,8 +6467,18 @@ updateSummary();
           brightnessPanel.classList.add('hidden');
           brightnessPanel.style.display = 'none';
           if (dismiss) dismiss.classList.remove('mobile-active');
+      try { window.__justClosedBrightness = Date.now(); } catch(_) {}
           // Zatrzymaj propagację, żeby nie zamykać całego UI tym samym tapnięciem
           e.stopPropagation();
+          // On mobile, a synthetic click often follows touchstart; block the next capture click if within 200ms
+          const blockNextClick = (ce) => {
+            if (window.__justClosedBrightness && Date.now() - window.__justClosedBrightness < 200) {
+              ce.stopPropagation();
+              ce.preventDefault?.();
+            }
+            document.removeEventListener('click', blockNextClick, true);
+          };
+          document.addEventListener('click', blockNextClick, true);
         }
       }, { passive: false, capture: true });
 
@@ -6453,6 +6491,7 @@ updateSummary();
 
       // Zamykanie panelu wymiarów kliknięciem poza panelem
       document.addEventListener('click', (e) => {
+        if (window.__justClosedBrightness && Date.now() - window.__justClosedBrightness < 120) return;
         const dimensionOverlay = document.getElementById('dimension-overlay');
         const dimensionsButton = document.getElementById('dimensions-show');
         
@@ -6498,6 +6537,7 @@ updateSummary();
 
       // Zamykanie QR popup kliknięciem poza panelem
       document.addEventListener('click', (e) => {
+        if (window.__justClosedBrightness && Date.now() - window.__justClosedBrightness < 120) return;
         const qrPopup = document.getElementById('qr-popup');
         const qrButton = document.getElementById('qr-button');
         
@@ -6530,6 +6570,7 @@ updateSummary();
 
 
       document.addEventListener('click', () => {
+        if (window.__justClosedBrightness && Date.now() - window.__justClosedBrightness < 120) return;
         const hdrPanel = document.getElementById('hdr-panel');
         if (hdrPanel) {
           hdrPanel.classList.add('hidden');
@@ -9028,6 +9069,7 @@ function setDefaultMaterialsFromSheet() {
 
         // Zamknij panel przy kliknięciu poza nim
         document.addEventListener('click', (e) => {
+          if (window.__justClosedBrightness && Date.now() - window.__justClosedBrightness < 120) return;
           if (!searchPanel.contains(e.target) && !searchToggle.contains(e.target)) {
             if (isSearchOpen) {
               isSearchOpen = false;
