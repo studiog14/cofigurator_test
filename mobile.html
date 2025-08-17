@@ -197,7 +197,10 @@ body.mobile-mode #legs-thumbnails,
 body.mobile-mode #material-panel-viewer,
 body.mobile-mode .options-grid,
 body.mobile-mode #mobile-right-panel [id*='thumbnails'],
-body.mobile-mode [id*='thumbnails']{display:grid !important;grid-template-columns:1fr 1fr !important;gap:8px !important;margin-top:8px}
+body.mobile-mode [id*='thumbnails']{display:flex !important;flex-wrap:wrap !important;gap:8px !important;margin-top:8px}
+body.mobile-mode #mobile-right-panel .options-grid .thumbnail-wrapper,
+body.mobile-mode .options-grid .thumbnail-wrapper,
+body.mobile-mode [id*='thumbnails'] .thumbnail-wrapper{width:calc((100% - 8px)/2) !important}
 /* Default right-panel thumbnails to unified size */
 body.mobile-mode #mobile-right-panel .thumbnail{width:80px !important;height:80px !important;margin:0 auto !important}
 body.mobile-mode #mobile-right-panel .thumbnail img{width:64px !important;height:64px !important}
@@ -792,7 +795,7 @@ body.mobile-mode #mobile-main-model-thumbnails .thumbnail-wrapper{width:calc((10
 
                                     var applyAllGrids = function(){
                                         try {
-                                            // Enforce 2-col grids for thumbnails and options
+                                            // Enforce desktop-like flex layout and force 2-per-row via wrapper widths
                                             var nodes = document.querySelectorAll(
                                                 '#mobile-model-thumbnails, #mobile-main-model-thumbnails, #mobile-legs-thumbnails,'+
                                                 ' #mobile-right-panel #model-thumbnails, #mobile-right-panel #legs-thumbnails, #mobile-right-panel #material-panel-viewer, #mobile-right-panel .options-grid,'+
@@ -801,13 +804,16 @@ body.mobile-mode #mobile-main-model-thumbnails .thumbnail-wrapper{width:calc((10
                                             );
                                             nodes.forEach(function(el){
                                                 try {
-                                                    el.style.setProperty('display','grid','important');
-                                                    el.style.setProperty('grid-template-columns','1fr 1fr','important');
+                                                    el.style.setProperty('display','flex','important');
+                                                    el.style.setProperty('flex-wrap','wrap','important');
                                                     el.style.setProperty('gap','8px','important');
                                                     el.style.setProperty('margin-top','8px','important');
+                                                    // Set wrappers width inside this container
+                                                    var wrappers = el.querySelectorAll('.thumbnail-wrapper');
+                                                    wrappers.forEach(function(w){ w.style.setProperty('width','calc((100% - 8px)/2)','important'); });
                                                 } catch(_){}
                                             });
-                                            // Enforce 2-col grid for category buttons containers
+                                            // Categories remain grid 2-per-row
                                             var catNodes = document.querySelectorAll('#mobile-category-buttons-container, #category-buttons-container');
                                             catNodes.forEach(function(el){
                                                 try {
