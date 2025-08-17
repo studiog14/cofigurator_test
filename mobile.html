@@ -21,78 +21,12 @@
         .error{color:#b00020}
     </style>
     <script>
-        (function(){
+        (async function(){
             // Minimal mobile-mode hint for CSS before app scripts run
             document.addEventListener('DOMContentLoaded', function(){
-                                try {
-                                    var ua = navigator.userAgent || '';
-                                    var isAndroid = /Android/i.test(ua);
-                                    var isIOS = /iPhone|iPad|iPod/i.test(ua) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
-                                    // Jeśli to nie jest urządzenie mobilne, przełącz na wersję desktop bez dotykania index.html
-                                    var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
-                                    // Na Androidzie przekieruj prosto do hostowanej wersji (bez iOS shims)
-                                                try {
-                                                    // Move desktop search right UNDER categories, replacing the 'Wybierz model' area
-                                                    var sc = document.getElementById('search-container');
-                                                    var cats = right.querySelector('#category-buttons');
-                                                    if (sc && cats) {
-                                                        if (sc.parentElement !== right && sc.parentElement !== cats.parentElement) {
-                                                            // Prefer to insert after categories block
-                                                            cats.insertAdjacentElement('afterend', sc);
-                                                        } else if (sc.parentElement === right) {
-                                                            cats.insertAdjacentElement('afterend', sc);
-                                                        }
-                                                        // Keep search behavior as on desktop (toggle-driven). Do not force panel visible.
-                                                        sc.style.display = '';
-                                                    } else if (sc) {
-                                                        // Fallback: place inside model-section top if categories not found
-                                                        var modelSec = right.querySelector('#model-section');
-                                                        if (modelSec && sc.parentElement !== modelSec) {
-                                                            modelSec.insertBefore(sc, modelSec.firstChild);
-                                                        }
-                                                    }
-
-                                                    // Hide model thumbnails block so that search sits in its place
-                                                    var mt = right.querySelector('#model-thumbnails');
-                                                    if (mt) { mt.style.display = 'none'; }
-
-                                                    // Fallback: if no desktop search exists, inject a simple inline search (rare)
-                                                    if (!sc && !document.getElementById('mobile-inline-search')){
-                                                        var wrap = document.createElement('div');
-                                                        wrap.id = 'mobile-inline-search';
-                                                        wrap.style.cssText = 'position:relative;z-index:1;background:transparent;padding:0;margin:0 0 8px 0;display:flex;gap:8px;align-items:center;';
-                                                        var input = document.createElement('input');
-                                                        input.type='search';
-                                                        input.placeholder='Szukaj modeli…';
-                                                        input.style.cssText='flex:1;border:2px solid #F5C842;border-radius:8px;padding:10px 12px;font-size:14px;outline:none;';
-                                                        wrap.appendChild(input);
-                                                        // Insert after categories if possible
-                                                        if (cats) {
-                                                            cats.insertAdjacentElement('afterend', wrap);
-                                                        } else {
-                                                            right.insertBefore(wrap, right.firstChild);
-                                                        }
-                                                        var filter = function(){
-                                                            try {
-                                                                var q=(input.value||'').trim().toLowerCase();
-                                                                var items = right.querySelectorAll('.thumbnail-wrapper');
-                                                                items.forEach(function(w){
-                                                                    try{
-                                                                        var cap = w.querySelector('.thumbnail-caption');
-                                                                        var txt = (cap && cap.textContent || '').toLowerCase();
-                                                                        w.style.display = (!q || txt.indexOf(q)!==-1) ? '' : 'none';
-                                                                    }catch(_){}
-                                                                });
-                                                            } catch(_){ }
-                                                        };
-                                                        input.addEventListener('input', filter, { passive:true });
-                                                        // Reapply filter on list re-render
-                                                        var mof = new MutationObserver(function(){ filter(); });
-                                                        mof.observe(right, { childList:true, subtree:true });
-                                                    }
-                                                } catch(_){ }
-                }
-            }
+                // Early mobile hint only; real DOM moves happen later once SPA renders
+                try { document.body.classList.add('mobile-mode'); } catch(_){ }
+            });
 
             // Hard reset cache/storage on mobile (one-time per tab) before loading the app
             try {
