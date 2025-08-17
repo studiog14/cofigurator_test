@@ -160,10 +160,10 @@ body.mobile-mode .category-button.active{background:#F5C842;color:#fff;border-co
 /* Ensure Promocje category uses red like desktop */
 body.mobile-mode .category-button.promotion{border-color:#FF6B6B;color:#FF6B6B}
 body.mobile-mode .category-button.promotion.active{background:#FF6B6B !important;border-color:#FF6B6B !important;color:#fff !important}
-/* Ensure right panel is wide enough for 2 tiles (narrower on mobile) */
-body.mobile-mode #mobile-right-panel{width:clamp(220px,32vw,300px);max-width:clamp(220px,32vw,300px)}
-/* Make welcome overlay flush with the panel edge (match panel width var) */
-body.mobile-mode #welcome-screen{width:calc(100% - var(--panelW)) !important}
+/* Ensure right panel is wide enough for 2 tiles */
+body.mobile-mode #mobile-right-panel{width:clamp(260px,38vw,360px);max-width:clamp(260px,38vw,360px)}
+/* Make welcome overlay flush with the panel edge (match clamp width) */
+body.mobile-mode #welcome-screen{width:calc(100% - clamp(260px,38vw,360px)) !important}
 /* Mobile scroll improvements: prevent body rubber-banding and scroll within right panel only */
 html.mobile-mode, body.mobile-mode{overscroll-behavior-y:contain;overscroll-behavior:contain}
 body.mobile-mode{overflow:hidden}
@@ -172,7 +172,7 @@ html.mobile-mode, body.mobile-mode, body.mobile-mode #welcome-screen, body.mobil
 /* Prefer tap interactions; helps avoid double-tap zoom */
 body.mobile-mode{touch-action:manipulation}
 /* Ensure right panel is wide enough for 2 tiles (use shared var to avoid gaps) */
-body.mobile-mode{--panelW: clamp(220px,32vw,300px)}
+body.mobile-mode{--panelW: clamp(260px,38vw,360px)}
 body.mobile-mode #mobile-right-panel{width:var(--panelW) !important;max-width:var(--panelW) !important;border-left:0 !important;box-shadow:none !important;margin-left:-2px !important}
 /* Override welcome width using the same var to avoid any seam; also ensure no edge styling */
 body.mobile-mode #welcome-screen{width:calc(100% - var(--panelW) + 2px) !important;border-right:0 !important;box-shadow:none !important}
@@ -180,40 +180,25 @@ body.mobile-mode #mobile-right-panel{height:100dvh;max-height:100dvh;overflow:au
 @supports (height: 100svh){ body.mobile-mode #mobile-right-panel{height:100svh;max-height:100svh} }
 /* Fallback for older browsers that lack 100dvh: use JS-set --vh */
 @supports not (height: 100dvh){ body.mobile-mode #mobile-right-panel{height:calc(var(--vh, 1vh) * 100);max-height:calc(var(--vh, 1vh) * 100)} }
-/* Welcome screen: add bottom spacer like UI to avoid hitting the safe area */
-body.mobile-mode #welcome-screen::after{content:"";display:block;height:96px;padding-bottom:env(safe-area-inset-bottom, 0px)}
-/* Welcome screen: hide only the 'Kontynuuj do aplikacji' button on mobile */
-body.mobile-mode #welcome-continue-btn{display:none !important}
-body.mobile-mode.pwa-installed #welcome-screen button[onclick^="showInstallInstructions"]{display:none !important}
-body.mobile-mode #mobile-right-panel{height:100dvh;max-height:100dvh;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scroll-padding-bottom:96px;padding:8px 10px calc(96px + env(safe-area-inset-bottom, 0px)) 10px}
 /* Categories: two per row without changing button look */
 body.mobile-mode #mobile-category-buttons-container,
-body.mobile-mode #mobile-category-buttons-container,
-body.mobile-mode #category-buttons-container,
-body.mobile-mode #special-categories-container{display:grid !important;grid-template-columns:1fr 1fr !important;gap:8px !important;margin:0 0 10px 0}
-/* Make each category pill fill its grid track with no extra margins */
-body.mobile-mode .category-button{width:100% !important;box-sizing:border-box !important;margin:0 !important}
+body.mobile-mode #category-buttons-container{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
 body.mobile-mode #mobile-category-buttons-container{margin-bottom:10px}
 /* Model thumbnails: two columns inside right panel */
 body.mobile-mode #mobile-right-panel #model-thumbnails,
-body.mobile-mode #mobile-right-panel #model-thumbnails,
 body.mobile-mode #mobile-right-panel #legs-thumbnails,
 body.mobile-mode #mobile-right-panel #material-panel-viewer,
-body.mobile-mode #mobile-right-panel .options-grid,
-body.mobile-mode #model-thumbnails,
-body.mobile-mode #legs-thumbnails,
-body.mobile-mode #material-panel-viewer,
-body.mobile-mode .options-grid{display:grid !important;grid-template-columns:1fr 1fr !important;gap:8px !important;margin-top:8px}
-/* Tile-as-card: fill the column width for proper card look (two per row) */
-body.mobile-mode #mobile-right-panel .thumbnail{width:100% !important;height:120px !important;margin:0 !important;display:flex !important;align-items:center !important;justify-content:center !important;padding:8px !important;background:#fff !important;border:1px solid #e5e5e5 !important;border-radius:10px !important;box-sizing:border-box !important}
-body.mobile-mode #mobile-right-panel .thumbnail img{max-width:100% !important;max-height:90px !important;width:auto !important;height:auto !important;object-fit:contain !important;display:block !important}
+body.mobile-mode #mobile-right-panel .options-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+/* Default right-panel thumbnails to unified size */
+body.mobile-mode #mobile-right-panel .thumbnail{width:80px !important;height:80px !important;margin:0 auto !important}
+body.mobile-mode #mobile-right-panel .thumbnail img{width:64px !important;height:64px !important}
 /* Bottom spacer at the end of the panel (not between lists) */
 body.mobile-mode #mobile-right-panel::after{content:"";display:block;height:96px}
 body.mobile-mode #mobile-right-panel .thumbnail-wrapper{width:100%}
-/* Frame-sized tile: fixed height so image never overlaps caption/price (dup for safety) */
-body.mobile-mode #mobile-right-panel .thumbnail{width:100% !important;height:120px !important}
-/* Image constrained to the frame (dup for safety) */
-body.mobile-mode #mobile-right-panel .thumbnail img{max-width:100% !important;max-height:90px !important}
+/* Frame-sized tile: fixed height so image never overlaps caption/price */
+body.mobile-mode #mobile-right-panel .thumbnail{width:100%;height:120px;display:flex;align-items:center;justify-content:center;padding:8px;background:#fff;border:1px solid #e5e5e5;border-radius:10px;box-sizing:border-box}
+/* Image constrained to the frame */
+body.mobile-mode #mobile-right-panel .thumbnail img{max-width:100%;max-height:90px;width:auto;height:auto;object-fit:contain;display:block}
 /* Ensure caption and price are clearly below the frame */
 body.mobile-mode #mobile-right-panel .thumbnail-caption{margin-top:8px;font-size:13px}
     /* Mobile-only proportional font scaling (relative to category/chair sizes) */
@@ -270,11 +255,11 @@ body.mobile-mode #part-tabs img{width:36px !important;height:36px !important;obj
 body.mobile-mode #material-panel-viewer{grid-template-columns:repeat(auto-fill,minmax(80px,1fr)) !important}
 body.mobile-mode #material-panel-viewer .thumbnail{width:80px !important;height:80px !important;display:flex !important;align-items:center !important;justify-content:center !important;margin:0 auto !important}
 body.mobile-mode #material-panel-viewer .thumbnail img{width:64px !important;height:64px !important;object-fit:contain !important;border-radius:8px !important}
-/* Ensure model/legs cards fill columns (no centering to small squares) */
+/* Unify chair and legs icons to same size as materials/collections */
 body.mobile-mode #mobile-right-panel #model-thumbnails .thumbnail,
-body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail{width:100% !important;height:120px !important;margin:0 !important}
+body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail{width:80px !important;height:80px !important;display:flex !important;align-items:center !important;justify-content:center !important;margin:0 auto !important}
 body.mobile-mode #mobile-right-panel #model-thumbnails .thumbnail img,
-body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail img{max-width:100% !important;max-height:90px !important;width:auto !important;height:auto !important}
+body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail img{width:64px !important;height:64px !important;object-fit:contain !important}
 </style>`;
                 if(html.includes('</head>')){
                     html = html.replace(/<head[^>]*>/i, function(m){ return m + '\n  ' + shimTag + '\n  ' + hintCss + '\n'; });
@@ -337,18 +322,6 @@ body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail img{max-width:1
 
                                 // 5) Po wstawieniu: doładuj odłożone CDN-y, anty-flash overlay i mobilny komunikat loadera + hint
                                 try {
-                                    // Detect PWA installed mode and toggle class to hide install button automatically
-                                    try {
-                                        var isStandalone = (window.matchMedia && (window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: fullscreen)').matches)) || (window.navigator.standalone === true);
-                                        if (isStandalone) { document.body.classList.add('pwa-installed'); }
-                                        // Also listen for changes (some browsers update this after install)
-                                        if (window.matchMedia) {
-                                            try {
-                                                var mq = window.matchMedia('(display-mode: standalone)');
-                                                if (mq && mq.addEventListener) mq.addEventListener('change', function(e){ try { if (e.matches) document.body.classList.add('pwa-installed'); } catch(_){} });
-                                            } catch(_){}
-                                        }
-                                    } catch(_){}
                                     // Enter pre-selection state (hide toolbar/tab and canvas) until a model is chosen
                                     try { document.body.classList.add('mobile-await-selection'); } catch(_){}
                                     // (Removed global mutation of allData categories to avoid breaking exact category matches)
@@ -577,13 +550,7 @@ body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail img{max-width:1
                                                 container.addEventListener('click', function(e){
                                                     var btn = e.target && e.target.closest && e.target.closest('.category-button');
                                                     if (!btn) return;
-                                                    try { window.__mobileCategoryPickedOnce = true; } catch(_){ }
-                                                    // Actively switch the active state on mobile to match clicked
-                                                    try {
-                                                        var all = container.querySelectorAll('.category-button');
-                                                        all.forEach(function(b){ b.classList.remove('active'); });
-                                                        btn.classList.add('active');
-                                                    } catch(_){ }
+                                                    try { window.__mobileCategoryPickedOnce = true; } catch(_){}
                                                     // Re-apply promotion styling after desktop code updates DOM
                                                     setTimeout(function(){ try { markPromotionsPill(container); } catch(_){ } }, 50);
                                                 }, { passive: true });
@@ -803,25 +770,25 @@ body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail img{max-width:1
 
                                     var applyAllGrids = function(){
                                         try {
-                                            var nodes = document.querySelectorAll('#mobile-right-panel #model-thumbnails, #mobile-right-panel #legs-thumbnails, #mobile-right-panel #material-panel-viewer, #mobile-right-panel .options-grid, #model-thumbnails, #legs-thumbnails, #material-panel-viewer, .options-grid');
+                                            var nodes = document.querySelectorAll('#mobile-right-panel #model-thumbnails, #mobile-right-panel #legs-thumbnails, #mobile-right-panel #material-panel-viewer, #mobile-right-panel .options-grid');
                                             nodes.forEach(function(el){
-                                                el.style.setProperty('display','grid','important');
-                                                el.style.setProperty('grid-template-columns','1fr 1fr','important');
-                                                el.style.setProperty('gap','8px','important');
-                                                el.style.setProperty('margin-top','8px');
+                                                el.style.display = 'grid';
+                                                el.style.gridTemplateColumns = '1fr 1fr';
+                                                el.style.gap = '10px';
+                                                el.style.marginTop = '8px';
                                             });
                                             // Ensure tiles keep fixed frame and captions below
                                             var tiles = document.querySelectorAll('#mobile-right-panel .thumbnail');
                                             tiles.forEach(function(t){
-                                                t.style.setProperty('height','120px','important');
-                                                t.style.setProperty('display','flex','important');
-                                                t.style.setProperty('align-items','center','important');
-                                                t.style.setProperty('justify-content','center','important');
-                                                t.style.setProperty('padding','8px','important');
-                                                t.style.setProperty('background','#fff','important');
-                                                t.style.setProperty('border','1px solid #e5e5e5','important');
-                                                t.style.setProperty('border-radius','10px','important');
-                                                t.style.setProperty('box-sizing','border-box','important');
+                                                t.style.height = '80px';
+                                                t.style.display = 'flex';
+                                                t.style.alignItems = 'center';
+                                                t.style.justifyContent = 'center';
+                                                t.style.padding = '8px';
+                                                t.style.background = '#fff';
+                                                t.style.border = '1px solid #e5e5e5';
+                                                t.style.borderRadius = '10px';
+                                                t.style.boxSizing = 'border-box';
                                             });
                                             // Mobile-only: append (hooker) to captions of hooker models to disambiguate names
                                             markHookerCaptions();
