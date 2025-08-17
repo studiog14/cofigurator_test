@@ -69,67 +69,15 @@
             } catch(_) {}
             const bootContainer = document.getElementById('boot-loader');
             function showError(msg){
-                if(bootContainer){
-                    bootContainer.innerHTML = '<div class="error">'+ (msg||'Błąd ładowania') +'</div>' +
-                        '<div class="muted">Spróbuj ponownie, lub otwórz wersję standardową: <a href="index.html">index.html</a></div>';
-                }
+                try {
+                    if (bootContainer) {
+                        bootContainer.innerHTML = '<div class="error">' + (msg || 'Wystąpił błąd podczas uruchamiania aplikacji.') + '</div>' +
+                                                  '<div class="muted">Odśwież stronę lub spróbuj ponownie później.</div>';
+                    } else {
+                        alert(msg || 'Wystąpił błąd.');
+                    }
+                } catch(_) {}
             }
-
-            // Hard reset cache/storage on mobile (one-time per tab) before loading the app
-            try {
-                const HR_FLAG = 'MOBILE_HARD_RESET_DONE_v1';
-                const alreadyDone = (window.name === HR_FLAG);
-                if (!alreadyDone) {
-                    try { var m = document.getElementById('boot-msg'); if (m) m.textContent = 'Czyszczenie cache…'; } catch(_){ }
-                    // Unregister all service workers
-                    try {
-                        if ('serviceWorker' in navigator && navigator.serviceWorker.getRegistrations) {
-                            const regs = await navigator.serviceWorker.getRegistrations();
-                            await Promise.all(regs.map(r => r && r.unregister ? r.unregister().catch(()=>{}) : Promise.resolve()));
-                        }
-                    } catch(_){ }
-                    // Delete all caches
-                    try {
-                        if (window.caches && caches.keys) {
-                            const keys = await caches.keys();
-                            await Promise.all(keys.map(k => caches.delete(k).catch(()=>{})));
-                        }
-                    } catch(_){ }
-                    // Clear IndexedDB databases when possible
-                    try {
-                        if (window.indexedDB) {
-                            // Modern browsers expose indexedDB.databases(); iOS 15 may not. Try/catch each delete.
-                            if (indexedDB.databases) {
-                                const dbs = await indexedDB.databases();
-                                await Promise.all((dbs||[]).map(db => {
-                                    if (!db || !db.name) return Promise.resolve();
-                                    return new Promise(res => {
-                                        try {
-                                            const req = indexedDB.deleteDatabase(db.name);
-                                            req.onsuccess = req.onerror = req.onblocked = () => res();
-                                        } catch(_) { res(); }
-                                    });
-                                }));
-                            }
-                        }
-                    } catch(_){ }
-                    // Clear Web Storage (best-effort)
-                    try { localStorage.clear(); } catch(_){ }
-                    try { sessionStorage.clear(); } catch(_){ }
-
-                    // Guard and reload with cache-busting param
-                    try { window.name = HR_FLAG; } catch(_){ }
-                    try {
-                        const u = new URL(location.href);
-                        u.searchParams.set('hr', Date.now().toString());
-                        location.replace(u.toString());
-                    } catch(_) { location.reload(); }
-                    return; // Stop bootstrap; it will continue after reload
-                } else {
-                    // Clean the guard so it doesn't leak
-                    try { window.name = ''; } catch(_){ }
-                }
-            } catch(_){ }
 
             // Safety: show hint after 8s (no auto-reload timers on mobile)
             try {
@@ -205,9 +153,9 @@ body.mobile-mode #mobile-right-panel .options-grid > *{
     box-sizing:border-box !important;
 }
 /* Frame-sized tile: fixed height so image never overlaps caption/price */
-body.mobile-mode #mobile-right-panel .thumbnail{width:100% !important;height:120px !important;display:flex;align-items:center;justify-content:center;padding:6px;background:#fff;border:1px solid #e5e5e5;border-radius:10px;box-sizing:border-box}
+body.mobile-mode #mobile-right-panel .thumbnail{width:100% !important;height:100px !important;display:flex;align-items:center;justify-content:center;padding:6px;background:#fff;border:1px solid #e5e5e5;border-radius:10px;box-sizing:border-box}
 /* Image constrained to the frame */
-body.mobile-mode #mobile-right-panel .thumbnail img{max-width:100%;max-height:90px;width:auto;height:auto;object-fit:contain;display:block}
+body.mobile-mode #mobile-right-panel .thumbnail img{max-width:100%;max-height:74px;width:auto;height:auto;object-fit:contain;display:block}
 /* Ensure caption and price are clearly below the frame */
 body.mobile-mode #mobile-right-panel .thumbnail-caption{margin-top:8px;font-size:13px}
     /* Mobile-only proportional font scaling (relative to category/chair sizes) */
@@ -260,15 +208,7 @@ body.mobile-mode #mobile-toolbar-tab{padding:6px 5px !important}
 body.mobile-mode #part-tabs button,
 body.mobile-mode #part-tabs .part-btn{width:56px !important;height:56px !important;border:1px solid #ccc !important;border-radius:8px !important;background:#fff !important;display:flex !important;align-items:center !important;justify-content:center !important;padding:6px !important}
 body.mobile-mode #part-tabs img{width:36px !important;height:36px !important;object-fit:contain !important}
-/* Material icons square and proportional like collection icons */
-body.mobile-mode #material-panel-viewer{grid-template-columns:repeat(auto-fill,minmax(80px,1fr)) !important}
-body.mobile-mode #material-panel-viewer .thumbnail{width:80px !important;height:80px !important;display:flex !important;align-items:center !important;justify-content:center !important;margin:0 auto !important}
-body.mobile-mode #material-panel-viewer .thumbnail img{width:64px !important;height:64px !important;object-fit:contain !important;border-radius:8px !important}
-/* Unify chair and legs icons to same size as materials/collections */
-body.mobile-mode #mobile-right-panel #model-thumbnails .thumbnail,
-body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail{width:80px !important;height:80px !important;display:flex !important;align-items:center !important;justify-content:center !important;margin:0 auto !important}
-body.mobile-mode #mobile-right-panel #model-thumbnails .thumbnail img,
-body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail img{width:64px !important;height:64px !important;object-fit:contain !important}
+/* (removed legacy 80px square tile overrides to unify with 2-column frame-based tiles) */
 /* Welcome: hide only the continue button; keep install unless PWA is installed */
 body.mobile-mode #welcome-continue-btn{display:none !important}
 body.mobile-mode.pwa-installed #welcome-install-btn{display:none !important}
@@ -746,6 +686,25 @@ body.mobile-mode.pwa-installed #welcome-install-btn{display:none !important}
                                 
                                 // Persist two-column grids and frame sizing after UI rerenders on mobile
                                 try {
+                                    function normalizeThumbnails(){
+                                        try {
+                                            var containers = document.querySelectorAll('#model-thumbnails, #legs-thumbnails, #material-panel-viewer, .options-grid');
+                                            containers.forEach(function(container){
+                                                Array.from(container.children).forEach(function(child){
+                                                    try {
+                                                        var isWrapper = child.classList && child.classList.contains('thumbnail-wrapper');
+                                                        var looksLikeTile = child.classList && (child.classList.contains('thumbnail') || child.matches('button, a'));
+                                                        if (!isWrapper && looksLikeTile) {
+                                                            var wrapper = document.createElement('div');
+                                                            wrapper.className = 'thumbnail-wrapper';
+                                                            child.after(wrapper);
+                                                            wrapper.appendChild(child);
+                                                        }
+                                                    } catch(_){}
+                                                });
+                                            });
+                                        } catch(_){}
+                                    }
                                     function markHookerCaptions(){
                                         try {
                                             var wrappers = document.querySelectorAll('#mobile-right-panel .thumbnail-wrapper');
@@ -780,8 +739,9 @@ body.mobile-mode.pwa-installed #welcome-install-btn{display:none !important}
                                         } catch(_) {}
                                     }
 
-                                    var applyAllGrids = function(){
+                    var applyAllGrids = function(){
                                         try {
+                        normalizeThumbnails();
                                             var nodes = document.querySelectorAll('#mobile-right-panel #model-thumbnails, #mobile-right-panel #legs-thumbnails, #mobile-right-panel #material-panel-viewer, #mobile-right-panel .options-grid');
                                             nodes.forEach(function(el){
                                                 el.style.display = 'flex';
@@ -805,7 +765,7 @@ body.mobile-mode.pwa-installed #welcome-install-btn{display:none !important}
                                             // Ensure tiles keep fixed frame and captions below
                                             var tiles = document.querySelectorAll('#mobile-right-panel .thumbnail');
                                             tiles.forEach(function(t){
-                                                t.style.height = '120px';
+                                                t.style.height = '100px';
                                                 t.style.display = 'flex';
                                                 t.style.alignItems = 'center';
                                                 t.style.justifyContent = 'center';
