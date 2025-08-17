@@ -6335,6 +6335,7 @@ updateSummary();
         }
 
         function onPointerUp(e) {
+          if (!dragging) return; // don't block outside taps
           dragging = false;
           e.preventDefault();
         }
@@ -6372,6 +6373,17 @@ updateSummary();
           brightnessPanel.style.display = 'none';
         }
       });
+
+      // Mobile: also close on touchstart outside for faster response
+      document.addEventListener('touchstart', (e) => {
+        const brightnessPanel = document.getElementById('brightness-panel');
+        const hdrToggle = document.getElementById('hdr-toggle');
+        if (!brightnessPanel) return;
+        if (!brightnessPanel.contains(e.target) && e.target !== hdrToggle && !hdrToggle.contains(e.target)) {
+          brightnessPanel.classList.add('hidden');
+          brightnessPanel.style.display = 'none';
+        }
+      }, { passive: true });
 
       // Panel wymiarów
       document.getElementById('dimensions-show')?.addEventListener('click', (e) => {
