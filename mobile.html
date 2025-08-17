@@ -252,25 +252,25 @@ body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail img{width:64px 
                         patched = patched.replace(/emailForm\.addEventListener\(/g, 'emailForm && emailForm.addEventListener(');
                         // Po inic Viewer: jeśli wybrano model przed inicjalizacją, załaduj go automatycznie
                         patched = patched.replace(/window\\.viewer\s*\=\s*viewer\s*;/, function(m){ return m + "\ntry{ if(window.__pendingMobileVariant){ loadModel(window.__pendingMobileVariant); window.__pendingMobileVariant=null; } }catch(_){}\n"; });
-                            return '<script'+attrs+'>'+patched+'<\/script>';
+                            return '<script'+attrs+'>'+patched+'</'+'script>';
                         } catch(e) {
-                            return '<script'+attrs+'>'+code+'<\/script>';
+                            return '<script'+attrs+'>'+code+'</'+'script>';
                         }
                     });
 
                 // 2c) Odłóż ładowanie zewnętrznych CDN scriptów na później, aby uniknąć parser-blocking via document.write
                 html = html.replace(/<script\s+src="https:\/\/cdn\.jsdelivr\.net\/npm\/qrcodejs\/qrcode\.min\.js"[^>]*><\/script>/gi,
-                    '<script data-mobile-defer-src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"><\\/script>');
+                    '<script data-mobile-defer-src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></'+'script>');
                 html = html.replace(/<script\s+src="https:\/\/cdn\.emailjs\.com\/dist\/email\.min\.js"[^>]*><\/script>/gi,
-                    '<script data-mobile-defer-src="https://cdn.emailjs.com/dist/email.min.js"><\\/script>');
+                    '<script data-mobile-defer-src="https://cdn.emailjs.com/dist/email.min.js"></'+'script>');
                 // Zabezpiecz emailjs.init tak, aby poczekał na bibliotekę
                 html = html.replace(/emailjs\.init\(([^)]*)\);/i,
                     '(function initEmail(){ if (window.emailjs&&emailjs.init){ try{ emailjs.init($1); }catch(_){ } } else { setTimeout(initEmail,200); } })();');
 
                     // 2d) Zmień komunikat loadera i wstrzyknij wskazówkę (CSS-only reveal po 8s)
                     html = html.replace(/<div\s+class=\"loading-text\"([^>]*)>([\s\S]*?)<\/div>/i, function(_, attrs){
-                        return '<div class="loading-text"'+attrs+'>Trwa uruchamianie konfiguratora<\/div>' +
-                               '<div id="mobile-longload-hint" style="margin-top:12px;font-size:14px;color:#666;text-align:center;max-width:320px;opacity:0;animation:mobileHint 0s linear 8s forwards">To może potrwać dłuższą chwilę — pobieramy modele i tekstury. Jeśli ekran nie zniknie, odśwież stronę.<\/div>';
+               return '<div class="loading-text"'+attrs+'>Trwa uruchamianie konfiguratora</'+'div>' +
+                   '<div id="mobile-longload-hint" style="margin-top:12px;font-size:14px;color:#666;text-align:center;max-width:320px;opacity:0;animation:mobileHint 0s linear 8s forwards">To może potrwać dłuższą chwilę — pobieramy modele i tekstury. Jeśli ekran nie zniknie, odśwież stronę.</'+'div>';
                     });
 
                     // 2e) Doładuj odłożone CDN-y po wstawieniu dokumentu – bez wstrzykiwania dodatkowych <script> w stringu
@@ -399,11 +399,13 @@ body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail img{width:64px 
                                     // Doładuj skrypty CDN
                                     var placeholders = document.querySelectorAll('script[data-mobile-defer-src]');
                                     placeholders.forEach(function(ph){
-                                        var s = document.createElement('script');
-                                        s.src = ph.getAttribute('data-mobile-defer-src');
-                                        s.defer = true;
-                                        (ph.parentNode || document.head || document.documentElement).insertBefore(s, ph);
-                                        ph.parentNode && ph.parentNode.removeChild(ph);
+                                        try {
+                                            var s = document.createElement('script');
+                                            s.src = ph.getAttribute('data-mobile-defer-src');
+                                            s.async = true;
+                                            document.head ? document.head.appendChild(s) : (document.documentElement || document.body).appendChild(s);
+                                            ph.remove();
+                                        } catch(_){ }
                                     });
 
                                     // Robust PWA detection/hiding of install UI
@@ -537,10 +539,19 @@ body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail img{width:64px 
                                                     // Move search under categories and keep default desktop toggle
                                                     var sc = document.getElementById('search-container');
                                                     var catsBlk = right.querySelector('#category-buttons');
-                                                    if (sc && catsBlk && sc.parentElement !== catsBlk.parentElement) {
-                                                        catsBlk.insertAdjacentElement('afterend', sc);
+                                                    if (sc && catsBlk) {
+                                                        if (sc.parentElement !== catsBlk.parentElement) catsBlk.insertAdjacentElement('afterend', sc);
+                                                        sc.style.display = '';
+                                                    } else if (!sc) {
+                                                        // If search not yet in DOM, retry shortly (SPA might render it later)
+                                                        setTimeout(function(){
+                                                            try {
+                                                                var sc2 = document.getElementById('search-container');
+                                                                var cats2 = document.getElementById('category-buttons');
+                                                                if (sc2 && cats2) { cats2.insertAdjacentElement('afterend', sc2); sc2.style.display=''; }
+                                                            } catch(_){}
+                                                        }, 150);
                                                     }
-                                                    if (sc) sc.style.display = '';
                                                     // Do not force #search-panel visible; keep desktop behavior
                                                 } catch(_){ }
                                             }
