@@ -204,12 +204,17 @@ body.mobile-mode #mobile-right-panel .thumbnail img{width:64px !important;height
 /* Bottom spacer at the end of the panel (not between lists) */
 body.mobile-mode #mobile-right-panel::after{content:"";display:block;height:96px}
 body.mobile-mode #mobile-right-panel .thumbnail-wrapper{width:100%}
+/* Make wrappers split equally in flex wrap containers to form 2 columns */
+body.mobile-mode .options-grid .thumbnail-wrapper{width:calc((100% - 8px)/2) !important}
 /* Frame-sized tile: fixed height so image never overlaps caption/price */
 body.mobile-mode #mobile-right-panel .thumbnail{width:100%;height:120px;display:flex;align-items:center;justify-content:center;padding:6px;background:#fff;border:1px solid #e5e5e5;border-radius:10px;box-sizing:border-box}
 /* Image constrained to the frame */
 body.mobile-mode #mobile-right-panel .thumbnail img{max-width:100%;max-height:90px;width:auto;height:auto;object-fit:contain;display:block}
 /* Ensure caption and price are clearly below the frame */
 body.mobile-mode #mobile-right-panel .thumbnail-caption{margin-top:8px;font-size:13px}
+/* Fallback: any *-thumbnails container becomes flex 2-up on mobile */
+body.mobile-mode [id*='thumbnails']{display:flex !important;flex-wrap:wrap !important;gap:8px !important}
+body.mobile-mode [id*='thumbnails'] .thumbnail-wrapper{width:calc((100% - 8px)/2) !important}
     /* Mobile-only proportional font scaling (relative to category/chair sizes) */
     body.mobile-mode{--panelFontBase:12px;--captionFont:13px}
     body.mobile-mode #welcome-screen h1{font-size:calc(var(--panelFontBase) * 1.8) !important}
@@ -272,6 +277,11 @@ body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail img{width:64px 
 /* Welcome: hide only the continue button; keep install unless PWA is installed */
 body.mobile-mode #welcome-continue-btn{display:none !important}
 body.mobile-mode.pwa-installed #welcome-install-btn{display:none !important}
+/* Explicit overrides for SPA mobile containers that force block layout */
+body.mobile-mode #mobile-model-thumbnails,
+body.mobile-mode #mobile-main-model-thumbnails{display:flex !important;flex-wrap:wrap !important;gap:8px !important;margin-top:8px !important}
+body.mobile-mode #mobile-model-thumbnails .thumbnail-wrapper,
+body.mobile-mode #mobile-main-model-thumbnails .thumbnail-wrapper{width:calc((100% - 8px)/2) !important}
 </style>`;
                 if(html.includes('</head>')){
                     html = html.replace(/<head[^>]*>/i, function(m){ return m + '\n  ' + shimTag + '\n  ' + hintCss + '\n'; });
