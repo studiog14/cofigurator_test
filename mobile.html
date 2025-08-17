@@ -182,17 +182,26 @@ body.mobile-mode #mobile-right-panel{height:100dvh;max-height:100dvh;overflow:au
 @supports not (height: 100dvh){ body.mobile-mode #mobile-right-panel{height:calc(var(--vh, 1vh) * 100);max-height:calc(var(--vh, 1vh) * 100)} }
 /* Welcome screen: add bottom spacer like UI to avoid hitting the safe area */
 body.mobile-mode #welcome-screen::after{content:"";display:block;height:96px;padding-bottom:env(safe-area-inset-bottom, 0px)}
-/* Welcome screen: hide the 'Kontynuuj do aplikacji' button on mobile */
-body.mobile-mode #welcome-screen button{display:none !important}
+/* Welcome screen: hide only the 'Kontynuuj do aplikacji' button on mobile */
+body.mobile-mode #welcome-continue-btn{display:none !important}
+body.mobile-mode.pwa-installed #welcome-screen button[onclick^="showInstallInstructions"]{display:none !important}
+body.mobile-mode #mobile-right-panel{height:100dvh;max-height:100dvh;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scroll-padding-bottom:96px;padding:8px 10px calc(96px + env(safe-area-inset-bottom, 0px)) 10px}
 /* Categories: two per row without changing button look */
 body.mobile-mode #mobile-category-buttons-container,
-body.mobile-mode #category-buttons-container{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+body.mobile-mode #mobile-category-buttons-container,
+body.mobile-mode #category-buttons-container,
+body.mobile-mode #special-categories-container{display:grid !important;grid-template-columns:1fr 1fr !important;gap:8px !important;margin:0 0 10px 0}
 body.mobile-mode #mobile-category-buttons-container{margin-bottom:10px}
 /* Model thumbnails: two columns inside right panel */
 body.mobile-mode #mobile-right-panel #model-thumbnails,
+body.mobile-mode #mobile-right-panel #model-thumbnails,
 body.mobile-mode #mobile-right-panel #legs-thumbnails,
 body.mobile-mode #mobile-right-panel #material-panel-viewer,
-body.mobile-mode #mobile-right-panel .options-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+body.mobile-mode #mobile-right-panel .options-grid,
+body.mobile-mode #model-thumbnails,
+body.mobile-mode #legs-thumbnails,
+body.mobile-mode #material-panel-viewer,
+body.mobile-mode .options-grid{display:grid !important;grid-template-columns:1fr 1fr !important;gap:8px !important;margin-top:8px}
 /* Default right-panel thumbnails to unified size */
 body.mobile-mode #mobile-right-panel .thumbnail{width:80px !important;height:80px !important;margin:0 auto !important}
 body.mobile-mode #mobile-right-panel .thumbnail img{width:64px !important;height:64px !important}
@@ -326,6 +335,18 @@ body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail img{width:64px 
 
                                 // 5) Po wstawieniu: doładuj odłożone CDN-y, anty-flash overlay i mobilny komunikat loadera + hint
                                 try {
+                                    // Detect PWA installed mode and toggle class to hide install button automatically
+                                    try {
+                                        var isStandalone = (window.matchMedia && (window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: fullscreen)').matches)) || (window.navigator.standalone === true);
+                                        if (isStandalone) { document.body.classList.add('pwa-installed'); }
+                                        // Also listen for changes (some browsers update this after install)
+                                        if (window.matchMedia) {
+                                            try {
+                                                var mq = window.matchMedia('(display-mode: standalone)');
+                                                if (mq && mq.addEventListener) mq.addEventListener('change', function(e){ try { if (e.matches) document.body.classList.add('pwa-installed'); } catch(_){} });
+                                            } catch(_){}
+                                        }
+                                    } catch(_){}
                                     // Enter pre-selection state (hide toolbar/tab and canvas) until a model is chosen
                                     try { document.body.classList.add('mobile-await-selection'); } catch(_){}
                                     // (Removed global mutation of allData categories to avoid breaking exact category matches)
