@@ -6363,31 +6363,36 @@ updateSummary();
         native.addEventListener('input', () => setThumbByValue(parseFloat(native.value)));
       }
 
-    // Zamknij panel jasności po kliknięciu poza nim (capture to prevent other closers)
-    document.addEventListener('click', (e) => {
-        const brightnessPanel = document.getElementById('brightness-panel');
-        const hdrToggle = document.getElementById('hdr-toggle');
-        
-        if (brightnessPanel && !brightnessPanel.contains(e.target) && e.target !== hdrToggle && !hdrToggle.contains(e.target)) {
-          brightnessPanel.classList.add('hidden');
-          brightnessPanel.style.display = 'none';
-      // Zatrzymaj propagację, żeby nie zamykać całego UI tym samym tapnięciem
-      e.stopPropagation();
-        }
-    }, { capture: true });
-
-    // Mobile: also close on touchstart outside for faster response (capture + non-passive)
-    document.addEventListener('touchstart', (e) => {
+      // Zamknij panel jasności po kliknięciu poza nim (capture to prevent other closers)
+      document.addEventListener('click', (e) => {
         const brightnessPanel = document.getElementById('brightness-panel');
         const hdrToggle = document.getElementById('hdr-toggle');
         if (!brightnessPanel) return;
+        const isVisible = brightnessPanel.style.display !== 'none' && !brightnessPanel.classList.contains('hidden');
+        if (!isVisible) return; // nie przechwytuj klików gdy panel i tak jest ukryty
+        
         if (!brightnessPanel.contains(e.target) && e.target !== hdrToggle && !hdrToggle.contains(e.target)) {
           brightnessPanel.classList.add('hidden');
           brightnessPanel.style.display = 'none';
-      // Zatrzymaj propagację, żeby nie zamykać całego UI tym samym tapnięciem
-      e.stopPropagation();
+          // Zatrzymaj propagację, żeby nie zamykać całego UI tym samym tapnięciem
+          e.stopPropagation();
         }
-    }, { passive: false, capture: true });
+      }, { capture: true });
+
+      // Mobile: also close on touchstart outside for faster response (capture + non-passive)
+      document.addEventListener('touchstart', (e) => {
+        const brightnessPanel = document.getElementById('brightness-panel');
+        const hdrToggle = document.getElementById('hdr-toggle');
+        if (!brightnessPanel) return;
+        const isVisible = brightnessPanel.style.display !== 'none' && !brightnessPanel.classList.contains('hidden');
+        if (!isVisible) return; // nie przechwytuj tapnięć gdy panel jest ukryty
+        if (!brightnessPanel.contains(e.target) && e.target !== hdrToggle && !hdrToggle.contains(e.target)) {
+          brightnessPanel.classList.add('hidden');
+          brightnessPanel.style.display = 'none';
+          // Zatrzymaj propagację, żeby nie zamykać całego UI tym samym tapnięciem
+          e.stopPropagation();
+        }
+      }, { passive: false, capture: true });
 
       // Panel wymiarów
       document.getElementById('dimensions-show')?.addEventListener('click', (e) => {
