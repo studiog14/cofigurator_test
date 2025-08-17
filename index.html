@@ -6583,6 +6583,81 @@ updateSummary();
         e.stopPropagation();
       });
 
+      // === AR MVP helpers ===
+      function isIOS() {
+        return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      }
+      function isAndroid() { return /Android/.test(navigator.userAgent); }
+      function isDesktop() { return !(isIOS() || isAndroid()); }
+
+      // Return current model names for AR files (best-effort)
+      function getCurrentArAssets() {
+        // Try to use selected chair name
+        const name = (window.selectedChair?.Nazwa || '').trim();
+        const baseName = name || '';
+        const glb = baseName ? `chairs/${baseName}.glb` : null;
+        // Heuristic: USDZ has same base if exists; you already have 'Tulla-2.usdz' as example
+        const usdzCandidates = [
+          `chairs/${baseName}.usdz`,
+          `chairs/${baseName}-2.usdz`,
+          `chairs/${baseName.replace(/\s+/g,'_')}.usdz`,
+          `chairs/Tulla-2.usdz` // fallback demo
+        ];
+        return { glb, usdzCandidates };
+      }
+
+      function buildSceneViewerUrl(glbUrl) {
+        const title = encodeURIComponent(window.selectedChair?.Nazwa || 'Model');
+        const file = encodeURIComponent(new URL(glbUrl, window.location.href).toString());
+        return `https://arvr.google.com/scene-viewer/1.0?file=${file}&mode=ar_only&title=${title}`;
+      }
+      function buildQuickLookUrl(usdzUrl) {
+        return new URL(usdzUrl, window.location.href).toString();
+      }
+      function buildArLandingUrl() {
+        // Desktop shows a QR that encodes this page with ?open_ar=1 so mobile auto-opens AR
+        const current = new URL(window.location.href);
+        current.searchParams.set('open_ar', '1');
+        return current.toString();
+      }
+      function showQrWithUrl(url) {
+        const qrPopup = document.getElementById('qr-popup');
+        const qrContainer = document.getElementById('qrcode');
+        if (!qrPopup || !qrContainer) return;
+        qrPopup.style.display = 'block';
+        qrContainer.innerHTML = '';
+        new QRCode(qrContainer, { text: url, width: 200, height: 200 });
+      }
+
+      async function openArFlow() {
+        const { glb, usdzCandidates } = getCurrentArAssets();
+        if (isAndroid() && glb) {
+          const url = buildSceneViewerUrl(glb);
+          window.location.href = url;
+          return;
+        }
+        if (isIOS()) {
+          // Try candidates sequentially (no HEAD here to avoid CORS); Quick Look just needs href
+          const usdz = usdzCandidates[0];
+          if (usdz) { window.location.href = buildQuickLookUrl(usdz); return; }
+        }
+        // Fallback: show info popup
+        openArPopup();
+      }
+
+      // Auto-open AR on mobile when landing from desktop QR
+      (function handleArLanding() {
+        try {
+          const url = new URL(window.location.href);
+          if (url.searchParams.get('open_ar') === '1' && (isAndroid() || isIOS())) {
+            // remove the param to avoid loops on back
+            url.searchParams.delete('open_ar');
+            window.history.replaceState({}, '', url.toString());
+            openArFlow();
+          }
+        } catch {}
+      })();
+
       // Przycisk powrotu do kategorii
       document.getElementById('back-to-categories')?.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -6972,9 +7047,15 @@ updateSummary();
 
       const arButton = document.getElementById('ar-button');
       if (arButton) {
-        arButton.addEventListener('click', (e) => {
+        arButton.addEventListener('click', async (e) => {
           e.stopPropagation();
-          openArPopup();
+          // MVP: Desktop -> pokaż QR z linkiem do AR; Mobile -> otwórz AR bezpośrednio
+          if (isDesktop()) {
+            const url = buildArLandingUrl();
+            showQrWithUrl(url);
+          } else {
+            await openArFlow();
+          }
         });
       }
 
