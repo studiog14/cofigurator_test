@@ -3027,7 +3027,7 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
     <img src="icons/AR_icon.png" alt="AR Ikona" style="width: 60px; margin-bottom: 10px;" />
     <div style="font-size: 18px; font-weight: bold;">Dostępne wkrótce</div>
     <div style="margin-top: 6px; font-size: 14px;">Tryb AR zostanie wkrótce uruchomiony.</div>
-    <button onclick="document.getElementById('ar-popup').style.display='none'" style="
+  <button onclick="closeArPopup()" style="
     margin-top: 12px;
     background: #141414;
     color: white;
@@ -6554,6 +6554,35 @@ updateSummary();
         e.stopPropagation();
       });
 
+      // === AR popup helpers and outside-to-dismiss ===
+      window.openArPopup = function openArPopup() {
+        const popup = document.getElementById('ar-popup');
+        if (!popup) return;
+        popup.style.display = 'block';
+      };
+
+      window.closeArPopup = function closeArPopup() {
+        const popup = document.getElementById('ar-popup');
+        if (!popup) return;
+        popup.style.display = 'none';
+      };
+
+      // Close AR popup on outside tap/click (but ignore the synthetic click after brightness close)
+      document.addEventListener('click', (e) => {
+        if (window.__justClosedBrightness && Date.now() - window.__justClosedBrightness < 120) return;
+        const arPopup = document.getElementById('ar-popup');
+        const arButtonEl = document.getElementById('ar-button');
+        if (!arPopup) return;
+        if (arPopup.style.display === 'block' && !arPopup.contains(e.target) && (!arButtonEl || !arButtonEl.contains(e.target))) {
+          closeArPopup();
+        }
+      }, { capture: true });
+
+      // Prevent closing when clicking inside AR popup
+      document.getElementById('ar-popup')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+
       // Przycisk powrotu do kategorii
       document.getElementById('back-to-categories')?.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -6943,9 +6972,9 @@ updateSummary();
 
       const arButton = document.getElementById('ar-button');
       if (arButton) {
-        arButton.addEventListener('click', () => {
-          const popup = document.getElementById('ar-popup');
-          if (popup) popup.style.display = 'block';
+        arButton.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openArPopup();
         });
       }
 
