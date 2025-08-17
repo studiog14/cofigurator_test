@@ -1652,6 +1652,12 @@
       #brightness-slider-mobile { display: block; }
     }
 
+    /* Overlay to capture first outside tap on mobile and close only the brightness slider */
+    #brightness-dismiss-layer { position: fixed; inset: 0; background: transparent; z-index: 1004; display: none; }
+    @media (max-width: 820px) {
+      #brightness-dismiss-layer.mobile-active { display: block; }
+    }
+
     #hdr-panel {
       position: absolute;
       bottom: 100%;
@@ -2905,6 +2911,8 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
 
   <!-- Dolny panel UI -->
   <div id="bottom-toolbar" style="display: none;">
+  <!-- Mobile dismiss layer for brightness panel -->
+  <div id="brightness-dismiss-layer" aria-hidden="true"></div>
 
     <!-- Przycisk HDR -->
     <button id="hdr-toggle" title="Zmień HDR">
@@ -6171,11 +6179,14 @@ updateSummary();
       document.getElementById('hdr-toggle')?.addEventListener('click', (e) => {
         e.stopPropagation();
         const panel = document.getElementById('brightness-panel');
+        const dismiss = document.getElementById('brightness-dismiss-layer');
         panel.classList.toggle('hidden');
         panel.style.display = panel.classList.contains('hidden') ? 'none' : 'block';
         
         // Dodaj obsługę suwaka po pokazaniu panelu
         if (!panel.classList.contains('hidden')) {
+          // Enable dismiss layer (mobile only via CSS)
+          if (dismiss) dismiss.classList.add('mobile-active');
           const brightnessSlider = document.getElementById('brightness-slider');
           if (brightnessSlider) {
             // Usuń stary listener jeśli istnieje
@@ -6187,6 +6198,10 @@ updateSummary();
 
           // Initialize custom mobile slider wiring
           setupMobileBrightnessSlider();
+        }
+        else {
+          // Disable dismiss layer when panel closes
+          if (dismiss) dismiss.classList.remove('mobile-active');
         }
       });
 
@@ -6367,13 +6382,18 @@ updateSummary();
       document.addEventListener('click', (e) => {
         const brightnessPanel = document.getElementById('brightness-panel');
         const hdrToggle = document.getElementById('hdr-toggle');
+        const dismiss = document.getElementById('brightness-dismiss-layer');
         if (!brightnessPanel) return;
         const isVisible = brightnessPanel.style.display !== 'none' && !brightnessPanel.classList.contains('hidden');
         if (!isVisible) return; // nie przechwytuj klików gdy panel i tak jest ukryty
         
-        if (!brightnessPanel.contains(e.target) && e.target !== hdrToggle && !hdrToggle.contains(e.target)) {
+        // If the dismiss layer is clicked, treat as outside tap but do not close the whole UI
+        const tappedDismissLayer = dismiss && dismiss.contains(e.target);
+        if (tappedDismissLayer || (!brightnessPanel.contains(e.target) && e.target !== hdrToggle && !hdrToggle.contains(e.target))) {
           brightnessPanel.classList.add('hidden');
           brightnessPanel.style.display = 'none';
+          // Disable dismiss layer after first outside tap
+          if (dismiss) dismiss.classList.remove('mobile-active');
           // Zatrzymaj propagację, żeby nie zamykać całego UI tym samym tapnięciem
           e.stopPropagation();
         }
@@ -6383,12 +6403,15 @@ updateSummary();
       document.addEventListener('touchstart', (e) => {
         const brightnessPanel = document.getElementById('brightness-panel');
         const hdrToggle = document.getElementById('hdr-toggle');
+        const dismiss = document.getElementById('brightness-dismiss-layer');
         if (!brightnessPanel) return;
         const isVisible = brightnessPanel.style.display !== 'none' && !brightnessPanel.classList.contains('hidden');
         if (!isVisible) return; // nie przechwytuj tapnięć gdy panel jest ukryty
-        if (!brightnessPanel.contains(e.target) && e.target !== hdrToggle && !hdrToggle.contains(e.target)) {
+        const tappedDismissLayer = dismiss && dismiss.contains(e.target);
+        if (tappedDismissLayer || (!brightnessPanel.contains(e.target) && e.target !== hdrToggle && !hdrToggle.contains(e.target))) {
           brightnessPanel.classList.add('hidden');
           brightnessPanel.style.display = 'none';
+          if (dismiss) dismiss.classList.remove('mobile-active');
           // Zatrzymaj propagację, żeby nie zamykać całego UI tym samym tapnięciem
           e.stopPropagation();
         }
