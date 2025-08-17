@@ -195,6 +195,15 @@ body.mobile-mode #mobile-right-panel .thumbnail-wrapper{flex:0 0 calc((100% - 8p
 body.mobile-mode #mobile-right-panel::after{content:"";display:block;height:96px}
 /* Ensure wrappers fill their slot */
 body.mobile-mode #mobile-right-panel .thumbnail-wrapper{box-sizing:border-box}
+/* Fallback: if items are inserted without .thumbnail-wrapper, force half width on any direct child */
+body.mobile-mode #mobile-right-panel #model-thumbnails > *,
+body.mobile-mode #mobile-right-panel #legs-thumbnails > *,
+body.mobile-mode #mobile-right-panel #material-panel-viewer > *,
+body.mobile-mode #mobile-right-panel .options-grid > *{
+    flex:0 0 calc((100% - 8px)/2) !important;
+    max-width:calc((100% - 8px)/2) !important;
+    box-sizing:border-box !important;
+}
 /* Frame-sized tile: fixed height so image never overlaps caption/price */
 body.mobile-mode #mobile-right-panel .thumbnail{width:100% !important;height:120px !important;display:flex;align-items:center;justify-content:center;padding:6px;background:#fff;border:1px solid #e5e5e5;border-radius:10px;box-sizing:border-box}
 /* Image constrained to the frame */
@@ -780,12 +789,18 @@ body.mobile-mode.pwa-installed #welcome-install-btn{display:none !important}
                                                 el.style.gap = '8px';
                                                 el.style.marginTop = '6px';
                                             });
-                                            // Force wrappers to occupy half width (two per row)
+                                            // Force wrappers (or any direct child) to occupy half width (two per row)
                                             var wraps = document.querySelectorAll('#mobile-right-panel .thumbnail-wrapper');
                                             wraps.forEach(function(w){
                                                 w.style.flex = '0 0 calc((100% - 8px)/2)';
                                                 w.style.maxWidth = 'calc((100% - 8px)/2)';
                                                 w.style.boxSizing = 'border-box';
+                                            });
+                                            var directChildren = document.querySelectorAll('#mobile-right-panel #model-thumbnails > *, #mobile-right-panel #legs-thumbnails > *, #mobile-right-panel #material-panel-viewer > *, #mobile-right-panel .options-grid > *');
+                                            directChildren.forEach(function(c){
+                                                c.style.flex = '0 0 calc((100% - 8px)/2)';
+                                                c.style.maxWidth = 'calc((100% - 8px)/2)';
+                                                c.style.boxSizing = 'border-box';
                                             });
                                             // Ensure tiles keep fixed frame and captions below
                                             var tiles = document.querySelectorAll('#mobile-right-panel .thumbnail');
