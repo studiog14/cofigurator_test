@@ -31,47 +31,66 @@
                                     // Jeśli to nie jest urządzenie mobilne, przełącz na wersję desktop bez dotykania index.html
                                     var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
                                     // Na Androidzie przekieruj prosto do hostowanej wersji (bez iOS shims)
-                                    if (isAndroid) {
-                                        try { window.location.replace('https://studiog14.github.io/cofigurator_test/'); return; } catch(_) { }
-                                    }
-                                    if (!isMobile) { try { window.location.replace('index.html'); return; } catch(_) {} }
-                                    document.body.classList.add('mobile-mode');
-                                    // Wyłącz double-tap zoom (mobile/iOS)
-                                    try {
-                                        var lastTouchEnd = 0;
-                                        document.addEventListener('touchend', function(e){
-                                            var now = Date.now();
-                                            if (now - lastTouchEnd <= 300) {
-                                                e.preventDefault();
-                                            }
-                                            lastTouchEnd = now;
-                                        }, { passive: false });
-                                    } catch(_) {}
-                                } catch(_) {}
-            });
-        })();
-    </script>
-</head>
-<body>
-        <div id="boot-loader" class="loader">
-            <div class="spinner" aria-hidden="true"></div>
-            <div id="boot-msg">Ładowanie konfiguratora</div>
-            <div id="boot-hint" class="muted" style="display:none">To może potrwać dłuższą chwilę — pobieramy modele i tekstury. Jeśli ekran nie zniknie, odśwież stronę.</div>
-        </div>
+                                                try {
+                                                    // Move desktop search right UNDER categories, replacing the 'Wybierz model' area
+                                                    var sc = document.getElementById('search-container');
+                                                    var cats = right.querySelector('#category-buttons');
+                                                    if (sc && cats) {
+                                                        if (sc.parentElement !== right && sc.parentElement !== cats.parentElement) {
+                                                            // Prefer to insert after categories block
+                                                            cats.insertAdjacentElement('afterend', sc);
+                                                        } else if (sc.parentElement === right) {
+                                                            cats.insertAdjacentElement('afterend', sc);
+                                                        }
+                                                        // Keep search behavior as on desktop (toggle-driven). Do not force panel visible.
+                                                        sc.style.display = '';
+                                                    } else if (sc) {
+                                                        // Fallback: place inside model-section top if categories not found
+                                                        var modelSec = right.querySelector('#model-section');
+                                                        if (modelSec && sc.parentElement !== modelSec) {
+                                                            modelSec.insertBefore(sc, modelSec.firstChild);
+                                                        }
+                                                    }
 
-    <script>
-        (async function(){
-            console.log('[mobile.html] bootstrap start');
-            // Early guard: if Android slipped past the DOMContentLoaded redirect, bail out
-            try {
-                var __ua = navigator.userAgent || '';
-                if (/Android/i.test(__ua)) { window.location.replace('https://studiog14.github.io/cofigurator_test/'); return; }
-            } catch(_) {}
-            const bootContainer = document.getElementById('boot-loader');
-            function showError(msg){
-                if(bootContainer){
-                    bootContainer.innerHTML = '<div class="error">'+ (msg||'Błąd ładowania') +'</div>' +
-                        '<div class="muted">Spróbuj ponownie, lub otwórz wersję standardową: <a href="index.html">index.html</a></div>';
+                                                    // Hide model thumbnails block so that search sits in its place
+                                                    var mt = right.querySelector('#model-thumbnails');
+                                                    if (mt) { mt.style.display = 'none'; }
+
+                                                    // Fallback: if no desktop search exists, inject a simple inline search (rare)
+                                                    if (!sc && !document.getElementById('mobile-inline-search')){
+                                                        var wrap = document.createElement('div');
+                                                        wrap.id = 'mobile-inline-search';
+                                                        wrap.style.cssText = 'position:relative;z-index:1;background:transparent;padding:0;margin:0 0 8px 0;display:flex;gap:8px;align-items:center;';
+                                                        var input = document.createElement('input');
+                                                        input.type='search';
+                                                        input.placeholder='Szukaj modeli…';
+                                                        input.style.cssText='flex:1;border:2px solid #F5C842;border-radius:8px;padding:10px 12px;font-size:14px;outline:none;';
+                                                        wrap.appendChild(input);
+                                                        // Insert after categories if possible
+                                                        if (cats) {
+                                                            cats.insertAdjacentElement('afterend', wrap);
+                                                        } else {
+                                                            right.insertBefore(wrap, right.firstChild);
+                                                        }
+                                                        var filter = function(){
+                                                            try {
+                                                                var q=(input.value||'').trim().toLowerCase();
+                                                                var items = right.querySelectorAll('.thumbnail-wrapper');
+                                                                items.forEach(function(w){
+                                                                    try{
+                                                                        var cap = w.querySelector('.thumbnail-caption');
+                                                                        var txt = (cap && cap.textContent || '').toLowerCase();
+                                                                        w.style.display = (!q || txt.indexOf(q)!==-1) ? '' : 'none';
+                                                                    }catch(_){}
+                                                                });
+                                                            } catch(_){ }
+                                                        };
+                                                        input.addEventListener('input', filter, { passive:true });
+                                                        // Reapply filter on list re-render
+                                                        var mof = new MutationObserver(function(){ filter(); });
+                                                        mof.observe(right, { childList:true, subtree:true });
+                                                    }
+                                                } catch(_){ }
                 }
             }
 
@@ -179,9 +198,13 @@ body.mobile-mode{touch-action:manipulation}
     body.mobile-mode #welcome-screen{border-right:0 !important;box-shadow:none !important;padding-bottom:calc(96px + env(safe-area-inset-bottom, 0px)) !important}
     /* Hide the "Kontynuuj" button on mobile */
     body.mobile-mode #welcome-continue-btn{display:none !important}
-    /* Hide install button when installed (standalone/PWA) */
-    @media all and (display-mode: standalone){ body.mobile-mode #welcome-install-btn{ display:none !important } }
-    body.mobile-mode.pwa-installed #welcome-install-btn{ display:none !important }
+        /* Hide install UI when installed (standalone/PWA) */
+        @media all and (display-mode: standalone){
+            body.mobile-mode #welcome-install-btn{ display:none !important }
+            body.mobile-mode #pwa-install-container{ display:none !important }
+        }
+        body.mobile-mode.pwa-installed #welcome-install-btn{ display:none !important }
+        body.mobile-mode.pwa-installed #pwa-install-container{ display:none !important }
 body.mobile-mode #mobile-right-panel{height:100dvh;max-height:100dvh;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scroll-padding-bottom:96px;padding-bottom:calc(96px + env(safe-area-inset-bottom, 0px))}
 @supports (height: 100svh){ body.mobile-mode #mobile-right-panel{height:100svh;max-height:100svh} }
 /* Fallback for older browsers that lack 100dvh: use JS-set --vh */
@@ -223,7 +246,7 @@ body.mobile-mode.pwa-installed #pwa-refresh-btn:active{transform:translateY(1px)
 /* Search UI inside the mobile panel */
 body.mobile-mode #mobile-right-panel #search-container{position:sticky !important;top:0 !important;z-index:1500;background:rgba(255,255,255,0.96);padding:8px 8px;margin:0 0 8px 0;display:flex;align-items:center;gap:8px}
 body.mobile-mode #mobile-right-panel #search-toggle{transform:none !important;width:40px;height:40px}
-body.mobile-mode #mobile-right-panel #search-panel{position:static !important;width:100% !important;max-width:100% !important;opacity:1 !important;visibility:visible !important;padding:0 !important;box-shadow:none !important;transform:none !important;background:transparent !important}
+body.mobile-mode #mobile-right-panel #search-panel{max-width:100% !important}
 body.mobile-mode #mobile-right-panel #search-input{margin:0; display:block}
 body.mobile-mode #mobile-right-panel #search-results{max-height:220px}
 body.mobile-mode #mobile-right-panel #search-filter-indicator{display:block !important;margin:6px 8px 10px 8px !important}
@@ -394,7 +417,8 @@ body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail img{width:64px 
                                         __mobileOverlay = document.createElement('div');
                                         __mobileOverlay.id = 'mobile-boot-overlay';
                                         __mobileOverlay.setAttribute('aria-hidden','true');
-                                        __mobileOverlay.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:9998;transition:opacity .2s ease;';
+                                        // Cover only the canvas/left area; do not block category panel on the right
+                                        __mobileOverlay.style.cssText = 'position:fixed;top:0;left:0;width:calc(100% - var(--panelW));height:100%;background:#fff;z-index:9998;transition:opacity .2s ease;pointer-events:none;';
                                         (document.body || document.documentElement).appendChild(__mobileOverlay);
                                     }
                                     // Detect PWA install and manage install/refresh controls (mobile only)
@@ -457,10 +481,12 @@ body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail img{width:64px 
                                             try { if (window.navigator && window.navigator.standalone === true) markInstalled(); } catch(_){}
                                             // Listen for appinstalled
                                             try { window.addEventListener('appinstalled', function(){ markInstalled(); hideNow(); }, { passive:true }); } catch(_){}
-                                            function hideNow(){
+                        function hideNow(){
                                                 try {
-                                                    var b = document.getElementById('welcome-install-btn');
-                                                    if (b) b.style.display = 'none';
+                            var b = document.getElementById('welcome-install-btn');
+                            if (b) b.style.display = 'none';
+                            var c = document.getElementById('pwa-install-container');
+                            if (c) c.style.display = 'none';
                                                 } catch(_){}
                                             }
                                             // Hide immediately if already installed
@@ -510,9 +536,96 @@ body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail img{width:64px 
                                                 return res;
                                             };
                                             wrapped.__mobileWrapped = true;
+                                                // Post-sync once more in case desktop toggled later
+                                                setTimeout(function(){
+                                                    try {
+                                                        var right2 = document.getElementById('mobile-right-panel');
+                                                        if (!right2) return;
+                                                        var btns2 = right2.querySelectorAll('.category-button');
+                                                        if (!btns2 || !btns2.length) return;
+                                                        var sel = selectedCategory;
+                                                        if (!sel) {
+                                                            var active = right2.querySelector('.category-button.active');
+                                                            sel = active ? active.textContent.trim() : (btns2[0] && btns2[0].textContent.trim());
+                                                        }
+                                                        if (sel) {
+                                                            var match2 = Array.from(btns2).find(function(b){ return (b.textContent||'').trim().toLowerCase() === String(sel).toLowerCase(); });
+                                                            if (match2){ btns2.forEach(function(b){ b.classList.remove('active'); }); match2.classList.add('active'); }
+                                                        }
+                                                    } catch(_){}
+                                                }, 60);
                                             window.renderMobileRightPanelList = wrapped;
                                             return;
                                         } catch(_){ if (retries < 50) setTimeout(function(){ wrapRenderList(retries+1); }, 200); }
+                                    })(0);
+
+                                    // Persistent mobile fixes: remove header, ensure search is in the right panel and visible
+                                    (function persistPanelFixes(retries){
+                                        try {
+                                            var right = document.getElementById('mobile-right-panel');
+                                            if (!right) throw 'no panel';
+                                            function apply(){
+                                                try {
+                                                    // Remove "Wybierz model:" header and its block spacing
+                                                    Array.from(right.querySelectorAll('h3')).forEach(function(h){
+                                                        var t=(h.textContent||'').trim().toLowerCase();
+                                                        if (t.indexOf('wybierz model')===0) {
+                                                            // hide whole selection-section container if present
+                                                            var sec = h.closest('.selection-section');
+                                                            if (sec) sec.style.display='none';
+                                                            h.remove();
+                                                        }
+                                                    });
+                                                    // Remove top separator HR above categories to fit search closer
+                                                    var hr = right.querySelector('hr');
+                                                    if (hr && hr.parentElement === right) { hr.remove(); }
+                                                } catch(_){}
+                                                try {
+                                                    // Move search container to top and make it visible
+                                                    var sc = document.getElementById('search-container');
+                                                    if (sc && sc.parentElement !== right) {
+                                                        right.insertBefore(sc, right.firstChild);
+                                                    }
+                                                    if (sc) { sc.style.display = 'flex'; }
+                                                    var sp = document.getElementById('search-panel');
+                                                    if (sp) {
+                                                        sp.style.opacity = '1'; sp.style.visibility = 'visible'; sp.style.transform = 'none'; sp.style.position = 'static'; sp.style.maxWidth = '100%';
+                                                    }
+                                                    // Fallback: if no desktop search exists, inject a simple inline search
+                                                    if (!sc && !document.getElementById('mobile-inline-search')){
+                                                        var wrap = document.createElement('div');
+                                                        wrap.id = 'mobile-inline-search';
+                                                        wrap.style.cssText = 'position:sticky;top:0;z-index:1500;background:rgba(255,255,255,0.96);padding:8px 8px;margin:0 0 8px 0;display:flex;gap:8px;align-items:center;border-bottom:1px solid #eee;';
+                                                        var input = document.createElement('input');
+                                                        input.type='search';
+                                                        input.placeholder='Szukaj modeli…';
+                                                        input.style.cssText='flex:1;border:2px solid #F5C842;border-radius:8px;padding:10px 12px;font-size:14px;outline:none;';
+                                                        wrap.appendChild(input);
+                                                        right.insertBefore(wrap, right.firstChild);
+                                                        var filter = function(){
+                                                            try {
+                                                                var q=(input.value||'').trim().toLowerCase();
+                                                                var items = right.querySelectorAll('.thumbnail-wrapper');
+                                                                items.forEach(function(w){
+                                                                    try{
+                                                                        var cap = w.querySelector('.thumbnail-caption');
+                                                                        var txt = (cap && cap.textContent || '').toLowerCase();
+                                                                        w.style.display = (!q || txt.indexOf(q)!==-1) ? '' : 'none';
+                                                                    }catch(_){}
+                                                                });
+                                                            } catch(_){ }
+                                                        };
+                                                        input.addEventListener('input', filter, { passive:true });
+                                                        // Reapply filter on list re-render
+                                                        var mof = new MutationObserver(function(){ filter(); });
+                                                        mof.observe(right, { childList:true, subtree:true });
+                                                    }
+                                                } catch(_){}
+                                            }
+                                            apply();
+                                            var mo = new MutationObserver(function(){ apply(); });
+                                            mo.observe(right, { childList:true, subtree:true });
+                                        } catch(_){ if (retries < 50) setTimeout(function(){ persistPanelFixes(retries+1); }, 200); }
                                     })(0);
 
                                     // Mobile-only: wrap loadModel to show/hide the model loader
@@ -670,6 +783,11 @@ body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail img{width:64px 
                                                     var btn = e.target && e.target.closest && e.target.closest('.category-button');
                                                     if (!btn) return;
                                                     try { window.__mobileCategoryPickedOnce = true; } catch(_){}
+                                                    // Trigger re-render for selected category if API exists
+                                                    try {
+                                                        var label = (btn.textContent||'').trim();
+                                                        if (typeof window.renderMobileRightPanelList==='function') window.renderMobileRightPanelList(label);
+                                                    } catch(_){}
                                                     // Re-apply promotion styling after desktop code updates DOM
                                                     setTimeout(function(){ try { markPromotionsPill(container); } catch(_){ } }, 30);
                                                     // Fallback: if desktop didn't set .active yet, enforce it on the clicked button
