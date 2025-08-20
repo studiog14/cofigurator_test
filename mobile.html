@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="format-detection" content="telephone=no" />
+    <title>Konfigurator krzeseł – Mobile</title>
+    <link rel="manifest" href="manifest.json" />
+    <link rel="apple-touch-icon" href="icons/favicon.png" />
+    <link rel="icon" href="favicon.png" />
+    <style>
+        html,body{height:100%;margin:0}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:#fff;color:#222}
+        .loader{display:flex;align-items:center;justify-content:center;flex-direction:column;height:100vh;gap:12px}
+        .spinner{width:40px;height:40px;border:3px solid #eee;border-top:3px solid #333;border-radius:50%;animation:spin 1s linear infinite}
+        @keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
+        .muted{color:#666;font-size:14px}
+        .error{color:#b00020}
+    </style>
+    <script>
+        (function(){
+            // Minimal mobile-mode hint for CSS before app scripts run
+            document.addEventListener('DOMContentLoaded', function(){
+                                try {
+                                    var ua = navigator.userAgent || '';
+                                    var isAndroid = /Android/i.test(ua);
+                                    var isIOS = /iPhone|iPad|iPod/i.test(ua) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+                                    // Jeśli to nie jest urządzenie mobilne, przełącz na wersję desktop bez dotykania index.html
+                                    var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+                                    // Na Androidzie przekieruj prosto do hostowanej wersji (bez iOS shims)
+                                    if (isAndroid) {
+                                        try { window.location.replace('https://studiog14.github.io/cofigurator_test/'); return; } catch(_) { }
+                                    }
+                                    if (!isMobile) { try { window.location.replace('index.html'); return; } catch(_) {} }
+                                    document.body.classList.add('mobile-mode');
+                                    // Wyłącz double-tap zoom (mobile/iOS)
+                                    try {
+                                        var lastTouchEnd = 0;
+                                        document.addEventListener('touchend', function(e){
+                                            var now = Date.now();
+                                            if (now - lastTouchEnd <= 300) {
+                                                e.preventDefault();
+                                            }
+                                            lastTouchEnd = now;
+                                        }, { passive: false });
+                                    } catch(_) {}
+                                } catch(_) {}
+            });
+        })();
+    </script>
+</head>
+<body>
+        <div id="boot-loader" class="loader">
+            <div class="spinner" aria-hidden="true"></div>
+            <div id="boot-msg">Ładowanie konfiguratora</div>
+            <div id="boot-hint" class="muted" style="display:none">To może potrwać dłuższą chwilę — pobieramy modele i tekstury. Jeśli ekran nie zniknie, odśwież stronę.</div>
+        </div>
+
+    <script>
+        (async function(){
+            console.log('[mobile.html] bootstrap start');
+            // Early guard: if Android slipped past the DOMContentLoaded redirect, bail out
+            try {
+                var __ua = navigator.userAgent || '';
+                if (/Android/i.test(__ua)) { window.location.replace('https://studiog14.github.io/cofigurator_test/'); return; }
+            } catch(_) {}
+            const bootContainer = document.getElementById('boot-loader');
+            function showError(msg){
+                if(bootContainer){
+                    bootContainer.innerHTML = '<div class="error">'+ (msg||'Błąd ładowania') +'</div>' +
+                        '<div class="muted">Spróbuj ponownie, lub otwórz wersję standardową: <a href="index.html">index.html</a></div>';
+                }
+            }
+
+            // Hard reset cache/storage on mobile (one-time per tab) before loading the app
+            try {
+                const HR_FLAG = 'MOBILE_HARD_RESET_DONE_v1';
+                const alreadyDone = (window.name === HR_FLAG);
+                if (!alreadyDone) {
+                    try { var m = document.getElementById('boot-msg'); if (m) m.textContent = 'Czyszczenie cache…'; } catch(_){ }
+                    // Unregister all service workers
+                    try {
+                        if ('serviceWorker' in navigator && navigator.serviceWorker.getRegistrations) {
+                            const regs = await navigator.serviceWorker.getRegistrations();
+                            await Promise.all(regs.map(r => r && r.unregister ? r.unregister().catch(()=>{}) : Promise.resolve()));
+                        }
+                    } catch(_){ }
+                    // Delete all caches
+                    try {
+                        if (window.caches && caches.keys) {
+                            const keys = await caches.keys();
+                            await Promise.all(keys.map(k => caches.delete(k).catch(()=>{})));
+                        }
+                    } catch(_){ }
+                    // Clear IndexedDB databases when possible
+                    try {
+                        if (window.indexedDB) {
+                            // Modern browsers expose indexedDB.databases(); iOS 15 may not. Try/catch each delete.
+                            if (indexedDB.databases) {
+                                const dbs = await indexedDB.databases();
+                                await Promise.all((dbs||[]).map(db => {
+                                    if (!db || !db.name) return Promise.resolve();
+                                    return new Promise(res => {
+                                        try {
+                                            const req = indexedDB.deleteDatabase(db.name);
+                                            req.onsuccess = req.onerror = req.onblocked = () => res();
+                                        } catch(_) { res(); }
+                                    });
+                                }));
+                            }
+                        }
+                    } catch(_){ }
+                    // Clear Web Storage (best-effort)
+                    try { localStorage.clear(); } catch(_){ }
+                    try { sessionStorage.clear(); } catch(_){ }
+
+                    // Guard and reload with cache-busting param
+                    try { window.name = HR_FLAG; } catch(_){ }
+                    try {
+                        const u = new URL(location.href);
+                        u.searchParams.set('hr', Date.now().toString());
+                        location.replace(u.toString());
+                    } catch(_) { location.reload(); }
+                    return; // Stop bootstrap; it will continue after reload
+                } else {
+                    // Clean the guard so it doesn't leak
+                    try { window.name = ''; } catch(_){ }
+                }
+            } catch(_){ }
+
+            // Safety: show hint after 8s (no auto-reload timers on mobile)
+            try {
+                setTimeout(function(){ var h=document.getElementById('boot-hint'); if(h) h.style.display='block'; },8000);
+            } catch(_){ }
+
+            try {
+                // Pobierz źródło index.html i przygotuj wersję z shimami dla iOS
+                // Etap 2: Ładowanie konfiguratora
+                try { var bm = document.getElementById('boot-msg'); if (bm) bm.textContent = 'Ładowanie konfiguratora'; } catch(_){}
+                const res = await fetch('index.html', { credentials: 'same-origin', cache: 'no-store' });
+                if(!res.ok){ throw new Error('HTTP '+res.status); }
+                let html = await res.text();
+
+                    // Prosty transpiler usuwający optional chaining / nullish coalescing w inline module script
+                    function transpileLight(src){
+                        // iOS 15 wspiera optional chaining; unikamy ryzykownych podmian regex.
+                        return src;
+                    }
+
+                // 1) Wstrzyknij es-module-shims w <head> (lub zaraz po <meta charset>)
+                const shimTag = '<script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1/dist/es-module-shims.min.js"></' + 'script>';
+                const hintCss = `
+<style id="mobile-hint-style">
+@keyframes mobileHint{to{opacity:1}}
+/* Active category state on mobile same as desktop */
+body.mobile-mode .category-button.active{background:#F5C842;color:#fff;border-color:#F5C842}
+/* Ensure Promocje category uses red like desktop */
+body.mobile-mode .category-button.promotion{border-color:#FF6B6B;color:#FF6B6B}
+body.mobile-mode .category-button.promotion.active{background:#FF6B6B !important;border-color:#FF6B6B !important;color:#fff !important}
+/* Ensure right panel is wide enough for 2 tiles */
+body.mobile-mode #mobile-right-panel{width:clamp(260px,38vw,360px);max-width:clamp(260px,38vw,360px)}
+/* Make welcome overlay flush with the panel edge (match clamp width) */
+body.mobile-mode #welcome-screen{width:calc(100% - clamp(260px,38vw,360px)) !important}
+/* Mobile scroll improvements: prevent body rubber-banding and scroll within right panel only */
+html.mobile-mode, body.mobile-mode{overscroll-behavior-y:contain;overscroll-behavior:contain}
+body.mobile-mode{overflow:hidden}
+/* Consistent white background to hide any canvas through-gaps */
+html.mobile-mode, body.mobile-mode, body.mobile-mode #welcome-screen, body.mobile-mode #mobile-right-panel{background:#fff !important}
+/* Prefer tap interactions; helps avoid double-tap zoom */
+body.mobile-mode{touch-action:manipulation}
+/* Ensure right panel is wide enough for 2 tiles (use shared var to avoid gaps) */
+body.mobile-mode{--panelW: clamp(260px,38vw,360px)}
+body.mobile-mode #mobile-right-panel{width:var(--panelW) !important;max-width:var(--panelW) !important;border-left:0 !important;box-shadow:none !important;margin-left:-2px !important}
+/* Override welcome width using the same var to avoid any seam; also ensure no edge styling */
+body.mobile-mode #welcome-screen{width:calc(100% - var(--panelW) + 2px) !important;border-right:0 !important;box-shadow:none !important}
+body.mobile-mode #mobile-right-panel{height:100dvh;max-height:100dvh;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scroll-padding-bottom:96px;padding-bottom:calc(96px + env(safe-area-inset-bottom, 0px))}
+@supports (height: 100svh){ body.mobile-mode #mobile-right-panel{height:100svh;max-height:100svh} }
+/* Fallback for older browsers that lack 100dvh: use JS-set --vh */
+@supports not (height: 100dvh){ body.mobile-mode #mobile-right-panel{height:calc(var(--vh, 1vh) * 100);max-height:calc(var(--vh, 1vh) * 100)} }
+/* Categories: two per row without changing button look */
+body.mobile-mode #mobile-category-buttons-container,
+body.mobile-mode #category-buttons-container{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+body.mobile-mode #mobile-category-buttons-container{margin-bottom:10px}
+/* Model thumbnails: two columns inside right panel */
+body.mobile-mode #mobile-right-panel #model-thumbnails,
+body.mobile-mode #mobile-right-panel #legs-thumbnails,
+body.mobile-mode #mobile-right-panel #material-panel-viewer,
+body.mobile-mode #mobile-right-panel .options-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+/* Default right-panel thumbnails to unified size */
+body.mobile-mode #mobile-right-panel .thumbnail{width:80px !important;height:80px !important;margin:0 auto !important}
+body.mobile-mode #mobile-right-panel .thumbnail img{width:64px !important;height:64px !important}
+/* Bottom spacer at the end of the panel (not between lists) */
+body.mobile-mode #mobile-right-panel::after{content:"";display:block;height:96px}
+body.mobile-mode #mobile-right-panel .thumbnail-wrapper{width:100%}
+/* Frame-sized tile: fixed height so image never overlaps caption/price */
+body.mobile-mode #mobile-right-panel .thumbnail{width:100%;height:120px;display:flex;align-items:center;justify-content:center;padding:8px;background:#fff;border:1px solid #e5e5e5;border-radius:10px;box-sizing:border-box}
+/* Image constrained to the frame */
+body.mobile-mode #mobile-right-panel .thumbnail img{max-width:100%;max-height:90px;width:auto;height:auto;object-fit:contain;display:block}
+/* Ensure caption and price are clearly below the frame */
+body.mobile-mode #mobile-right-panel .thumbnail-caption{margin-top:8px;font-size:13px}
+    /* Mobile-only proportional font scaling (relative to category/chair sizes) */
+    body.mobile-mode{--panelFontBase:12px;--captionFont:13px}
+    body.mobile-mode #welcome-screen h1{font-size:calc(var(--panelFontBase) * 1.8) !important}
+    body.mobile-mode #welcome-screen p{font-size:calc(var(--panelFontBase) * 1.1) !important}
+    body.mobile-mode .loading-text{font-size:calc(var(--panelFontBase) * 1.1) !important}
+    body.mobile-mode #boot-loader #boot-msg{font-size:calc(var(--panelFontBase) * 1.1) !important}
+    body.mobile-mode #mobile-longload-hint{font-size:calc(var(--panelFontBase) * 1.0) !important}
+    body.mobile-mode .muted{font-size:calc(var(--panelFontBase) * 1.1) !important}
+/* Search UI inside the mobile panel */
+body.mobile-mode #mobile-right-panel #search-container{position:sticky !important;top:0 !important;z-index:1500;background:rgba(255,255,255,0.96);padding:8px 8px;margin:0 0 8px 0;display:flex;align-items:center;gap:8px}
+body.mobile-mode #mobile-right-panel #search-toggle{transform:none !important;width:40px;height:40px}
+body.mobile-mode #mobile-right-panel #search-panel{position:static !important;width:100% !important;max-width:100% !important;opacity:1 !important;visibility:visible !important;padding:0 !important;box-shadow:none !important;transform:none !important;background:transparent !important}
+body.mobile-mode #mobile-right-panel #search-input{margin:0; display:block}
+body.mobile-mode #mobile-right-panel #search-results{max-height:220px}
+body.mobile-mode #mobile-right-panel #search-filter-indicator{display:block !important;margin:6px 8px 10px 8px !important}
+/* Hide legacy intro IDs only on mobile; keep #welcome-screen visible */
+body.mobile-mode #welcome, body.mobile-mode .welcome, body.mobile-mode #intro, body.mobile-mode .intro, body.mobile-mode #start, body.mobile-mode .start{display:none !important}
+/* Mobile-only: hide QR button in the floating toolbar */
+body.mobile-mode #qr-button{display:none !important}
+/* Mobile-only: make the left toolbar compact and slide-out */
+body.mobile-mode #bottom-toolbar{left:8px !important;padding:6px 4px !important;gap:10px !important;border-radius:10px !important;box-shadow:0 4px 12px rgba(0,0,0,.1) !important;transform:translate(calc(-100% - 8px), -50%) !important}
+body.mobile-mode #bottom-toolbar.mobile-open{transform:translate(0, -50%) !important}
+body.mobile-mode #bottom-toolbar button{padding:6px 8px !important;border-radius:8px !important}
+body.mobile-mode #bottom-toolbar img{width:18px !important;height:18px !important}
+/* Mobile-only: small grab tab to open toolbar */
+body.mobile-mode #mobile-toolbar-tab{position:fixed;left:0;top:50%;transform:translateY(-50%);background:#F5C842;border:1px solid #d2a81e;border-right:none;border-radius:0 8px 8px 0;padding:8px 6px;z-index:2001;box-shadow:0 2px 8px rgba(0,0,0,.12);display:flex;align-items:center;justify-content:center;opacity:.97}
+body.mobile-mode #mobile-toolbar-tab.hidden{display:none}
+body.mobile-mode #mobile-toolbar-tab span{font-size:11px;color:#222;writing-mode:vertical-rl;transform:rotate(180deg);font-weight:600;letter-spacing:.2px;font-family:'Poppins',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif}
+/* Await selection: hide toolbar and tab, and hide canvas to prevent flicker */
+body.mobile-mode.mobile-await-selection #mobile-toolbar-tab{display:none !important}
+body.mobile-mode.mobile-await-selection #bottom-toolbar{display:none !important}
+body.mobile-mode.mobile-await-selection #canvas{visibility:hidden !important}
+/* Mobile: slightly smaller 'Twoja konfiguracja' / export button */
+body.mobile-mode #export-config{padding:6px 8px !important;font-size:12px !important}
+/* Mobile: compact 'Twoja konfiguracja' button */
+body.mobile-mode #config-overview-button{padding:5px 9px !important;font-size:11px !important;bottom:12px !important;left:12px !important;border-radius:16px !important;z-index:2002 !important;font-family:'Poppins',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif !important;font-weight:600 !important}
+/* Center the yellow thumb exactly on the narrow vertical track on mobile */
+body.mobile-mode #brightness-panel #brightness-slider::-webkit-slider-thumb{left:0 !important;margin:0 !important}
+body.mobile-mode #brightness-panel input[type="range"]::-webkit-slider-thumb{left:0 !important;margin:0 !important}
+body.mobile-mode #brightness-panel #brightness-slider::-moz-range-thumb{margin:0 !important}
+body.mobile-mode #brightness-panel #brightness-slider::-ms-thumb{margin:0 !important}
+/* Further compact left toolbar on mobile */
+body.mobile-mode #bottom-toolbar{gap:8px !important;padding:6px 6px !important}
+body.mobile-mode #bottom-toolbar button{padding:4px 6px !important}
+body.mobile-mode #bottom-toolbar img{width:16px !important;height:16px !important}
+body.mobile-mode #mobile-toolbar-tab{padding:6px 5px !important}
+/* Part icons styled like collection icons */
+body.mobile-mode #part-tabs button,
+body.mobile-mode #part-tabs .part-btn{width:56px !important;height:56px !important;border:1px solid #ccc !important;border-radius:8px !important;background:#fff !important;display:flex !important;align-items:center !important;justify-content:center !important;padding:6px !important}
+body.mobile-mode #part-tabs img{width:36px !important;height:36px !important;object-fit:contain !important}
+/* Material icons square and proportional like collection icons */
+body.mobile-mode #material-panel-viewer{grid-template-columns:repeat(auto-fill,minmax(80px,1fr)) !important}
+body.mobile-mode #material-panel-viewer .thumbnail{width:80px !important;height:80px !important;display:flex !important;align-items:center !important;justify-content:center !important;margin:0 auto !important}
+body.mobile-mode #material-panel-viewer .thumbnail img{width:64px !important;height:64px !important;object-fit:contain !important;border-radius:8px !important}
+/* Unify chair and legs icons to same size as materials/collections */
+body.mobile-mode #mobile-right-panel #model-thumbnails .thumbnail,
+body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail{width:80px !important;height:80px !important;display:flex !important;align-items:center !important;justify-content:center !important;margin:0 auto !important}
+body.mobile-mode #mobile-right-panel #model-thumbnails .thumbnail img,
+body.mobile-mode #mobile-right-panel #legs-thumbnails .thumbnail img{width:64px !important;height:64px !important;object-fit:contain !important}
+/* Welcome: hide only the continue button; keep install unless PWA is installed */
+body.mobile-mode #welcome-continue-btn{display:none !important}
+body.mobile-mode.pwa-installed #welcome-install-btn{display:none !important}
+</style>`;
+                if(html.includes('</head>')){
+                    html = html.replace(/<head[^>]*>/i, function(m){ return m + '\n  ' + shimTag + '\n  ' + hintCss + '\n'; });
+                } else {
+                    // awaryjnie dodaj na początku
+                    html = shimTag + '\n' + hintCss + '\n' + html;
+                }
+
+                // 2) Konwersja import map i modułów na wariant shim
+                html = html
+                    .replace(/type="importmap"/g, 'type="importmap-shim"')
+                    .replace(/type="module"/g, 'type="module-shim"');
+
+                    // 2b) Przetranskrybuj inline module-shim scripts (bez dotykania zewnętrznych plików)
+                    html = html.replace(/<script([^>]*type=\"module-shim\"[^>]*)>([\s\S]*?)<\/script>/gi, function(_, attrs, code){
+                        try {
+                        let patched = transpileLight(code);
+                        // Dodatkowe mobilne gardy na brakujące elementy DOM
+                        patched = patched.replace(/buyButton\.addEventListener\(/g, 'buyButton && buyButton.addEventListener(');
+                        patched = patched.replace(/closeBtn\.addEventListener\(/g, 'closeBtn && closeBtn.addEventListener(');
+                        patched = patched.replace(/emailModal\.addEventListener\(/g, 'emailModal && emailModal.addEventListener(');
+                        patched = patched.replace(/emailForm\.addEventListener\(/g, 'emailForm && emailForm.addEventListener(');
+                        // Po inic Viewer: jeśli wybrano model przed inicjalizacją, załaduj go automatycznie
+                        patched = patched.replace(/window\\.viewer\s*\=\s*viewer\s*;/, function(m){ return m + "\ntry{ if(window.__pendingMobileVariant){ loadModel(window.__pendingMobileVariant); window.__pendingMobileVariant=null; } }catch(_){}\n"; });
+                            return '<script'+attrs+'>'+patched+'<\/script>';
+                        } catch(e) {
+                            return '<script'+attrs+'>'+code+'<\/script>';
+                        }
+                    });
+
+                // 2c) Odłóż ładowanie zewnętrznych CDN scriptów na później, aby uniknąć parser-blocking via document.write
+                html = html.replace(/<script\s+src="https:\/\/cdn\.jsdelivr\.net\/npm\/qrcodejs\/qrcode\.min\.js"[^>]*><\/script>/gi,
+                    '<script data-mobile-defer-src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"><\\/script>');
+                html = html.replace(/<script\s+src="https:\/\/cdn\.emailjs\.com\/dist\/email\.min\.js"[^>]*><\/script>/gi,
+                    '<script data-mobile-defer-src="https://cdn.emailjs.com/dist/email.min.js"><\\/script>');
+                // Zabezpiecz emailjs.init tak, aby poczekał na bibliotekę
+                html = html.replace(/emailjs\.init\(([^)]*)\);/i,
+                    '(function initEmail(){ if (window.emailjs&&emailjs.init){ try{ emailjs.init($1); }catch(_){ } } else { setTimeout(initEmail,200); } })();');
+
+                    // 2d) Zmień komunikat loadera i wstrzyknij wskazówkę (CSS-only reveal po 8s)
+                    html = html.replace(/<div\s+class=\"loading-text\"([^>]*)>([\s\S]*?)<\/div>/i, function(_, attrs){
+                        return '<div class="loading-text"'+attrs+'>Trwa uruchamianie konfiguratora<\/div>' +
+                               '<div id="mobile-longload-hint" style="margin-top:12px;font-size:14px;color:#666;text-align:center;max-width:320px;opacity:0;animation:mobileHint 0s linear 8s forwards">To może potrwać dłuższą chwilę — pobieramy modele i tekstury. Jeśli ekran nie zniknie, odśwież stronę.<\/div>';
+                    });
+
+                    // 2e) Doładuj odłożone CDN-y po wstawieniu dokumentu – bez wstrzykiwania dodatkowych <script> w stringu
+
+                        // 3) Delikatny sygnał do aplikacji, że to wariant mobile
+                //    (nie zmieniamy logiki index.html – tylko podpowiedź)
+                html = html.replace(/<body([^>]*)>/i, function(_, attrs){
+                    // Inject mobile classes and an inline overlay immediately so there is no flash between document.write and JS
+                    return '<body'+ (attrs||'') + ' class="mobile-mode">\n' +
+                           '<div id="mobile-boot-overlay" aria-hidden="true" style="position:fixed;inset:0;background:#fff;z-index:9998;transition:opacity .2s ease;"></div>';
+                });
+
+                                // 4) Podmień cały dokument – uruchomi to oryginalne skrypty w trybie shim
+                document.open();
+                document.write(html);
+                document.close();
+
+                                // 5) Po wstawieniu: doładuj odłożone CDN-y, anty-flash overlay i mobilny komunikat loadera + hint
+                                try {
+                                    // Enter pre-selection state (hide toolbar/tab and canvas) until a model is chosen
+                                    try { document.body.classList.add('mobile-await-selection'); } catch(_){}
+                                    // (Removed global mutation of allData categories to avoid breaking exact category matches)
+                                    // Dynamic VH fallback for mobile address bar resizing
+                                    (function setupVHFallback(){
+                                        try {
+                                            var setVh = function(){
+                                                try { document.documentElement.style.setProperty('--vh', (window.innerHeight * 0.01) + 'px'); } catch(_) {}
+                                            };
+                                            setVh();
+                                            window.addEventListener('resize', setVh, { passive: true });
+                                            window.addEventListener('orientationchange', setVh, { passive: true });
+                                        } catch(_) {}
+                                    })();
+                                    // Mobile-only: fit 3D canvas to available space (exclude right panel width)
+                                    (function setupMobileCanvasFit(){
+                                        function panelWidth(){
+                                            try {
+                                                var p = document.getElementById('mobile-right-panel');
+                                                if (p && p.offsetWidth) return p.offsetWidth;
+                                                var w = getComputedStyle(document.body).getPropertyValue('--panelW');
+                                                if (w) { var n = parseFloat(w); if (!isNaN(n)) return n; }
+                                            } catch(_) {}
+                                            return 300; // fallback
+                                        }
+                                        var rafId = null;
+                                        function adjust(){
+                                            if (!document.body.classList.contains('mobile-mode')) return;
+                                            try {
+                                                var canvas = document.getElementById('canvas');
+                                                if (!canvas) return;
+                                                var pw = panelWidth();
+                                                var w = Math.max(0, window.innerWidth - pw);
+                                                var h = window.innerHeight;
+                                                // Apply CSS size
+                                                canvas.style.width = w + 'px';
+                                                canvas.style.height = h + 'px';
+                                                // Apply actual GL size
+                                                canvas.width = w;
+                                                canvas.height = h;
+                                                if (window.viewer && viewer.renderManager && viewer.scene && viewer.scene.mainCamera) {
+                                                    try { viewer.renderManager.setSize(w, h, false); } catch(_) {}
+                                                    try { viewer.scene.mainCamera.aspect = (w>0 && h>0) ? (w/h) : viewer.scene.mainCamera.aspect; viewer.scene.mainCamera.updateProjectionMatrix(); } catch(_) {}
+                                                    try { if (viewer.render) viewer.render(); } catch(_) {}
+                                                }
+                                            } catch(_) {}
+                                        }
+                                        function schedule(){ if (rafId) cancelAnimationFrame(rafId); rafId = requestAnimationFrame(adjust); }
+                                        window.addEventListener('resize', schedule, { passive: true });
+                                        window.addEventListener('orientationchange', schedule, { passive: true });
+                                        // Initial attempts until canvas/viewer appear
+                                        var tries = 0; (function tick(){ tries++; adjust(); if (tries < 50 && (!window.viewer || !document.getElementById('canvas'))) setTimeout(tick, 100); })();
+                                        // Expose helper for later calls
+                                        window.__adjustMobileCanvas = schedule;
+                                    })();
+                                    // Anti-flash overlay: ukryj ewentualny ekran powitalny zanim UI będzie gotowe
+                                    var __mobileOverlay = document.getElementById('mobile-boot-overlay');
+                                    if (!__mobileOverlay) {
+                                        __mobileOverlay = document.createElement('div');
+                                        __mobileOverlay.id = 'mobile-boot-overlay';
+                                        __mobileOverlay.setAttribute('aria-hidden','true');
+                                        __mobileOverlay.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:9998;transition:opacity .2s ease;';
+                                        (document.body || document.documentElement).appendChild(__mobileOverlay);
+                                    }
+                                    // Doładuj skrypty CDN
+                                    var placeholders = document.querySelectorAll('script[data-mobile-defer-src]');
+                                    placeholders.forEach(function(ph){
+                                        var s = document.createElement('script');
+                                        s.src = ph.getAttribute('data-mobile-defer-src');
+                                        s.defer = true;
+                                        (ph.parentNode || document.head || document.documentElement).insertBefore(s, ph);
+                                        ph.parentNode && ph.parentNode.removeChild(ph);
+                                    });
+
+                                    // Mobile-only: wrap loadModel to show/hide the model loader
+                                    (function hookLoadModel(retries){
+                                        try {
+                                            if (typeof window.loadModel === 'function') {
+                                                var __origLoadModel = window.loadModel;
+                                                if (!__origLoadModel.__mobileWrapped) {
+                                                    var wrapped = async function(variant){
+                                                        try { var ml = document.getElementById('model-loader'); if (ml) ml.style.display = 'flex'; } catch(_){ }
+                                                        try {
+                                                            // Normalize only the passed variant so desktop logic recognizing 'hooker' works even if source uses 'hoker'
+                                                            var v = variant || {};
+                                                            try {
+                                                                var k = (v.Kategoria || ''); var l = k.toLowerCase();
+                                                                if (l && l.includes('hoker') && !l.includes('hooker')) {
+                                                                    v = Object.assign({}, v, { Kategoria: (k + ' hooker').trim() });
+                                                                }
+                                                            } catch(_) {}
+                                                            var res = await __origLoadModel.call(this, v);
+                                                            try { if (typeof window.__adjustMobileCanvas==='function') window.__adjustMobileCanvas(); } catch(_) {}
+                                                            // Mobile-only: slightly zoom in for non-hooker chairs
+                                                            try {
+                                                                if (document.body.classList.contains('mobile-mode') && window.viewer && window.viewer.scene && window.viewer.scene.mainCamera) {
+                                                                    var chair = (window.selectedChair || v || {});
+                                                                    var isHooker = (String(chair.Kategoria||'').toLowerCase().includes('hooker') || String(chair.Kategoria||'').toLowerCase().includes('hoker'));
+                                                                    if (!isHooker) {
+                                                                        var cam = window.viewer.scene.mainCamera;
+                                                                        // Move camera a bit closer along its forward vector
+                                                                        try {
+                                                                            var f = cam.getWorldDirection(new (window.THREE?THREE.Vector3:window.viewer.THREE?.Vector3||function(){})());
+                                                                            if (f && f.x!==undefined) {
+                                                                                cam.position.addScaledVector(f, -0.35); // small nudge closer
+                                                                                cam.updateProjectionMatrix();
+                                                                            }
+                                                                        } catch(_){ /* fallback: tweak zoom via controls distance if available */
+                                                                            if (window.viewer.controls) {
+                                                                                try { window.viewer.controls.minDistance = Math.max(0.8, (window.viewer.controls.minDistance||1) * 0.9); } catch(_){}
+                                                                                try { window.viewer.controls.maxDistance = Math.max(2.0, (window.viewer.controls.maxDistance||8) * 0.95); } catch(_){}
+                                                                                try { window.viewer.controls.update(); } catch(_){}
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            } catch(_){ }
+                                                            // After first successful model load, we can safely remove boot overlay early
+                                                            try {
+                                                                if (window.__mobileBootOverlayDone !== true && __mobileOverlay) {
+                                                                    __mobileOverlay.style.opacity = '0';
+                                                                    setTimeout(function(){ try { __mobileOverlay.remove(); } catch(_){} }, 200);
+                                                                    window.__mobileBootOverlayDone = true;
+                                                                }
+                                                            } catch(_){}
+                                                            // Leave pre-selection state: show canvas and toolbar tab
+                                                            try { document.body.classList.remove('mobile-await-selection'); } catch(_){}
+                                                            return res;
+                                                        }
+                                                        finally {
+                                                            try { setTimeout(function(){ var ml2=document.getElementById('model-loader'); if(ml2) ml2.style.display='none'; }, 300); } catch(_){}
+                                                            // After model loads, ensure the mobile panel shows from the top
+                                                            try {
+                                                                var panel = document.getElementById('mobile-right-panel');
+                                                                if (panel) {
+                                                                    panel.scrollTop = 0;
+                                                                    if (panel.scrollTo) panel.scrollTo({ top: 0, behavior: 'auto' });
+                                                                }
+                                                            } catch(_){}
+                                                        }
+                                                    };
+                                                    wrapped.__mobileWrapped = true;
+                                                    window.loadModel = wrapped;
+                                                }
+                                                return;
+                                            }
+                                        } catch(_) {}
+                                        if (retries < 100) setTimeout(function(){ hookLoadModel(retries+1); }, 100);
+                                    })(0);
+
+                                    // Mobile-only: create a small slide tab to toggle the left toolbar, and auto-compact it
+                    (function setupMobileToolbar(){
+                                        try {
+                                            var bar = document.getElementById('bottom-toolbar');
+                                            if (!bar) return;
+                                            // Ensure visible class remains managed by app; we only slide position
+                                            // Start compact (hidden beyond edge); show a small tab
+                                            var tab = document.createElement('div');
+                                            tab.id = 'mobile-toolbar-tab';
+                                            tab.innerHTML = '<span>Narzędzia</span>';
+                                            document.body.appendChild(tab);
+                                            function openBar(){ try { bar.classList.add('mobile-open'); tab.classList.add('hidden'); } catch(_){} }
+                                            function closeBar(){ try { bar.classList.remove('mobile-open'); tab.classList.remove('hidden'); } catch(_){} }
+                                            tab.addEventListener('click', openBar, { passive: true });
+                                            // Helper to check and close subpanels (HDR list, brightness, export)
+                                            function anySubpanelOpen(){
+                                                try {
+                                                    var hdrP = document.getElementById('hdr-panel');
+                                                    var briP = document.getElementById('brightness-panel');
+                                                    var expP = document.getElementById('export-panel');
+                                                    var dimO = document.getElementById('dimension-overlay');
+                                                    var open = false;
+                                                    if (hdrP && !hdrP.classList.contains('hidden') && hdrP.style.display !== 'none') open = true;
+                                                    if (briP && !briP.classList.contains('hidden') && briP.style.display !== 'none') open = true;
+                                                    if (expP && !expP.classList.contains('hidden') && expP.style.display !== 'none') open = true;
+                                                    if (dimO && dimO.style.display !== 'none') open = true;
+                                                    return open;
+                                                } catch(_) { return false; }
+                                            }
+                                            function closeSubpanels(){
+                                                try {
+                                                    var ids=['hdr-panel','brightness-panel','export-panel'];
+                                                    ids.forEach(function(id){ var el=document.getElementById(id); if(!el) return; el.classList.add('hidden'); el.style.display = (id==='hdr-panel' ? 'none' : el.style.display); });
+                                                    var dimO=document.getElementById('dimension-overlay'); if(dimO) dimO.style.display='none';
+                                                } catch(_){}
+                                            }
+                                            // Two-step outside tap: close open subpanels first, then the toolbar
+                                            document.addEventListener('click', function(e){
+                                                try {
+                                                    if (!bar.classList.contains('mobile-open')) return;
+                                                    if (bar.contains(e.target) || tab.contains(e.target)) return;
+                                                    if (anySubpanelOpen()) { closeSubpanels(); return; }
+                                                    closeBar();
+                                                } catch(_){}
+                                            }, { passive: true });
+                                            // Also close when HDR panel opens to avoid overlap
+                                            document.getElementById('hdr-toggle')?.addEventListener('click', function(){ openBar(); }, { passive: true });
+                                            document.getElementById('hdr-panel')?.addEventListener('click', function(){ closeBar(); }, { passive: true });
+                                            // Auto-close on orientation change to reset position
+                                            window.addEventListener('orientationchange', function(){ setTimeout(closeBar, 300); }, { passive: true });
+                                            // Initially closed
+                        closeBar();
+                        // Keep toolbar/tab hidden until a model is selected
+                        try { document.body.classList.add('mobile-await-selection'); } catch(_){}
+                                        } catch(_){}
+                                    })();
+
+                                    // Mobile category buttons: let desktop handlers toggle active; only persist 'Promocje' pill styling
+                                    (function attachCategoryActiveSync(retries){
+                                        function markPromotionsPill(root){
+                                            try {
+                                                var container = root || document;
+                                                var btns = container.querySelectorAll('.category-button');
+                                                if (!btns || !btns.length) return;
+                                                Array.from(btns).forEach(function(b){
+                                                    var lbl = (b.textContent||'').trim().toLowerCase();
+                                                    if (lbl === 'promocje') b.classList.add('promotion');
+                                                });
+                                            } catch(_){}
+                                        }
+                                        try {
+                                            var container = document.getElementById('mobile-right-panel') || document.getElementById('mobile-category-buttons-container') || document.getElementById('category-buttons-container');
+                                            if (container) {
+                                                // keep the 'Promocje' pill styled on initial render
+                                                markPromotionsPill(container);
+                                                container.addEventListener('click', function(e){
+                                                    var btn = e.target && e.target.closest && e.target.closest('.category-button');
+                                                    if (!btn) return;
+                                                    try { window.__mobileCategoryPickedOnce = true; } catch(_){}
+                                                    // Re-apply promotion styling after desktop code updates DOM
+                                                    setTimeout(function(){ try { markPromotionsPill(container); } catch(_){ } }, 50);
+                                                }, { passive: true });
+                                                // Observe for re-renders and keep the 'Promocje' pill styled
+                                                var moCats = new MutationObserver(function(){ try { markPromotionsPill(container); } catch(_){} });
+                                                moCats.observe(container, { childList: true, subtree: true });
+                                                return;
+                                            }
+                                        } catch(_) {}
+                                        if (retries < 50) setTimeout(function(){ attachCategoryActiveSync(retries+1); }, 200);
+                                    })(0);
+
+                                    // Mobile: default to 'Promocje' category on first load (until user picks something), and style its pill in red
+                                    (function ensurePromotionsDefault(retries){
+                                        try {
+                                            if (window.__mobileCategoryPickedOnce) return; // user already chose
+                                            // If function exists, render the promotions list in the right panel
+                                            if (typeof window.renderMobileRightPanelList === 'function') {
+                                                window.renderMobileRightPanelList('Promocje');
+                                            }
+                                            // Mark the Promocje button as active + promotion for red style
+                                            var cont = document.getElementById('mobile-right-panel') || document;
+                                            var btns = cont.querySelectorAll('.category-button');
+                                            if (btns && btns.length) {
+                                                var promoBtn = Array.from(btns).find(function(b){ return (b.textContent||'').trim().toLowerCase()==='promocje'; });
+                                                // If any active exists already, don't override user/UI choice
+                                                var anyActive = Array.from(btns).some(function(b){ return b.classList.contains('active'); });
+                                                if (promoBtn) {
+                                                    // keep the red border regardless of active
+                                                    promoBtn.classList.add('promotion');
+                                                    if (!anyActive) {
+                                                        btns.forEach(function(b){ b.classList.remove('active'); });
+                                                        promoBtn.classList.add('active');
+                                                    }
+                                                    return; // success
+                                                }
+                                            }
+                                        } catch(_) {}
+                                        if (retries < 50) setTimeout(function(){ ensurePromotionsDefault(retries+1); }, 200);
+                                    })(0);
+
+                                    // Mobile click delegation fallback: trigger loadModel when thumbnail clicked even if original handler fails
+                                    (function attachMobileThumbFallback(){
+                                        document.addEventListener('click', function(ev){
+                                            try {
+                                                var t = ev.target;
+                                                if (!t) return;
+                                                var thumb = t.closest && t.closest('#mobile-right-panel .thumbnail, #model-thumbnails .thumbnail, .model-thumbnail');
+                                                if (!thumb) return;
+                                                // Try to resolve model from caption text
+                                                var wrap = thumb.parentElement;
+                                                var cap = wrap && wrap.querySelector && wrap.querySelector('.thumbnail-caption');
+                                                var captionText = cap && cap.textContent ? cap.textContent.trim() : '';
+                                                var dataName = (thumb.getAttribute && thumb.getAttribute('data-name')) || '';
+                                                var nameRaw = dataName || captionText;
+                                                var dataCat = (thumb.getAttribute && thumb.getAttribute('data-kategoria')) || (thumb.dataset && thumb.dataset.kategoria) || '';
+                                                var imgEl = wrap && wrap.querySelector && wrap.querySelector('img');
+                                                var imgSrc = imgEl && imgEl.getAttribute && imgEl.getAttribute('src');
+                                                var imgFile = '';
+                                                try { if (imgSrc) { var u=new URL(imgSrc, location.href); imgFile = (u.pathname||'').split('/').pop(); } } catch(_) {}
+                                                var norm = function(s){ try { return (s||'').normalize('NFD').replace(/\p{Diacritic}/gu,''); } catch(_) { return (s||''); } };
+                                                var strip = function(s){ try { return (typeof window.stripBrackets==='function') ? window.stripBrackets(s) : String(s||'').replace(/\s*\([^)]*\)\s*/g,'').trim(); } catch(_) { return (s||''); } };
+                                                var lower = function(s){ return (s||'').toLowerCase().trim(); };
+                                                var name = nameRaw;
+                                                var isHookerLabel = /(hooker|hoker)/i.test(nameRaw) || /(hooker|hoker)/i.test(dataCat);
+                                                var pick = null;
+                                                if (Array.isArray(window.allData)) {
+                                                    var candidates = window.allData.filter(function(it){ return it && it.Typ==='model'; });
+                                                    var activeBtn = document.querySelector('.category-button.active');
+                                                    var activeText = activeBtn && activeBtn.textContent ? activeBtn.textContent.toLowerCase() : '';
+                                                    var preferHooker = /(hooker|hoker)/.test(nameRaw) || /(hooker|hoker)/.test(dataCat) || /(hooker|hoker)/.test(activeText);
+                                                    var preferNonHooker = /krzes/.test(activeText) && !preferHooker;
+                                                    var hookerCands = candidates.filter(function(it){ var cat=lower(String(it.Kategoria||'')); return cat.includes('hooker') || cat.includes('hoker'); });
+                                                    var chairCands = candidates.filter(function(it){ return !lower(String(it.Kategoria||'')).includes('hooker'); });
+                                                    var searchSets = preferHooker ? [hookerCands] : (preferNonHooker ? [chairCands] : [candidates]);
+
+                                                    function findBy(pred){ for (var i=0;i<searchSets.length;i++){ var r=searchSets[i].find(pred); if(r) return r; } return null; }
+
+                                                    // 1) Try exact name only within the selected search set
+                                                    pick = findBy(function(it){ return lower(it.Nazwa) === lower(name); });
+                                                    // 2) Try normalized exact
+                                                    if (!pick) { var nameNorm = lower(norm(name)); pick = findBy(function(it){ return lower(norm(it.Nazwa)) === nameNorm; }); }
+                                                    // 3) Try stripped parentheses
+                                                    if (!pick) { var nameStripped = lower(norm(strip(name))); pick = findBy(function(it){ return lower(norm(strip(it.Nazwa))) === nameStripped; }); }
+                                                    // 4) As a last fallback, try match by thumbnail image file name (only within the selected set and only if unique)
+                                                    if (!pick && imgFile) {
+                                                        var imgLower = imgFile.toLowerCase();
+                                                        var matched = (searchSets[0]||[]).filter(function(it){ var ob=(it.Obrazek||'').toString().toLowerCase(); var file=ob.split('/').pop(); return file===imgLower; });
+                                                        if (matched.length === 1) pick = matched[0];
+                                                    }
+                                                }
+                                                if (pick && typeof window.loadModel==='function'){
+                                                    var ml = document.getElementById('model-loader'); if (ml) ml.style.display='flex';
+                                                    window.loadModel(pick);
+                                                    // Also nudge panel to the top shortly after selection
+                                                    setTimeout(function(){ try { var panel=document.getElementById('mobile-right-panel'); if(panel){ panel.scrollTop=0; if(panel.scrollTo) panel.scrollTo({top:0, behavior:'auto'}); } } catch(_){} }, 200);
+                                                }
+                                            } catch(_){}
+                                        }, { passive: true });
+                                    })();
+
+                                    // Przenieś desktopowe wyszukiwanie do panelu mobilnego i pokaż je zawsze
+                                    (function moveSearchToMobilePanel(retries){
+                                        try {
+                                            var panel = document.getElementById('mobile-right-panel');
+                                            var search = document.getElementById('search-container');
+                                            if (panel && search && search.parentElement !== panel) {
+                                                panel.insertAdjacentElement('afterbegin', search);
+                                                var indicator = document.getElementById('search-filter-indicator');
+                                                if (indicator && indicator.parentElement !== panel) {
+                                                    panel.insertAdjacentElement('afterbegin', indicator);
+                                                }
+                                            }
+                                            // Wymuś widoczność panelu wyszukiwania na mobile (klasa .active)
+                                            var sp = document.getElementById('search-panel');
+                                            if (sp && !sp.classList.contains('active')) sp.classList.add('active');
+                                            return;
+                                        } catch(_) {}
+                                        if (retries < 50) setTimeout(function(){ moveSearchToMobilePanel(retries+1); }, 200);
+                                    })(0);
+
+                                    // Tekst loadera dla mobile
+                                    // Etap 3: Trwa uruchamianie konfiguratora (na loaderze aplikacji)
+                                    var lt = document.querySelector('#custom-loader .loading-text');
+                                    if (lt) { lt.textContent = 'Trwa uruchamianie konfiguratora'; }
+
+                                    // Hint po 8s, auto-refresh po 20s (jednorazowo)
+                                    setTimeout(function(){
+                                        var loader = document.getElementById('custom-loader');
+                                        if (!loader || loader.style.display==='none' || document.getElementById('mobile-longload-hint')) return;
+                                        var hint = document.createElement('div');
+                                        hint.id = 'mobile-longload-hint';
+                                        hint.style.cssText = 'margin-top:12px;font-size:14px;color:#666;text-align:center;max-width:320px;';
+                                        hint.textContent = 'To może potrwać dłuższą chwilę — pobieramy modele i tekstury. Jeśli ekran nie zniknie, odśwież stronę.';
+                                        try { loader.appendChild(hint); } catch(_){}
+                                    }, 8000);
+
+                                    // Removed auto-refresh timer on mobile
+                                    
+                                    // Usuń overlay gdy UI będzie gotowe (tak, aby ekran powitalny i panel UI pojawiły się jednocześnie)
+                                    try {
+                                        var tries = 0;
+                                        var removeOverlay = function(){
+                                            var panel = document.getElementById('mobile-right-panel');
+                                            var panelReady = false;
+                                            try {
+                                                if (panel) {
+                                                    // Uznaj panel za gotowy, gdy pojawią się kluczowe elementy UI
+                                                    panelReady = !!(
+                                                        panel.querySelector('#search-container') ||
+                                                        panel.querySelector('#mobile-category-buttons-container') ||
+                                                        panel.querySelector('#category-buttons-container') ||
+                                                        panel.querySelector('#model-thumbnails') ||
+                                                        panel.querySelector('#legs-thumbnails')
+                                                    );
+                                                }
+                                            } catch(_) {}
+                                            if (!window.__mobileBootOverlayDone && panelReady) {
+                                                window.__mobileBootOverlayDone = true;
+                                                if (__mobileOverlay) {
+                                                    __mobileOverlay.style.opacity = '0';
+                                                    setTimeout(function(){ try { __mobileOverlay.remove(); } catch(_){} }, 200);
+                                                }
+                                                return true;
+                                            }
+                                            // Retry for a while to uniknąć zablokowania ekranu
+                                            tries++;
+                                            if (tries < 40) setTimeout(removeOverlay, 250);
+                                            else {
+                                                // Ostateczny fallback po ~10s
+                                                if (!window.__mobileBootOverlayDone) {
+                                                    window.__mobileBootOverlayDone = true;
+                                                    try { if (__mobileOverlay) { __mobileOverlay.style.opacity='0'; setTimeout(function(){ try{__mobileOverlay.remove();}catch(_){}} ,200); } } catch(_){}
+                                                }
+                                            }
+                                            return false;
+                                        };
+                                        removeOverlay();
+                                    } catch(_){ }
+                                } catch(_){ }
+                                
+                                // Persist two-column grids and frame sizing after UI rerenders on mobile
+                                try {
+                                    function markHookerCaptions(){
+                                        try {
+                                            var wrappers = document.querySelectorAll('#mobile-right-panel .thumbnail-wrapper');
+                                            wrappers.forEach(function(w){
+                                                try {
+                                                    var cap = w.querySelector('.thumbnail-caption');
+                                                    var img = w.querySelector('img');
+                                                    if (!cap || !img) return;
+                                                    var txt = cap.textContent || '';
+                                                    // If already shows (hooker), skip
+                                                    if (/\(hooker\)/i.test(txt)) return;
+                                                    var imgSrc = img.getAttribute('src')||''; var file='';
+                                                    try { var u=new URL(imgSrc, location.href); file=(u.pathname||'').split('/').pop().toLowerCase(); } catch(_) {}
+                                                    var model = null;
+                                                    if (Array.isArray(window.allData) && file) {
+                                                        var cands = window.allData.filter(function(it){
+                                                            return it && it.Typ==='model' && String(it.Obrazek||'').toLowerCase().split('/').pop()===file;
+                                                        });
+                                                        if (cands.length===1) model=cands[0];
+                                                    }
+                                                    if (model) {
+                                                        var k = String(model.Kategoria||'').toLowerCase();
+                                                        if (k.includes('hooker') || k.includes('hoker')) {
+                                                            cap.textContent = (txt.trim() + ' (hooker)').trim();
+                                                            // also set data-name on button to the exact model name
+                                                            var btn = w.querySelector('.thumbnail');
+                                                            if (btn) btn.setAttribute('data-name', model.Nazwa||'');
+                                                        }
+                                                    }
+                                                } catch(_) {}
+                                            });
+                                        } catch(_) {}
+                                    }
+
+                                    var applyAllGrids = function(){
+                                        try {
+                                            var nodes = document.querySelectorAll('#mobile-right-panel #model-thumbnails, #mobile-right-panel #legs-thumbnails, #mobile-right-panel #material-panel-viewer, #mobile-right-panel .options-grid');
+                                            nodes.forEach(function(el){
+                                                el.style.display = 'grid';
+                                                el.style.gridTemplateColumns = '1fr 1fr';
+                                                el.style.gap = '10px';
+                                                el.style.marginTop = '8px';
+                                            });
+                                            // Ensure tiles keep fixed frame and captions below
+                                            var tiles = document.querySelectorAll('#mobile-right-panel .thumbnail');
+                                            tiles.forEach(function(t){
+                                                t.style.height = '80px';
+                                                t.style.display = 'flex';
+                                                t.style.alignItems = 'center';
+                                                t.style.justifyContent = 'center';
+                                                t.style.padding = '8px';
+                                                t.style.background = '#fff';
+                                                t.style.border = '1px solid #e5e5e5';
+                                                t.style.borderRadius = '10px';
+                                                t.style.boxSizing = 'border-box';
+                                            });
+                                            // Mobile-only: append (hooker) to captions of hooker models to disambiguate names
+                                            markHookerCaptions();
+                                        } catch(_){ }
+                                    };
+                                    applyAllGrids();
+                                    var mo = new MutationObserver(function(){ applyAllGrids(); });
+                                    mo.observe(document.body, { childList: true, subtree: true });
+                                } catch(_){ }
+
+                                // Hide 'Wybierz model' / 'Wybierz krzesło' headers on mobile; keep desktop intact
+                                (function hidePickHeaders(){
+                                    function hideNow(root){
+                                        try {
+                                            var hs = (root||document).querySelectorAll('h3');
+                                            hs.forEach(function(h){
+                                                try {
+                                                    var t = (h.textContent||'').trim().toLowerCase();
+                                                    if (t === 'wybierz model:' || t === 'wybierz krzesło:') {
+                                                        h.style.display = 'none';
+                                                    }
+                                                } catch(_) {}
+                                            });
+                                        } catch(_) {}
+                                    }
+                                    hideNow();
+                                    try {
+                                        var mo = new MutationObserver(function(m){ hideNow(); });
+                                        mo.observe(document.body, { childList:true, subtree:true });
+                                    } catch(_) {}
+                                })();
+
+                                // Detect if running as installed PWA and toggle class to hide install button
+                                (function detectPWAInstalled(){
+                                    function update(){
+                                        try {
+                                            var installed = false;
+                                            try { installed = installed || window.matchMedia('(display-mode: standalone)').matches; } catch(_){}
+                                            try { installed = installed || window.matchMedia('(display-mode: fullscreen)').matches; } catch(_){}
+                                            try { installed = installed || window.matchMedia('(display-mode: minimal-ui)').matches; } catch(_){}
+                                            try { installed = installed || (window.navigator && window.navigator.standalone === true); } catch(_){}
+                                            document.body.classList.toggle('pwa-installed', !!installed);
+                                        } catch(_){}
+                                    }
+                                    update();
+                                    try { window.addEventListener('load', update, { passive:true }); } catch(_){}
+                                    try { window.matchMedia('(display-mode: standalone)').addEventListener('change', update); } catch(_){}
+                                    try { window.matchMedia('(display-mode: fullscreen)').addEventListener('change', update); } catch(_){}
+                                })();
+            } catch (e) {
+                console.error('Mobile loader failed:', e);
+                showError('Nie udało się wczytać aplikacji mobilnej.');
+            }
+        })();
+    </script>
+</body>
+</html>

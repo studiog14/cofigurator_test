@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>AR – Konfigurator</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/favicon.png" />
+  <style>
+    html, body { height:100%; margin:0; background:#000; font-family: Arial, sans-serif; }
+    #xr-loading { 
+      position: fixed; inset: 0; z-index: 3001; 
+      display: flex; align-items: center; justify-content: center; 
+      background: rgba(0,0,0,0.45); 
+    }
+    #xr-loading .inner { display: flex; flex-direction: column; align-items: center; }
+    #xr-loading .spinner { 
+      width: 48px; height: 48px; border-radius: 50%; 
+      border: 4px solid rgba(255,255,255,0.25); 
+      border-top-color: #fff; 
+      animation: xrspin 1s linear infinite; 
+    }
+    #xr-loading p { color: #fff; margin-top: 12px; font-size: 14px; }
+    @keyframes xrspin { to { transform: rotate(360deg); } }
+    
+    #xr-exit-btn { 
+      position: fixed; bottom: 20px; right: 20px; z-index: 3002; 
+      background: rgba(0,0,0,0.65); color: #fff; border: 0; 
+      border-radius: 10px; padding: 12px 16px; font-size: 14px; 
+      display: none; 
+    }
+    
+    #xr-reticle-2d { 
+      position: fixed; left: 50%; top: 50%; 
+      width: 40px; height: 40px; margin: -20px 0 0 -20px; 
+      z-index: 3001; border-radius: 50%; 
+      border: 2px solid rgba(255,215,0,0.9); 
+      box-shadow: 0 0 8px rgba(255,215,0,0.6); 
+      display: none; pointer-events: none; 
+    }
+    
+    #ar-unsupported { 
+      position: fixed; inset: 0; display: none; 
+      align-items: center; justify-content: center; 
+      background: #000; color:#fff; z-index: 3003; 
+      text-align:center; padding: 20px; 
+    }
+    #ar-unsupported a { color:#fff; text-decoration: underline; }
+    
+    #ar-ui { 
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 3004; 
+      display: flex; gap: 8px; padding: 10px; justify-content: center; 
+      background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 35%); 
+    }
+    #ar-ui button { 
+      background: rgba(0,0,0,0.65); color:#fff; border:0; 
+      border-radius: 10px; padding:10px 12px; font-size: 14px; 
+    }
+  </style>
+</head>
+<body>
+  <div id="xr-loading">
+    <div class="inner">
+      <div class="spinner"></div>
+      <p>Uruchamianie AR…</p>
+    </div>
+  </div>
+  
+  <div id="xr-reticle-2d"></div>
+  <button id="xr-exit-btn">Zakocz AR</button>
+  
+  <div id="ar-unsupported">
+    <div>
+      <h3>AR nie jest dostpne</h3>
+      <p>Ta przegldarka nie wspiera WebXR AR.</p>
+      <p>Na iOS wcz WebXR w Safari › Advanced › Experimental Features.</p>
+      <p>
+        <button id="open-native-ar" style="display:none; background:#1e88e5;color:#fff;border:0;border-radius:10px;padding:10px 14px;">
+          Otwórz w trybie natywnym
+        </button>
+      </p>
+      <p><a href="index.html">Wró do konfiguratora</a></p>
+    </div>
+  </div>
+  
+  <div id="ar-ui" style="display:none">
+    <button id="btn-rotate">Obró 15°</button>
+    <button id="btn-scale-up">Skaluj +</button>
+    <button id="btn-scale-down">Skaluj -</button>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.157.0/build/three.module.js';
+    import { GLTFLoader } from 'https://unpkg.com/three@0.157.0/examples/jsm/loaders/GLTFLoader.js';
+
+    console.log('?? AR.html z WebXR uruchamia si...');
+
+    // Pobierz model z URL lub localStorage
+    const url = new URL(window.location.href);
+    const paramModel = url.searchParams.get('model');
+    const modelUrl = paramModel || localStorage.getItem('ar:lastModel') || 'chairs/Tulla-2.glb';
+    
+    try { 
+      localStorage.setItem('ar:lastModel', modelUrl); 
+    } catch(e) { 
+      console.warn('localStorage niedostpny'); 
+    }
+
+    console.log('?? adowanie modelu:', modelUrl);
+
+    // Setup Three.js z WebXR
+    const renderer = new THREE.WebGLRenderer({ 
+      antialias: true, 
+      alpha: true, 
+      powerPreference: 'high-performance' 
+    });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    
+    // ?? KLUCZOWE: Wczenie WebXR
+    renderer.xr.enabled = true;
+    
+    document.body.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.01, 50);
+    
+    // Dodaj podstawowe owietlenie
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.0));
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    dirLight.position.set(1, 1, 1);
+    scene.add(dirLight);
+
+    // Elementy UI
+    const loading = document.getElementById('xr-loading');
+    const exitBtn = document.getElementById('xr-exit-btn');
+    const reticle = document.getElementById('xr-reticle-2d');
+    const unsupported = document.getElementById('ar-unsupported');
+    const nativeBtn = document.getElementById('open-native-ar');
+    const arUI = document.getElementById('ar-ui');
+    const btnRotate = document.getElementById('btn-rotate');
+    const btnScaleUp = document.getElementById('btn-scale-up');
+    const btnScaleDown = document.getElementById('btn-scale-down');
+
+    // Stan AR
+    let xrState = { 
+      session: null, 
+      refSpace: null, 
+      hitTestSource: null, 
+      placed: false, 
+      model: null 
+    };
+
+    // GLTF Loader
+    const gltfLoader = new GLTFLoader();
+    
+    async function loadModel(uri) {
+      return new Promise((resolve, reject) => {
+        console.log('?? adowanie GLTF:', uri);
+        gltfLoader.load(
+          uri,
+          (gltf) => {
+            const root = gltf.scene || gltf.scenes?.[0];
+            if (!root) { 
+              reject(new Error('Brak sceny w GLB')); 
+              return; 
+            }
+            
+            // Optymalizacja dla AR
+            root.traverse((child) => {
+              if (child.isMesh) {
+                child.castShadow = false;
+                child.receiveShadow = false;
+              }
+            });
+            
+            // Zapewnij rozsdn skal
+            if (root.scale.length() < 0.001) {
+              root.scale.setScalar(0.01);
+            }
+            
+            console.log('? Model zaadowany pomylnie');
+            resolve(root);
+          },
+          (progress) => {
+            console.log('?? Postp adowania:', Math.round(progress.loaded / progress.total * 100) + '%');
+          },
+          (error) => {
+            console.error('? Bd adowania GLTF:', error);
+            reject(error);
+          }
+        );
+      });
+    }
+
+    // Obsuga zmiany rozmiaru okna
+    function onResize() {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      renderer.setSize(w, h);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+    window.addEventListener('resize', onResize, { passive: true });
+
+    // ?? GÓWNA FUNKCJA AR z WebXR
+    async function startAR() {
+      try {
+        loading.style.display = 'flex';
+        console.log('?? Uruchamianie AR z WebXR...');
+
+        // ?? Sprawd wsparcie WebXR
+        const supported = !!(navigator.xr && await navigator.xr.isSessionSupported?.('immersive-ar'));
+        
+        if (!supported) {
+          console.log('? WebXR AR nie jest wspierany, pokazuj fallback');
+          loading.style.display = 'none';
+          unsupported.style.display = 'flex';
+          
+          // Setup natywny AR fallback
+          const ua = navigator.userAgent || '';
+          const isAndroid = /Android/i.test(ua);
+          const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+          
+          if (nativeBtn) {
+            if (isAndroid) {
+              // Android Scene Viewer
+              const title = encodeURIComponent(modelUrl.split('/').pop() || 'Model');
+              const fileAbs = encodeURIComponent(new URL(modelUrl, window.location.href).toString());
+              const sceneViewerUrl = `https://arvr.google.com/scene-viewer/1.0?file=${fileAbs}&mode=ar_only&title=${title}`;
+              
+              nativeBtn.style.display = 'inline-block';
+              nativeBtn.onclick = () => { 
+                window.location.href = sceneViewerUrl; 
+              };
+            } else if (isIOS) {
+              // iOS Quick Look (próbuj USDZ)
+              const base = modelUrl.replace(/\.glb$/i, '');
+              const candidates = [
+                `${base}.usdz`, 
+                `${base}-2.usdz`, 
+                `${base.replace(/\s+/g,'_')}.usdz`, 
+                `chairs/Tulla-2.usdz`
+              ];
+              
+              let chosen = null;
+              for (const candidate of candidates) {
+                try {
+                  const res = await fetch(candidate, { method: 'HEAD' });
+                  if (res.ok) {
+                    chosen = candidate;
+                    break;
+                  }
+                } catch(e) {
+                  console.log('USDZ nie znaleziony:', candidate);
+                }
+              }
+              
+              if (chosen) {
+                nativeBtn.style.display = 'inline-block';
+                nativeBtn.onclick = () => { 
+                  window.location.href = new URL(chosen, window.location.href).toString(); 
+                };
+              }
+            }
+          }
+          return;
+        }
+
+        // Wstpnie zaaduj model
+        let modelRoot = null;
+        try {
+          modelRoot = await loadModel(modelUrl);
+        } catch(e) {
+          console.error('? Nie udao si zaadowa modelu:', e);
+          alert('Nie udao si zaadowa modelu: ' + modelUrl);
+          return;
+        }
+
+        // ?? KLUCZOWE: danie sesji AR WebXR
+        console.log('?? danie sesji WebXR AR...');
+        const session = await navigator.xr.requestSession('immersive-ar', {
+          requiredFeatures: ['hit-test', 'local-floor'],
+          optionalFeatures: ['dom-overlay'],
+          domOverlay: { root: document.body }
+        });
+        
+        xrState.session = session;
+        await renderer.xr.setSession(session);
+
+        console.log('? Sesja WebXR AR uruchomiona!');
+
+        // Poka UI AR
+        exitBtn.style.display = 'block';
+        reticle.style.display = 'block';
+        arUI.style.display = 'flex';
+        
+        // Setup obsugi wyjcia
+        exitBtn.onclick = endAR;
+
+        // Setup przestrzeni referencyjnych
+        const refSpace = await session.requestReferenceSpace('local-floor');
+        xrState.refSpace = refSpace;
+        
+        const viewerSpace = await session.requestReferenceSpace('viewer');
+        xrState.hitTestSource = await session.requestHitTestSource?.({ 
+          space: viewerSpace 
+        });
+
+        // Event listenery
+        session.addEventListener('end', () => { endAR(); });
+        session.addEventListener('select', () => { 
+          console.log('?? Select event - umieszczanie modelu');
+          xrState.placed = true; 
+        });
+
+        // Setup kontrolek UI
+        btnRotate.onclick = () => {
+          if (xrState.model) {
+            xrState.model.rotateY(THREE.MathUtils.degToRad(15));
+            console.log('?? Obrócono model o 15 stopni');
+          }
+        };
+        
+        btnScaleUp.onclick = () => {
+          if (xrState.model) {
+            xrState.model.scale.multiplyScalar(1.1);
+            console.log('?? Powikszono model');
+          }
+        };
+        
+        btnScaleDown.onclick = () => {
+          if (xrState.model) {
+            xrState.model.scale.multiplyScalar(0.9);
+            console.log('?? Pomniejszono model');
+          }
+        };
+
+        // ?? KLUCZOWE: Ptla renderowania z hit-test
+        renderer.setAnimationLoop((timestamp, frame) => {
+          if (!frame) return;
+          
+          const pose = frame.getViewerPose(refSpace);
+          if (!pose) return;
+          
+          // Hit testing - wykrywanie powierzchni
+          if (xrState.hitTestSource) {
+            const results = frame.getHitTestResults(xrState.hitTestSource);
+            if (results && results.length > 0) {
+              const hit = results[0];
+              const hitPose = hit.getPose(refSpace);
+              
+              if (hitPose && xrState.placed) {
+                // Umie/zaktualizuj model na pozycji hit
+                if (!xrState.model && modelRoot) {
+                  xrState.model = modelRoot;
+                  scene.add(modelRoot);
+                  console.log('??? Model dodany do sceny');
+                }
+                
+                if (xrState.model) {
+                  const matrix = new THREE.Matrix4().fromArray(hitPose.transform.matrix);
+                  xrState.model.matrixAutoUpdate = false;
+                  xrState.model.matrix.copy(matrix);
+                  xrState.model.updateMatrixWorld(true);
+                }
+              }
+            }
+          }
+          
+          renderer.render(scene, camera);
+        });
+
+        loading.style.display = 'none';
+        console.log('?? WebXR AR sesja uruchomiona pomylnie!');
+        
+      } catch(error) {
+        console.error('? Bd uruchamiania AR:', error);
+        loading.style.display = 'none';
+        alert('Nie udao si uruchomi AR: ' + error.message);
+      }
+    }
+
+    // Zakocz sesj AR
+    async function endAR() {
+      console.log('?? Koczenie sesji AR...');
+      
+      try {
+        loading.style.display = 'none';
+        exitBtn.style.display = 'none';
+        reticle.style.display = 'none';
+        arUI.style.display = 'none';
+      } catch(e) {}
+      
+      try {
+        renderer.setAnimationLoop(null);
+      } catch(e) {}
+      
+      if (xrState.session) {
+        try {
+          await xrState.session.end();
+        } catch(e) {
+          console.warn('Bd koczenia sesji:', e);
+        }
+      }
+      
+      // Reset stanu
+      xrState = { 
+        session: null, 
+        refSpace: null, 
+        hitTestSource: null, 
+        placed: false, 
+        model: null 
+      };
+      
+      // Nawiguj z powrotem
+      try {
+        if (history.length > 1) {
+          history.back();
+        } else {
+          window.location.assign('index.html');
+        }
+      } catch(e) {
+        window.location.href = 'index.html';
+      }
+    }
+
+    // ?? Auto-start AR gdy strona si aduje
+    startAR();
+  </script>
+</body>
+</html>
