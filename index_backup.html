@@ -1,0 +1,5429 @@
+<!DOCTYPE html>
+<html lang="pl">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="format-detection" content="telephone=no" />
+  <title>Konfigurator krzeseł - Fajne Krzesła</title>
+  <link rel="icon" href="icons/favicon.png" type="image/jpeg" />
+  <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="pragma" content="no-cache" />
+  <meta http-equiv="expires" content="0" />
+
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet" />
+  <script type="importmap">
+{
+  "imports": {
+    "threepipe": "https://unpkg.com/threepipe@latest/dist/index.mjs",
+    "@threepipe/webgi-plugins": "https://unpkg.com/@threepipe/webgi-plugins@latest/dist/index.mjs",
+    "three": "https://unpkg.com/three@0.157.0/build/three.module.js"
+    
+
+    
+  }
+}
+</script>
+
+  <style>
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Poppins', sans-serif;
+    }
+
+    #app {
+      display: flex;
+      height: 100vh;
+      width: 100vw;
+      position: relative;
+      visibility: hidden;
+    }
+
+    #app.visible {
+  visibility: visible;
+  opacity: 1;
+}
+
+    #canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    body {
+      background: #ededed80;
+      /* przezroczyste tło, lepszy blur */
+    }
+
+    /* Panele UI: identyczna przezroczystość i blur obu paneli */
+    #sidebar,
+    #config-overview {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 4px 32px rgba(0, 0, 0, 0.10);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+    }
+
+    #sidebar {
+      flex: 0 0 460px;
+      min-width: 460px;
+      max-width: 540px;
+      padding: 32px 24px 24px 24px;
+      z-index: 1200;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      box-sizing: border-box;
+      overflow-y: auto;
+      overflow-x: visible;
+      position: relative;
+      /* NIE dodawaj background! */
+    }
+
+    #sidebar-content {
+      flex-grow: 1;
+      overflow-y: auto;
+    }
+
+    /* Pole wyszukiwania w lewym sidebar'ze po prawej stronie */
+    #search-container {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      z-index: 1300;
+    }
+
+    #search-toggle {
+      background: #F5C842;
+      border: none;
+      border-radius: 50%;
+      width: 44px;
+      height: 44px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      transition: all 0.3s ease;
+    }
+
+    #search-toggle:hover {
+      background: #E5B432;
+      transform: scale(1.05);
+    }
+
+    #search-toggle svg {
+      width: 20px;
+      height: 20px;
+      fill: #333;
+    }
+
+    #search-panel {
+      position: fixed !important;
+      top: 70px !important;
+      right: -320px !important;
+      width: 320px !important;
+      max-width: calc(100vw - 40px) !important;
+      background: rgba(255, 255, 255, 0.98) !important;
+      backdrop-filter: blur(15px) !important;
+      border-radius: 12px !important;
+      padding: 16px !important;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2) !important;
+      opacity: 0 !important;
+      visibility: hidden !important;
+      transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
+      z-index: 1400 !important;
+      transform: translateX(0) !important;
+    }
+
+    #search-panel.active {
+      right: 20px !important;
+      opacity: 1 !important;
+      visibility: visible !important;
+      transform: translateX(0) !important;
+    }
+
+    #search-input {
+      width: 100%;
+      border: 2px solid #F5C842;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 16px;
+      outline: none;
+      background: white;
+      box-sizing: border-box;
+    }
+
+    #search-input::placeholder {
+      color: #888;
+    }
+
+    #search-input:focus {
+      border-color: #E5B432;
+      box-shadow: 0 0 0 3px rgba(245, 200, 66, 0.2);
+    }
+
+    #search-results {
+      margin-top: 8px;
+      max-height: 300px;
+      overflow-y: auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+      gap: 8px;
+    }
+
+    .search-result-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 8px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: 2px solid transparent;
+      background: rgba(255, 255, 255, 0.9);
+      text-align: center;
+    }
+
+    .search-result-item:hover {
+      background: rgba(245, 200, 66, 0.15);
+      border-color: #F5C842;
+      transform: translateY(-2px);
+    }
+
+    .search-result-item img {
+      width: 50px;
+      height: 50px;
+      object-fit: cover;
+      border-radius: 6px;
+      margin-bottom: 4px;
+    }
+
+    .search-result-item .result-name {
+      font-size: 11px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 2px;
+      line-height: 1.2;
+    }
+
+    .search-result-item .result-category {
+      font-size: 10px;
+      color: #666;
+      line-height: 1.1;
+    }
+
+    /* Fallback dla wyników bez obrazków */
+    .search-result-item.text-only {
+      grid-column: 1 / -1;
+      flex-direction: row;
+      justify-content: flex-start;
+      text-align: left;
+      padding: 8px 12px;
+    }
+
+    .search-result-item.text-only .result-name {
+      font-size: 14px;
+      margin-bottom: 0;
+      margin-right: 8px;
+    }
+
+    .search-result-item.text-only .result-category {
+      font-size: 12px;
+    }
+
+    .search-result-item .result-type {
+      font-size: 10px;
+      color: #F5C842;
+      font-weight: 600;
+      margin-top: 2px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Przyciski kategorii */
+    .category-button {
+      padding: 8px 16px;
+      border: 2px solid #F5C842;
+      background: white;
+      color: #333;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-transform: capitalize;
+    }
+
+    .category-button:hover {
+      background: #F5C842;
+      color: white;
+      transform: translateY(-1px);
+    }
+
+    .category-button.active {
+      background: #F5C842;
+      color: white;
+    }
+
+    .category-button.promotion {
+      border-color: #FF6B6B;
+      color: #FF6B6B;
+    }
+
+    .category-button.promotion:hover,
+    .category-button.promotion.active {
+      background: #FF6B6B;
+      color: white;
+    }
+
+    /* Modal wyboru akcji po wyszukiwaniu */
+    #search-choice-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 2000;
+      backdrop-filter: blur(5px);
+    }
+
+    #search-choice-modal.active {
+      display: flex;
+    }
+
+    .search-choice-content {
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      max-width: 400px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+      animation: modalSlideIn 0.3s ease;
+    }
+
+    @keyframes modalSlideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .search-choice-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: #333;
+    }
+
+    .search-choice-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 16px;
+      padding: 12px;
+      border-radius: 8px;
+      background: #f8f9fa;
+      border: 2px solid transparent;
+    }
+
+    .search-choice-item img {
+      width: 40px;
+      height: 40px;
+      object-fit: contain;
+      margin-right: 12px;
+      border-radius: 4px;
+    }
+
+    .search-choice-item-info {
+      flex: 1;
+      text-align: left;
+    }
+
+    .search-choice-item-name {
+      font-weight: 600;
+      font-size: 14px;
+      color: #333;
+      margin-bottom: 2px;
+    }
+
+    .search-choice-item-category {
+      font-size: 12px;
+      color: #666;
+    }
+
+    .search-choice-buttons {
+      display: flex;
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    .search-choice-btn {
+      flex: 1;
+      padding: 12px 16px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .search-choice-btn.primary {
+      background: #F5C842;
+      color: #333;
+    }
+
+    .search-choice-btn.primary:hover {
+      background: #E5B432;
+      transform: translateY(-1px);
+    }
+
+    .search-choice-btn.secondary {
+      background: #f8f9fa;
+      color: #666;
+      border: 2px solid #e9ecef;
+    }
+
+    .search-choice-btn.secondary:hover {
+      background: #e9ecef;
+      color: #333;
+    }
+
+
+
+    #config-overview {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      width: 300px;
+      padding: 12px 16px;
+      /* Zmniejszone padding */
+      z-index: 1300;
+      font-size: 15px;
+      max-height: 1000px;
+      opacity: 1;
+      transition: max-height 0.3s ease, opacity 0.3s ease, padding 0.3s ease;
+      overflow: hidden;
+      box-shadow: 0 4px 32px rgba(0, 0, 0, 0.10);
+      border-radius: 16px;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      background: #fff;
+      box-sizing: border-box;
+    }
+
+    #config-overview.collapsed {
+      max-height: 40px;
+      /* Zmniejszone z 60px */
+      opacity: 0.8;
+      padding: 8px 16px;
+      /* Zmniejszone padding w stanie zwiniętym */
+    }
+
+
+
+    #config-overview:hover {
+      opacity: 1;
+    }
+
+    .overview-content {
+      max-height: 1000px;
+      opacity: 1;
+      transition: max-height 0.3s ease, opacity 0.3s ease;
+      overflow: hidden;
+    }
+
+    #config-overview.collapsed .overview-content {
+      max-height: 0;
+      opacity: 0;
+    }
+
+
+
+
+
+    hr {
+      border: none;
+      border-top: 1px solid #eee;
+      margin: 16px 0 12px;
+    }
+
+    .selection-section h3 {
+      font-size: 16px;
+      margin-bottom: 10px;
+      color: #555;
+    }
+
+    .options-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .thumbnail-wrapper {
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .thumbnail {
+      width: 80px;
+      height: 80px;
+      object-fit: contain;
+      cursor: pointer;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      transition: all 0.2s;
+      background-color: transparent;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 4px;
+      box-sizing: border-box;
+      opacity: 1;
+      /* Ikonki w pełni widoczne */
+    }
+
+    .thumbnail:hover {
+      transform: scale(1.05);
+      border-color: #444;
+    }
+
+    .thumbnail.selected {
+      outline: 2px solid #050505;
+      border: 2px solid transparent;
+      outline-offset: -2px;
+      box-shadow: 0 0 8px rgba(49, 49, 49, 0.5);
+    }
+
+    .thumbnail img {
+      max-width: 90%;
+      max-height: 90%;
+      opacity: 1;
+    }
+
+    .thumbnail-caption {
+      font-size: 15px;
+      color: #555;
+      margin-top: 6px;
+      font-weight: 500;
+      opacity: 1;
+    }
+
+    #overview-icons img {
+      width: 80px;
+      height: 80px;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      object-fit: contain;
+      opacity: 1;
+    }
+
+    #config-overview h4 {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 18px;
+    }
+
+    #overview-details .detail-item {
+      font-size: 16px;
+      margin: 8px 0;
+    }
+
+    #overview-total-price {
+      font-size: 22px;
+    }
+
+    #overview-icons {
+      gap: 16px;
+      margin-bottom: 20px;
+      padding-bottom: 20px;
+    }
+
+    #summary {
+      margin-top: auto;
+      padding-top: 15px;
+      border-top: 1px solid #ffffff;
+    }
+
+    #back-to-models-container {
+      display: flex;
+      align-items: center;
+      margin-bottom: 18px;
+      justify-content: flex-start;
+    }
+
+    .back-to-model-btn {
+      position: relative;
+      width: 80px;
+      height: 80px;
+      border: 1.5px solid #bbb;
+      border-radius: 12px;
+      background: #fff;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      margin-right: 10px;
+      transition: box-shadow 0.2s;
+    }
+
+    .back-to-model-btn:hover {
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
+    }
+
+    .back-to-model-btn img {
+      width: 60px;
+      height: 60px;
+      object-fit: contain;
+      display: block;
+    }
+
+    .back-to-model-btn .close-x {
+      position: absolute;
+      top: 4px;
+      right: 6px;
+      background: #fff;
+      border: none;
+      font-size: 20px;
+      color: #333;
+      cursor: pointer;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      line-height: 20px;
+      padding: 0;
+      box-shadow: 0 1px 4px #0001;
+      transition: background 0.2s;
+    }
+
+    .back-to-model-btn .close-x:hover {
+      background: #eee;
+    }
+
+    #camera-debug-panel {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      background: #fff;
+      border: 1px solid #ccc;
+      padding: 16px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px #0002;
+    }
+
+    #camera-debug-panel label {
+      display: block;
+      margin: 8px 0 4px;
+      font-size: 14px;
+    }
+
+    #camera-debug-panel input {
+      width: 100%;
+      margin-bottom: 8px;
+    }
+
+    #camera-debug-panel button {
+      width: 100%;
+      padding: 8px;
+      background: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    #camera-debug-panel button:hover {
+      background: #0056b3;
+    }
+
+    body {
+      background: #ededed;
+      /* lub Twój kolor tła */
+    }
+
+    #buy-button {
+      width: 100%;
+      padding: 14px 0;
+      background: #111;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 18px;
+      font-weight: 600;
+      margin-top: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    #buy-button:hover {
+      background: #333;
+    }
+
+    #buy-button .cart-icon {
+      width: 22px;
+      height: 22px;
+      display: inline-block;
+    }
+
+    #sidebar .model-image {
+      width: 100%;
+      max-width: 100%;
+      height: 110px;
+      object-fit: contain;
+      display: block;
+      margin: 0 auto 10px auto;
+      background: #fff;
+      border-radius: 10px;
+      border: 1px solid #eee;
+    }
+
+
+
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal.hidden {
+      display: none;
+    }
+
+    .modal-content {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 320px;
+      background: #fff;
+      padding: 24px 28px;
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+      font-family: "Poppins", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      color: #222;
+    }
+
+
+    .close-button {
+      position: absolute;
+      top: 12px;
+      right: 16px;
+      cursor: pointer;
+      font-size: 26px;
+      font-weight: 700;
+      color: #888;
+      transition: color 0.2s ease;
+    }
+
+    .close-button:hover {
+      color: #444;
+    }
+
+    .modal-content h2 {
+      margin-top: 0;
+      margin-bottom: 16px;
+      font-weight: 700;
+      font-size: 20px;
+      text-align: center;
+    }
+
+    .modal-content label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .modal-content input {
+      width: 100%;
+      padding: 10px 12px;
+      margin-bottom: 18px;
+      border: 1.5px solid #ddd;
+      border-radius: 12px;
+      font-size: 15px;
+      box-sizing: border-box;
+      transition: border-color 0.2s ease;
+    }
+
+    .modal-content input:focus {
+      border-color: #888;
+      outline: none;
+    }
+
+    .modal-content button[type="submit"] {
+      width: 100%;
+      background: #000;
+      color: #fff;
+      font-weight: 700;
+      font-size: 16px;
+      padding: 12px 0;
+      border: none;
+      border-radius: 16px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    .modal-content button[type="submit"]:hover {
+      background: #333;
+    }
+
+    /* Komunikat sukcesu */
+    #success-message {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-100%, -50%);
+
+      background: #ffffff;
+      /* jasne zielone tło */
+      border: 1.5px solid #1f1f1f;
+      /* zielona ramka, spójna z tłem */
+      color: #000000;
+      /* ciemnozielony tekst */
+
+      font-weight: 700;
+      font-family: "Poppins", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+
+      padding: 20px 28px;
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(3, 3, 3, 0.15);
+
+      max-width: 320px;
+      width: 90%;
+      text-align: center;
+      z-index: 9999;
+    }
+
+
+    /* Ukrywanie i pokazywanie */
+    .hidden {
+      display: none;
+    }
+
+    .visible {
+      display: block;
+    }
+
+
+    #bottom-toolbar {
+      position: fixed;
+      /* <- zmień z absolute */
+      bottom: 14px;
+      left: 50%;
+      transform: translateX(-100%);
+      background: #fff;
+      border: 1.5px solid #ccc;
+      border-radius: 12px;
+      padding: 8px 14px;
+      display: flex;
+      gap: 16px;
+      z-index: 2000;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+      opacity: 0;
+      transition: opacity 0.4s ease;
+      justify-content: center;
+    }
+
+
+    #bottom-toolbar button {
+      background: #f0f0f0;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    #bottom-toolbar.visible {
+      opacity: 1;
+    }
+
+    #bottom-toolbar button:hover {
+      background: #e0e0e0;
+    }
+
+    #dimension-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1000;
+    }
+
+    .dimension-line {
+      position: absolute;
+      background-color: #000;
+      height: 2px;
+    }
+
+    .axis-line {
+      position: absolute;
+      height: 2px;
+      background-color: #222;
+      opacity: 0.6;
+    }
+
+    .axis-line.x {
+      top: 50%;
+      left: 0;
+      width: 100%;
+      transform: translateY(-50%);
+    }
+
+    .axis-line.y {
+      left: 50%;
+      top: 0;
+      width: 2px;
+      height: 100%;
+      transform: translateX(-50%);
+    }
+
+    .axis-line.z {
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border: 2px dashed #888;
+      box-sizing: border-box;
+      border-radius: 10px;
+    }
+
+    .dimension-label {
+      position: absolute;
+      background-color: rgba(255, 255, 255, 0.7);
+      padding: 5px;
+      border-radius: 3px;
+      font-size: 14px;
+      font-weight: bold;
+    }
+
+    .dimension-label:nth-child(4) {
+      top: 20px;
+    }
+
+    .dimension-label:nth-child(5) {
+      top: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .dimension-label:nth-child(6) {
+      bottom: 20px;
+    }
+
+
+    #qr-close-btn {
+      background-color: #000;
+      color: #fff;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.2s ease;
+    }
+
+    #qr-close-btn:hover {
+      background-color: #333;
+    }
+
+    #qr-popup {
+      right: auto !important;
+      left: 20px !important;
+      transform: translate(175%, 0%) !important;
+      width: 320px;
+      background: #fff;
+      border: 2px solid rgb(0, 0, 0);
+      /* łatwiej zobaczyć granice */
+      z-index: 999;
+      padding: 24px;
+      border-radius: 16px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+      text-align: center;
+      box-sizing: border-box;
+    }
+
+    #qr-popup p {
+      font-size: 16px;
+      margin-bottom: 12px;
+      color: #000;
+    }
+
+    #qrcode {
+      margin: 0 auto 16px auto;
+      display: flex;
+      justify-content: center;
+    }
+
+    #collapse-btn {
+      font-size: 18px;
+      /* Zmniejszona z 22px */
+      font-weight: bold;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #111;
+      margin-right: 8px;
+      padding: 0;
+      width: 24px;
+      /* Zmniejszona z 30px */
+      height: 24px;
+      /* Zmniejszona z 30px */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      /* Dodane dla lepszego wycentrowania */
+    }
+
+    .overview-header h6 {
+      font-size: 18;
+      /* Dodane, aby zmniejszyć rozmiar nagłówka */
+      margin: 0;
+      /* Usunięcie domyślnych marginesów */
+    }
+
+    .overview-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 8px;
+      /* Zmniejszone z 12px */
+    }
+
+    #config-overview.hidden {
+      display: none;
+    }
+
+    .overview-title {
+      font-size: 16px;
+      /* lub inna preferowana wielkość */
+      font-weight: bold;
+      margin: 0;
+    }
+
+   /* 📱 Tryb PIONOWY — ukryj aplikację, pokaż komunikat */
+@media (max-width: 820px) and (orientation: portrait) {
+  #app,
+  #bottom-toolbar,
+  #sidebar,
+  .dimension-panel,
+  .dimension-label,
+  #qr-button {
+    display: none !important;
+  }
+
+  #rotate-message {
+    display: flex !important;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 40px;
+    font-size: 18px;
+    background: #000;
+    color: #fff;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2000;
+  }
+
+   #export-panel {
+    display: none !important;
+  }
+
+  /* Ukryj wyszukiwanie w trybie portrait */
+  #search-container {
+    display: none;
+  }
+}
+
+/* 🤖 Tryb POZIOMY — pokazujemy UI */
+@media (max-width: 820px) and (orientation: landscape) {
+  #rotate-message {
+    display: none !important;
+  }
+
+  canvas {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  width: 100%;
+  height: 100vh;
+  display: block;
+}
+
+ #sidebar {
+  width: 280px; /* stała szerokość panelu UI */
+  max-width: 280px;
+  min-width: 280px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+  /* Responsywne style dla wyszukiwania na mobile */
+  #search-toggle {
+    width: 38px;
+    height: 38px;
+  }
+
+  #search-toggle svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  #search-panel {
+    width: 240px;
+  }
+
+  #search-input {
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+
+  #search-results {
+    max-height: 150px;
+  }
+
+  .search-result-item {
+    padding: 6px 10px;
+    font-size: 14px;
+  }
+
+#bottom-toolbar #qr-button {
+  display: none !important;
+}
+
+#part-tabs {
+  display: flex;
+  flex-wrap: nowrap; /* 🔒 nie zawijaj w nowe linie */
+  overflow-x: auto;  /* 🔄 pozwól na przesuwanie */
+  gap: 8px;
+  padding: 8px;
+  justify-content: flex-start;
+}
+
+/* Styl dla pojedynczej ikonki */
+#part-tabs button,
+#part-tabs .part-btn {
+  width: 56px;
+  height: 56px;
+  font-size: 11px;
+  padding: 6px;
+  flex: 0 0 auto; /* 🔐 stała szerokość */
+  border-radius: 6px;
+  box-sizing: border-box;
+}
+
+/* Jeśli ikonka ma obrazek */
+#part-tabs img {
+  width: 32px;
+  height: 32px;
+}
+
+
+#bottom-toolbar {
+  left: 50%;
+  transform: translateX(-125%);
+  bottom: 12px;
+  padding: 10px 16px;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px; /* opcjonalny odstęp między przyciskami */
+}
+
+.dimension-panel {
+  position: fixed !important;
+  top: auto !important;       /* lub np. top: 80px */
+  bottom: 150px !important;   /* odległość od dołu */
+  left: 200px !important;      /* odległość od lewej krawędzi */
+  right: auto !important;     /* lub np. right: 20px */
+  transform: none !important;
+
+  font-size: 12px !important;
+  padding: 6px 8px !important;
+  width: auto !important;
+  max-width: 90% !important;
+  z-index: 2147483647 !important;
+  background: white !important;
+  border: 1px solid #ccc !important;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2) !important;
+  border-radius: 6px !important;
+}
+
+#export-panel {
+    display: none !important;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+   #export-config,
+  .export-trigger,
+  .toolbar-btn[data-action="export"] {
+    display: none !important;
+  }
+
+
+
+  .thumbnail,
+  #overview-icons img,
+  .back-to-model-btn {
+    width: 56px;
+    height: 56px;
+  }
+
+  .thumbnail-caption {
+    font-size: 13px;
+    margin-top: 4px;
+    text-align: center;
+  }
+
+  #buy-button {
+    font-size: 14px;
+    padding: 10px;
+    width: 100%;
+    margin-top: 12px;
+  }
+
+  #config-overview {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 150px; /* szerokość bocznego panelu */
+  height: 100vh; /* pełna wysokość */
+  padding: 16px;
+  background: rgba(245, 245, 245, 0.95);
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+  border-radius: 0 8px 8px 0;
+  z-index: 999;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+
+
+  #config-overview h2 {
+    font-size: 6px !important;
+    line-height: 1 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  #config-overview h2::after {
+    content: "+  Twoja konfiguracja";
+    font-size: 14px;
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #000;
+  }
+
+  #config-overview .overview-title {
+    display: none;
+  }
+}
+
+
+
+    .dimension-panel {
+      background-color: white;
+      border: 1px solid #ccc;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+      padding: 10px;
+      border-radius: 5px;
+      font-size: 14px;
+      z-index: 1001;
+    }
+
+    #hdr-toggle {
+      position: relative;
+    }
+
+    #hdr-panel {
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%) translateY(-8px);
+      background: #fff;
+      border-radius: 12px;
+      padding: 12px 16px;
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
+      z-index: 9999;
+      min-width: 240px;
+      display: none;
+      padding-top: 30px;
+    }
+
+    #hdr-panel.hidden {
+      display: none;
+    }
+
+    #hdr-close {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      background: none;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      color: #111111;
+      z-index: 1000;
+    }
+
+    #hdr-options {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+      padding-top: 10px;
+    }
+
+    #hdr-options .thumbnail {
+      width: 72px;
+      height: 72px;
+    }
+
+    #hdr-options .thumbnail img {
+      max-width: 100%;
+      max-height: 100%;
+    }
+
+    .hdr-close-btn {
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      background: none;
+      border: none;
+      font-size: 22px;
+      font-weight: bold;
+      cursor: pointer;
+      color: #555;
+      z-index: 10000;
+    }
+
+    .hdr-close-btn:hover {
+      color: #000;
+    }
+
+    #export-panel {
+      position: absolute;
+      bottom: 60px;
+      /* nad przyciskiem */
+      right: 62px;
+      /* <- tu zwiększ wartość, żeby przesunąć panel bardziej w lewo */
+      background: #ffffff;
+      border: 1px solid #eeeeee;
+      border-radius: 8px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 100;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    #export-panel.hidden {
+      display: none;
+    }
+
+    .export-btn {
+      background-color: #444;
+      color: #222222;
+      padding: 6px 12px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    .export-btn:hover {
+      background-color: #555;
+    }
+/*Ukrycie przyciku exportu*/
+#export-config {
+  display: none;
+}
+
+#export-panel {
+  display: none;
+}
+
+   .collection-icon {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  cursor: pointer;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  transition: transform 0.2s, border-color 0.2s;
+}
+
+.collection-icon:hover {
+  transform: scale(1.05);
+  border-color: #444;
+}
+
+.collection-icon.selected {
+  outline: 2px solid #000;
+  box-shadow: 0 0 8px rgba(0,0,0,0.2);
+}
+
+
+
+
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-5px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    #material-options details summary {
+      cursor: pointer;
+      font-weight: bold;
+      background: #f7f7f7;
+      border-radius: 8px;
+      padding: 6px 10px;
+      margin-bottom: 6px;
+    }
+
+    .collection-icon {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  cursor: pointer;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  transition: transform 0.2s, border-color 0.2s;
+}
+
+.collection-icon:hover {
+  transform: scale(1.05);
+  border-color: #444;
+}
+
+.collection-icon.selected {
+  outline: 2px solid #000;
+  box-shadow: 0 0 8px rgba(0,0,0,0.2);
+}
+
+.collection-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 88px;
+  align-items: center;
+}
+
+#custom-loader {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  font-family: 'Poppins', Arial, sans-serif;
+}
+
+#custom-loader.fade-out {
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  pointer-events: none;
+}
+
+#model-loader {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(255, 255, 255, 0.97);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  font-family: 'Poppins', Arial, sans-serif;
+  transition: opacity 0.5s ease-in-out;
+}
+
+#model-loader p {
+  font-size: 18px;
+  color: #333;
+  text-align: center;
+  margin: 10px 0 0 0;
+  font-weight: 500;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+}
+
+/* Model loader animations */
+@keyframes logoPulse {
+  0%, 100% { opacity: 0.9; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+
+@keyframes progressSlide {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(0%); }
+  100% { transform: translateX(100%); }
+}
+
+/* 🎯 WELCOME SCREEN */
+#welcome-screen {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%;
+  height: 100%;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  font-family: 'Poppins', Arial, sans-serif;
+  text-align: center;
+  padding: 20px;
+  /* Ukrywa tylko canvas, nie UI */
+}
+
+#welcome-logo {
+  max-width: 200px;
+  height: auto;
+  margin-bottom: 30px;
+  animation: logoPulse 3s ease-in-out infinite;
+}
+
+#welcome-screen h1 {
+  font-size: 2.5em;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 20px 0;
+}
+
+#welcome-screen p {
+  font-size: 1.1em;
+  color: #666;
+  max-width: 500px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Welcome screen yellow accents */
+.title-with-accent {
+  position: relative;
+  margin-bottom: 25px;
+}
+
+.title-with-accent h1 {
+  margin-bottom: 15px !important;
+}
+
+.yellow-accent-line {
+  width: 120px;
+  height: 4px;
+  background: linear-gradient(90deg, #FFD700, #FFA500);
+  margin: 0 auto;
+  border-radius: 2px;
+  animation: accentGlow 2s ease-in-out infinite;
+}
+
+.promo-text {
+  font-size: 1em !important;
+  color: #555 !important;
+  font-style: normal;
+  margin-top: 20px !important;
+  opacity: 0.9;
+  animation: fadeInUp 1s ease-out 0.5s both;
+}
+
+@keyframes accentGlow {
+  0%, 100% { 
+    transform: scaleX(1);
+    box-shadow: 0 0 5px rgba(255, 215, 0, 0.3);
+  }
+  50% { 
+    transform: scaleX(1.1);
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 0.9;
+    transform: translateY(0);
+  }
+}
+
+/* 🎬 ANIMATIONS */
+@keyframes logoPulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.05); opacity: 0.8; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes progressSlide {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(0%); }
+  100% { transform: translateX(100%); }
+}
+
+.loader {
+  border: 8px solid #f3f3f3;
+  border-top: 8px solid #555;
+  
+  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  animation: spin 1s linear infinite;
+  display: inline-block;
+  margin-bottom: 12px;
+}
+#material-preloader {
+  display: none;
+  position: fixed;
+  z-index: 10000;
+  left: 0; top: 0; right: 0; bottom: 0;
+  width: 100vw; height: 100vh;
+  background: rgba(255,255,255,0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#material-preloader .preloader-box {
+  text-align: center;
+  background: rgba(255,255,255,0.97);
+  border-radius: 12px;
+  padding: 20px 30px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+#material-preloader .loader {
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #555;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  animation: spin 1s linear infinite;
+  display: inline-block;
+  margin-bottom: 12px;
+}
+@keyframes spin {
+  0% { transform: rotate(0deg);}
+  100% { transform: rotate(360deg);}
+}
+
+
+  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+
+<body>
+    <!-- 🔄 ANIMATED LOADER z żółtym paskiem -->
+    <div id="custom-loader">
+        <div class="logo-container" style="
+            position: relative;
+            margin-bottom: 40px;
+            animation: logoPulse 3s ease-in-out infinite;
+        ">
+            <img src="icons/FK_logo.png" alt="Fajne Krzesła" style="
+                max-width: 200px; 
+                height: auto;
+                border-radius: 10px;
+                opacity: 0.9;
+            " />
+        </div>
+        
+        <div class="spinner" style="
+            width: 40px;
+            height: 40px;
+            border: 3px solid #f0f0f0;
+            border-top: 3px solid #333;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 30px;
+        "></div>
+        
+        <div class="progress-container" style="
+            width: 280px;
+            height: 3px;
+            background: #f0f0f0;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 25px;
+        ">
+            <div class="progress-bar" style="
+                width: 100%;
+                height: 100%;
+                background: #FFD700;
+                animation: progressSlide 2s ease-in-out infinite;
+            "></div>
+        </div>
+        
+        <div class="loading-text" style="
+            font-size: 16px; 
+            color: #333;
+            font-weight: 500;
+            text-align: center;
+            letter-spacing: 0.5px;
+        ">Inicjalizacja konfiguratora...</div>
+    </div>
+
+    <!-- 🔄 SPINNER podczas zmiany modelu -->
+    <div id="model-loader">
+        <div class="logo-container" style="
+            position: relative;
+            margin-bottom: 30px;
+            animation: logoPulse 3s ease-in-out infinite;
+        ">
+            <img src="icons/FK_logo.png" alt="Fajne Krzesła" style="
+                max-width: 150px; 
+                height: auto;
+                border-radius: 10px;
+                opacity: 0.9;
+            " />
+        </div>
+        
+        <div class="spinner" style="
+            width: 35px;
+            height: 35px;
+            border: 3px solid #f0f0f0;
+            border-top: 3px solid #333;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        "></div>
+        
+        <p>Ładowanie modelu...</p>
+        
+        <div class="progress-container" style="
+            width: 220px;
+            height: 3px;
+            background: #f0f0f0;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 15px;
+        ">
+            <div class="progress-bar" style="
+                width: 100%;
+                height: 100%;
+                background: #FFD700;
+                animation: progressSlide 2s ease-in-out infinite;
+            "></div>
+        </div>
+    </div>
+
+  <div id="app">
+
+<div id="material-preloader" style="display:none;">
+  <div class="preloader-box">
+    <span class="loader"></span>
+    <div style="margin-top: 16px; font-size: 2em;">Ładowanie materiału...</div>
+  </div>
+</div>
+
+    <!-- CANVAS CONTAINER z WELCOME SCREEN -->
+    <div id="canvas-container" style="flex: 1 1 0; position: relative; height: 100%; background: #ededed15;">
+      <canvas id="canvas"></canvas>
+      
+      <!-- 🎯 WELCOME SCREEN - tylko nad canvas -->
+      <div id="welcome-screen">
+          <img id="welcome-logo" src="icons/FK_logo.png" alt="Fajne Krzesła">
+          <div class="title-with-accent">
+              <h1>Konfigurator Krzeseł</h1>
+              <div class="yellow-accent-line"></div>
+          </div>
+          <p>Wybierz kategorię oraz model krzesła z bocznego panelu, aby rozpocząć konfigurację w 3D</p>
+          <p class="promo-text">Możesz również zapoznać się z naszymi promocjami i bestsellerami - najczęściej wybieranymi modelami krzeseł</p>
+      </div>
+    </div>
+    
+    <div id="config-overview" class="collapsed hidden">
+      <div class="overview-header">
+        <button id="collapse-btn">+</button>
+        <span class="overview-title">Twoja Konfiguracja</span>
+      </div>
+      <div class="overview-content">
+        <!-- tu cała zawartość, która ma się zwijać -->
+        <div id="overview-icons"></div>
+        <div id="overview-details"></div>
+        <div id="overview-total">
+          <p>Suma: <strong id="overview-total-price">0.00 PLN</strong></p>
+          <button id="buy-button">Kupuję</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="sidebar">
+      <!-- Pole wyszukiwania w prawym górnym rogu sidebar'a -->
+      <div id="search-container">
+        <button id="search-toggle" type="button" aria-label="Szukaj">
+          <svg viewBox="0 0 24 24">
+            <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+          </svg>
+        </button>
+        
+        <div id="search-panel">
+          <input 
+            type="text" 
+            id="search-input" 
+            placeholder="Szukaj modeli, materiałów, kolekcji..."
+            autocomplete="off"
+          />
+          <div id="search-results"></div>
+        </div>
+      </div>
+
+      <!-- Modal wyboru akcji po wyszukiwaniu -->
+      <div id="search-choice-modal">
+        <div class="search-choice-content">
+          <div class="search-choice-title">Co chcesz zrobić?</div>
+          <div class="search-choice-item">
+            <img id="search-choice-item-img" src="" alt="" onerror="this.style.display='none'">
+            <div class="search-choice-item-info">
+              <div class="search-choice-item-name" id="search-choice-item-name"></div>
+              <div class="search-choice-item-category" id="search-choice-item-category"></div>
+            </div>
+          </div>
+          <div class="search-choice-buttons">
+            <button class="search-choice-btn secondary" id="search-choice-view-options">Wyniki wyszukiwania</button>
+            <button class="search-choice-btn primary" id="search-choice-go-to-chair">Przejdź do krzesła</button>
+          </div>
+        </div>
+      </div>
+
+
+      
+      <!-- Wskaźnik aktywnego filtra wyszukiwania -->
+      <div id="search-filter-indicator" style="display: none; margin-bottom: 15px; padding: 8px 12px; background: rgba(245, 200, 66, 0.1); border: 1px solid #F5C842; border-radius: 8px; font-size: 14px;">
+        <span style="font-weight: 600;">🔍 Filtr aktywny:</span> 
+        <span id="search-filter-text"></span>
+        <button id="clear-search-filter" style="float: right; background: none; border: none; color: #666; cursor: pointer; font-size: 16px; padding: 0;" title="Wyczyść filtr">×</button>
+      </div>
+      
+      <hr />
+      
+      <!-- Przyciski kategorii -->
+      <div id="category-buttons" style="margin-bottom: 20px;">
+        <h3 style="margin-bottom: 10px; font-size: 16px; color: #555;">Kategorie:</h3>
+        <div id="category-buttons-container" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
+      </div>
+      
+      <div id="model-section">
+        <div class="selection-section">
+          <h3>Wybierz model:</h3>
+          <div id="model-thumbnails" class="options-grid"></div>
+        </div>
+      </div>
+      <div id="config-section" style="display:none;">
+        <div id="back-to-models-container" style="margin-bottom: 15px;"></div>
+        <div id="legs-section" class="selection-section">
+          <h3>Nogi:</h3>
+          <div id="legs-thumbnails" class="options-grid"></div>
+        </div>
+        <div id="parts-section" class="selection-section">
+          <h3>Wybierz element:</h3>
+          <div id="part-tabs" class="options-grid"></div>
+        </div>
+        <div id="materials-section" class="selection-section">
+          <h3>Wybierz materiał:</h3>
+          <div id="material-options" style="display: none;"></div>
+
+<!-- PANEL KOLEKCJI + MATERIAŁY -->
+<div id="collection-container" style="display: flex; gap: 24px; margin-top: 20px;">
+  <div id="collection-icons" style="display: flex; flex-direction: column; gap: 14px; width: 88px;"></div>
+  <div id="material-panel-viewer" class="options-grid" style="flex-grow: 1;"></div>
+</div>
+
+
+
+
+      </div>
+      <div id="summary"></div>
+    </div>
+  </div>
+  <!-- FORMULARZ EMAIL - POPUP -->
+  <div id="emailModal" class="modal hidden">
+    <div class="modal-content">
+      <span class="close-button">&times;</span>
+      <h2>Wyślij swoją konfigurację</h2>
+      <form id="emailForm">
+        <label for="name">Imię i nazwisko:</label>
+        <input type="text" id="name" name="name" required>
+
+        <label for="email">Adres e-mail:</label>
+        <input type="email" id="email" name="email" required>
+
+        <label for="phone">Numer telefonu:</label>
+        <input type="tel" id="phone" name="phone">
+
+        <!-- Ukryte pola na dane konfiguracji -->
+        <input type="hidden" id="model" name="model">
+        <input type="hidden" id="price" name="price">
+        <input type="hidden" id="total" name="total">
+
+        <button type="submit">Wyślij</button>
+      </form>
+    </div>
+  </div>
+
+  
+
+
+
+  <!-- KOMUNIKAT obrotu -->
+  <div id="rotate-message" style="display: none;">
+  🔄 Obróć urządzenie poziomo
+</div>
+
+
+
+  <!-- KOMUNIKAT SUKCESU -->
+  <div id="success-message" class="hidden">✅ Dziękujemy! Formularz został wysłany.</div>
+
+
+
+  <!-- Dolny panel UI -->
+  <div id="bottom-toolbar" style="display: none;">
+
+    <!-- Przycisk HDR -->
+    <button id="hdr-toggle" title="Zmień HDR">
+      <img src="icons/bulb_icon.png" alt="HDR" style="width: 20px; height: 20px;">
+    </button>
+
+    <div id="hdr-panel" class="hidden">
+      <button id="hdr-close" class="hdr-close-btn">×</button>
+      <div id="hdr-options" class="options-grid"></div>
+    </div>
+
+
+
+
+
+
+
+
+
+    <button id="ar-button" title="AR">
+      <img src="icons/AR_icon.png" alt="AR" style="width: 30px; height: 30px;">
+    </button>
+
+    <button id="dimensions-show" title="Wymiary modelu">
+      <img src="icons/dimmension_icon.png" alt="Wymiary" style="width: 20px; height: 20px;">
+    </button>
+
+
+    <button id="export-config" title="Pobierz konfigurację">
+      <img src="icons/export_icon.png" alt="Eksport" style="width: 20px; height: 20px;">
+    </button>
+
+      <div id="export-panel" class="hidden">
+      <button class="export-btn" data-format="fbx">FBX</button>
+      <button class="export-btn" data-format="dae">DAE</button>
+      <button class="export-btn" data-format="obj">OBJ</button>
+    </div>
+
+    <button id="qr-button" title="Zobacz na telefonie">
+      <img src="icons/qr_icon.png" alt="QR" style="width: 20px; height: 20px;">
+    </button>
+  </div>
+
+
+  <div id="dimension-overlay" style="display: none;"></div>
+
+  <link rel="manifest" href="manifest.json?v=2025080201" />
+  <link rel="apple-touch-icon" href="icons/favicon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"">
+
+
+  <div id="ar-popup" style="
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-100%, -50%);
+  background: white;
+  padding: 20px 30px;
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+  display: none;
+  z-index: 9999;
+  text-align: center;
+  max-width: 300px;
+">
+    <img src="icons/AR_icon.png" alt="AR Ikona" style="width: 60px; margin-bottom: 10px;" />
+    <div style="font-size: 18px; font-weight: bold;">Dostępne wkrótce</div>
+    <div style="margin-top: 6px; font-size: 14px;">Tryb AR zostanie wkrótce uruchomiony.</div>
+    <button onclick="document.getElementById('ar-popup').style.display='none'" style="
+    margin-top: 12px;
+    background: #141414;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+  ">Zamknij</button>
+  </div>
+
+
+
+
+
+
+  <div id="qr-popup"
+    style="display:none; position:fixed; top:20%; left:50%; transform:translateX(-50%); background:white; padding:20px; border-radius:12px; box-shadow:0 0 20px rgba(0,0,0,0.2); z-index:3000;">
+    <p style="margin-bottom:10px;">Zeskanuj kod QR telefonem:</p>
+    <div id="qrcode"></div>
+    <button id="qr-close-btn">Zamknij</button>
+
+  </div>
+
+
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
+  <script>
+    function showQR() {
+      const url = window.location.href;
+      document.getElementById('qr-popup').style.display = 'block';
+      document.getElementById('qrcode').innerHTML = ''; // czyść stare
+      document.getElementById('qr-close-btn').addEventListener('click', () => {
+        document.getElementById('qr-popup').style.display = 'none';
+      });
+
+      new QRCode(document.getElementById("qrcode"), {
+        text: url,
+        width: 200,
+        height: 200,
+      });
+    }
+  </script>
+
+
+  <script src="https://cdn.emailjs.com/dist/email.min.js"></script>
+  <script>
+    emailjs.init('tjw0wCwxn3xsnfNV5');
+
+    function generateSummaryText() {
+      let text = "";
+      let totalPrice = 0;
+
+      if (window.selectedChair) {
+        const price = parseFloat(window.selectedChair.Cena) || 0;
+        totalPrice += price;
+        text += `Model: ${window.selectedChair.Nazwa} (${price.toFixed(2)} PLN)\n`;
+      }
+
+      if (window.selectedLeg) {
+        const price = parseFloat(window.selectedLeg.Cena) || 0;
+        totalPrice += price;
+        text += `Wariant nóg: ${window.selectedLeg.Nazwa} (${price.toFixed(2)} PLN)\n`;
+      }
+
+      const partOrder = ['seat', 'backseat_inside', 'backseat_outside', 'legs_material', 'backseat'];
+      partOrder.forEach(part => {
+        const mat = window.selectedMaterials?.[part];
+        if (mat) {
+          const price = parseFloat(mat.Cena) || 0;
+          totalPrice += price;
+          text += `${part.replace(/_/g, ' ')}: ${mat.Nazwa} (${price.toFixed(2)} PLN)\n`;
+        }
+      });
+
+      text += `\nSuma konfiguracji: ${totalPrice.toFixed(2)} PLN`;
+      return { text, totalPrice };
+    }
+
+
+
+    emailForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+
+      const summary = generateSummaryText();
+
+      document.getElementById('model').value = window.selectedChair?.Nazwa || 'Brak modelu';
+      document.getElementById('price').value = parseFloat(window.selectedChair?.Cena || 0).toFixed(2);
+      document.getElementById('total').value = summary.totalPrice.toFixed(2);
+
+      let configTextInput = document.getElementById('configText');
+      if (!configTextInput) {
+        configTextInput = document.createElement('textarea');
+        configTextInput.name = 'configText';
+        configTextInput.id = 'configText';
+        configTextInput.hidden = true;
+        emailForm.appendChild(configTextInput);
+      }
+      configTextInput.value = summary.text;
+
+      emailjs.sendForm('service_iqzcwli', 'template_qgq7htg', emailForm)
+        .then(() => {
+          document.getElementById('emailModal')?.classList.add('hidden');
+
+          const successMessage = document.getElementById('success-message');
+          successMessage.classList.remove('hidden');
+          successMessage.classList.add('visible');
+
+          setTimeout(() => {
+            successMessage.classList.remove('visible');
+            successMessage.classList.add('hidden');
+          }, 3500);
+
+          emailForm.reset();
+        })
+        .catch((error) => {
+          alert('❌ Coś poszło nie tak. Spróbuj ponownie.');
+          console.error('EmailJS error:', error);
+        });
+    });
+  </script>
+
+
+
+
+
+
+  <script type="module">
+    // Główna biblioteka Three.js (z importmap)
+    import * as THREE from 'three'; // opcjonalne, jeśli używasz tylko konkretnych importów
+
+    // Konkretnie z Three.js (potrzebne do wymiarów i geometrii)
+    import {
+      Group,
+      Box3,
+      Vector3,
+      ArrowHelper,
+      Sprite,
+      SpriteMaterial,
+      CanvasTexture,
+      Color,
+      TextureLoader
+    } from 'three';
+
+    // ThreePipe core – viewer i pluginy
+    import {
+      ThreeViewer,
+      LoadingScreenPlugin,
+      GBufferPlugin,
+      SSAAPlugin,
+    } from 'threepipe';
+
+    // Pluginy z WebGI (ThreePipe)
+    import {
+      SSReflectionPlugin,
+      BloomPlugin
+    } from '@threepipe/webgi-plugins';
+
+
+
+
+
+
+
+
+    const CAMERA_FOV = 12;
+    const CAMERA_NEAR = 0.1;
+    const CAMERA_FAR = 100;
+    const CAMERA_POSITION = { x: -4.5, y: 0.76, z: 3.9 };
+    const CAMERA_TARGET = { x: 0.79, y: -1.09, z: -0.22 };
+
+    const MIN_ZOOM_DISTANCE = 1; // minimalna odległość kamery od modelu (przybliżenie)
+    const MAX_ZOOM_DISTANCE = 8; // maksymalna odległość kamery od modelu (oddalenie)
+    const VERTICAL_OFFSET = 0;
+
+    let viewer, currentModelContainer, currentLegModel;
+    let allData = [];
+    let selectedChair, selectedLeg, selectedMaterials = {};
+    let globalCameraTargetPosition;
+    let userInteracted = false;
+    let dimensionHelpers = [];
+    let currentModel = null;
+    let selectedLegVariant = null;
+    let lastOpenedCollection = null;
+
+
+
+
+
+
+
+
+
+    const ELEMENT_ICONS = {
+      seat: 'icons/m_seat_icon.png',
+      backseat_inside: 'icons/m_backseat_in_icon.png',
+      backseat_outside: 'icons/m_backseat_out_icon.png',
+      backseat: 'icons/m_backseat_icon.png',
+      legs: 'icons/m_legs_icon.png'
+    };
+
+    function showScreen(screenName) {
+      const welcomeScreen = document.getElementById('welcome-screen');
+      
+      // Ukryj welcome screen przy przejściu do jakiegokolwiek ekranu
+      if (welcomeScreen && screenName !== 'search-results') {
+        welcomeScreen.style.display = 'none';
+      }
+      
+      document.getElementById('model-section').style.display = (screenName === 'models' || screenName === 'search-results') ? 'block' : 'none';
+      document.getElementById('config-section').style.display = screenName === 'config' ? 'block' : 'none';
+    }
+
+
+    async function loadCameraTarget() {
+      try {
+        const targetsContainer = await viewer.load('camera_target.glb');
+        if (targetsContainer) {
+          // Szukaj obiektu o nazwie "camera_target" (lub zmień na nazwę empty z Blender)
+          const targetObject = targetsContainer.getObjectByName('camera_target');
+          if (targetObject) {
+            globalCameraTargetPosition = targetObject.getWorldPosition(new Vector3());
+          } else {
+            // Jeśli nie znajdzie, użyj środka sceny
+            globalCameraTargetPosition = new Vector3(0, 0, 0);
+          }
+          viewer.scene.remove(targetsContainer); // nie pokazuj empty w scenie
+        }
+      } catch (e) {
+        console.warn("Nie udało się załadować 'camera_target.glb'. Używam domyślnych ustawień.");
+        globalCameraTargetPosition = new Vector3(0, 0, 0);
+      }
+    }
+
+    async function loadModelWithFreshness(path, viewer, options = {}) {
+      try {
+        // Wykonaj zapytanie HEAD, aby pobrać Last-Modified z serwera
+        const res = await fetch(path, { method: 'HEAD' });
+        const lastModified = res.headers.get('Last-Modified');
+
+        // Jeśli data jest dostępna, użyj jej jako wersji cache-bustera
+        const version = lastModified ? new Date(lastModified).getTime() : Date.now();
+        const pathWithVersion = `${path}?v=${version}`;
+
+        // Załaduj model z cache-busterem
+        const modelContainer = await viewer.load(pathWithVersion, options);
+        return modelContainer;
+      } catch (e) {
+        console.error(`Nie udało się załadować modelu: ${path}`, e);
+        throw e;
+      }
+    }
+
+
+
+    async function init() {
+      const canvas = document.getElementById("canvas");
+
+      viewer = new ThreeViewer({
+        canvas: canvas,
+        plugins: [ GBufferPlugin, SSAAPlugin, SSReflectionPlugin, BloomPlugin],
+        rendererSettings: { antialias: true }
+      });
+      if (viewer.controls) {
+        viewer.controls.minDistance = MIN_ZOOM_DISTANCE;
+        viewer.controls.maxDistance = MAX_ZOOM_DISTANCE;
+        viewer.controls.dampingFactor = 0.1;
+        viewer.controls.enableDamping = true;
+        // Dodaj nasłuchiwanie TUTAJ, po utworzeniu viewer i controls:
+        viewer.controls.addEventListener('change', clampCameraDistance);
+      }
+
+      const collapseBtn = document.getElementById('collapse-btn');
+      const overviewPanel = document.getElementById('config-overview');
+
+      collapseBtn.onclick = () => {
+        overviewPanel.classList.toggle('collapsed');
+        collapseBtn.textContent = overviewPanel.classList.contains('collapsed') ? '+' : '−';
+      };
+
+
+      document.getElementById('buy-button').innerHTML = '<span class="cart-icon">🛒</span>Zapytaj o produkt';
+
+      document.getElementById('buy-button').onclick = () => {
+        const summary = generateSummaryText();
+        const emailAddress = 'mrpeter@o2.pl'; // adres docelowy
+
+        const subject = `Zapytanie o wycenę: ${selectedChair.Nazwa}`;
+        const body = `Dzień dobry,\n\nProszę o wycenę poniższej konfiguracji:\n\n${summary.text}\n-------------------\nSuma: ${summary.totalPrice.toFixed(2)} PLN\n\nPozdrawiam,\n[Imię i nazwisko]`;
+
+        console.log("Symulowana wysyłka wiadomości:");
+        console.log("Temat:", subject);
+        console.log("Treść:", body);
+
+        // Zamknij modal jeśli otwarty
+        const modal = document.getElementById('emailModal');
+        if (modal) modal.classList.add('hidden');
+
+        // Pokaż komunikat sukcesu (dodaj klasę visible i usuń hidden)
+        const successMessage = document.getElementById('success-message');
+        if (successMessage) {
+          successMessage.classList.add('visible');
+          successMessage.classList.remove('hidden');
+
+          // Po 0.5s otwórz mailto, by dać czas na pokazanie komunikatu
+          
+
+          // Ukryj komunikat po 3 sekundach
+          setTimeout(() => {
+            successMessage.classList.remove('visible');
+            successMessage.classList.add('hidden');
+          }, 3500);
+        } else {
+          // Jeżeli brak komunikatu, to od razu wywołaj mailto
+          window.location.href = `mailto:${emailAddress}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        }
+      };
+
+
+
+
+      try {
+        await viewer.setEnvironmentMap("hdr/hamburg_hbf_1k.hdr", { isHDR: true });
+      } catch (e) { console.error("Błąd ładowania HDR:", e); }
+
+      await loadCameraTarget();
+      window.addEventListener("resize", resizeCanvas);
+      resizeCanvas();
+      await loadDataFromSheet();
+      
+      // Pokaż welcome screen jako domyślny ekran
+      const welcomeScreen = document.getElementById('welcome-screen');
+      if (welcomeScreen) {
+        welcomeScreen.style.display = 'flex';
+      }
+      
+      // Ukryj toolbar na welcome screen
+      const toolbar = document.getElementById('bottom-toolbar');
+      if (toolbar) {
+        toolbar.classList.remove('visible');
+        toolbar.style.display = 'none';
+      }
+      
+      // Ukryj panel konfiguracji na welcome screen
+      const configOverview = document.getElementById('config-overview');
+      if (configOverview) {
+        configOverview.style.display = 'none';
+        configOverview.classList.add('hidden');
+      }
+    }
+
+    function setCameraView(targetPosition) {
+      const camera = viewer.scene.activeCamera;
+      camera.fov = CAMERA_FOV;
+      camera.near = CAMERA_NEAR;
+      camera.far = CAMERA_FAR;
+      camera.position.set(CAMERA_POSITION.x, CAMERA_POSITION.y, CAMERA_POSITION.z);
+
+      // Ustaw target na wybraną pozycję (np. globalCameraTargetPosition)
+      let center = globalCameraTargetPosition || new Vector3(0, 0, 0);
+      camera.lookAt(center);
+      camera.updateProjectionMatrix();
+
+      // Całkowicie wyłącz kontrolki pozycjonowania
+      if (viewer.controls) {
+        viewer.controls.target.copy(center);
+        viewer.controls.enableRotate = true;
+        viewer.controls.enablePan = false;
+        viewer.controls.screenSpacePanning = false;
+        viewer.controls.enableZoom = false;
+        viewer.controls.enabled = true; // to blokuje WSZYSTKIE interakcje
+        viewer.controls.update();
+      }
+    }
+
+    function resizeCanvas() {
+      const sidebar = document.getElementById("sidebar");
+      const sidebarWidth = sidebar ? sidebar.offsetWidth : 0;
+      const canvas = document.getElementById("canvas");
+      const width = window.innerWidth - sidebarWidth;
+      const height = window.innerHeight;
+      // Ustaw rozmiar CSS
+      canvas.style.width = width + "px";
+      canvas.style.height = height + "px";
+      // Ustaw rozmiar atrybutów (dla WebGL)
+      canvas.width = width;
+      canvas.height = height;
+      if (viewer && viewer.renderer && viewer.scene && viewer.scene.activeCamera) {
+        viewer.renderer.setSize(width, height, false);
+        viewer.scene.activeCamera.aspect = width / height;
+        viewer.scene.activeCamera.updateProjectionMatrix();
+      }
+    }
+
+    async function silentLoadModel(variant) {
+      if (currentModelContainer) viewer.scene.remove(currentModelContainer);
+      currentModelContainer = await loadModelWithFreshness(`chairs/${variant.Nazwa}.glb`, viewer, { autoCenter: true });
+
+      console.log("Meshe w modelu:", currentModelContainer.children.map(obj => obj.name)); // <-- DODAJ TO TUTAJ
+      //selectedChair = variant; // <-- DODAJ TO!
+
+      
+      // Wyśrodkuj kamerę na modelu
+      const box = new Box3().setFromObject(currentModelContainer);
+      const center = box.getCenter(new Vector3());
+      setCameraView(center);
+      currentModelContainer.position.sub(center);
+      updateSummary();
+      renderPartButtons();
+    }
+
+    async function loadModel(variant) {
+  // Ukryj welcome screen przy wyborze krzesła
+  const welcomeScreen = document.getElementById('welcome-screen');
+  if (welcomeScreen) {
+    welcomeScreen.style.display = 'none';
+  }
+  
+  if (currentModelContainer) {
+    viewer.scene.remove(currentModelContainer);
+    if (typeof currentModelContainer.dispose === 'function') currentModelContainer.dispose();
+  }
+  if (currentLegModel) {
+    viewer.scene.remove(currentLegModel);
+    if (typeof currentLegModel.dispose === 'function') currentLegModel.dispose();
+  }
+  currentModelContainer = null;
+  currentLegModel = null;
+  selectedLeg = null;
+  selectedMaterials = {};
+
+  document.getElementById('model-loader').style.display = 'flex';
+
+  try {
+    const modelPath = `chairs/${variant.Nazwa}.glb`;
+    selectedChair = variant;
+
+    // Załaduj kubełek
+    currentModelContainer = await loadModelWithFreshness(modelPath, viewer, { autoCenter: true });
+
+    // Jeśli kubełek, to ewentualnie załaduj domyślne nogi
+    if (selectedChair.Grupa && selectedChair.Grupa.toLowerCase() === 'kubełek') {
+      const chairBounds = new Box3().setFromObject(currentModelContainer);
+      currentModelContainer.position.y -= chairBounds.min.y;
+
+      const legsVariants = allData.filter(d => d.Grupa.toLowerCase() === 'nogi');
+      const defaultLeg = legsVariants.find(l => l.Nazwa.toLowerCase().includes('regularne')) || legsVariants[0];
+
+      if (defaultLeg) {
+        await setLegModel(defaultLeg);
+      }
+
+      document.getElementById('legs-section').style.display = 'block';
+      activateLegsTabAndShowMaterials();
+    } else {
+      document.getElementById('legs-section').style.display = 'none';
+      if (currentLegModel) {
+        viewer.scene.remove(currentLegModel);
+        currentLegModel = null;
+        selectedLeg = null;
+      }
+    }
+
+    // ✅ Dopiero teraz chowamy loader
+    // ✅ Eleganckie ukrycie z fade-out
+document.getElementById('model-loader').classList.add('fade-out');
+setTimeout(() => {
+  document.getElementById('model-loader').style.display = 'none';
+  document.getElementById('model-loader').classList.remove('fade-out');
+}, 500);
+
+
+    // Pokaż dolny pasek narzędzi
+    const toolbar = document.getElementById('bottom-toolbar');
+    toolbar.classList.add('visible');
+    toolbar.style.display = 'flex';
+
+    // Pokaż panel konfiguracji
+    const configOverview = document.getElementById('config-overview');
+    if (configOverview) {
+      configOverview.style.display = 'block';
+      configOverview.classList.remove('hidden');
+    }
+
+    renderPartButtons();
+    userInteracted = true;
+    hideDimensions();
+
+    // Pokaż sekcję materiałów nóg
+    document.getElementById('materials-section').style.display = 'block';
+
+    // Wyrenderuj kafelki materiałów nóg
+    const legsMaterials = allData.filter(d => d.Grupa.toLowerCase() === 'nogi');
+    renderOptions('materials-thumbnails', legsMaterials, (item) => {
+      setLegMaterial(item);
+    });
+
+    setCameraView(globalCameraTargetPosition);
+    enforceZoomLimits();
+    updateUI();
+    showScreen('config');
+
+  } catch (e) {
+    console.error(`BŁĄD ładowania modelu: ${e.message}`, e);
+    // Ukryj loader nawet przy błędzie
+    document.getElementById('model-loader').style.display = 'none';
+  }
+}
+
+
+
+
+
+
+
+
+
+    function createLegMaterial(legData) {
+      const metalness = isNaN(parseFloat(legData.metalness)) ? 1 : parseFloat(legData.metalness);
+      const roughness = isNaN(parseFloat(legData.roughness)) ? 0.1 : parseFloat(legData.roughness);
+      const color = legData.color || '#FFFFFF';
+
+      return new THREE.MeshStandardMaterial({
+        color: new THREE.Color(color),
+        metalness: metalness,
+        roughness: roughness,
+      });
+    }
+    
+    function czyNogaPasujeDoKubełka(nogaVariant, kubelekNazwa) {
+  const zgodneKubełki = (nogaVariant.DlaKubełka || '')
+    .toLowerCase()
+    .split(',')
+    .map(k => k.trim());
+  return zgodneKubełki.includes(kubelekNazwa.toLowerCase());
+}
+
+
+    async function setLegModel(variant) {
+  userInteracted = true;
+  console.log("Wywołanie setLegModel dla wariantu:", variant);
+
+  // ✅ Sprawdzenie zgodności kubełka z wariantem nóg
+  if (selectedChair && selectedChair.Grupa.toLowerCase() === 'kubełek') {
+    const zgodneKubełki = (variant.DlaKubełka || '').toLowerCase().split(',').map(k => k.trim());
+    const nazwaKubełka = selectedChair.Nazwa?.toLowerCase();
+    if (!zgodneKubełki.includes(nazwaKubełka)) {
+      console.warn(`❌ Wariant nóg "${variant.Nazwa}" nie pasuje do kubełka "${selectedChair.Nazwa}"`);
+      return;
+    }
+  }
+
+  // Pokaż loader podczas ładowania nóg
+  showModelLoader('Ładowanie nóg...');
+
+      console.log("Wywołanie setLegModel dla wariantu:", variant);
+      const oldLegs = currentLegModel;
+      try {
+        const modelPath = `legs/${variant.Nazwa}.glb`;
+        console.log("Ładuję model nóg z ścieżki:", modelPath);
+        const newLegs = await loadModelWithFreshness(modelPath, viewer, { autoCenter: false });
+
+
+        const legBounds = new Box3().setFromObject(newLegs);
+        const legHeight = legBounds.max.y - legBounds.min.y;
+
+        if (currentModelContainer && selectedChair) {
+          if (selectedChair.Grupa.toLowerCase() === 'kubełek') {
+            let height = parseFloat(variant.height) || legHeight;
+            newLegs.position.y = -height;
+            currentModelContainer.position.y = 0;
+          } else {
+            currentModelContainer.position.y = legHeight + VERTICAL_OFFSET;
+            newLegs.position.y = 0;
+          }
+        }
+
+        if (oldLegs) {
+          viewer.scene.remove(oldLegs);
+          if (typeof oldLegs.dispose === 'function') oldLegs.dispose();
+        }
+        viewer.scene.add(newLegs);
+        currentLegModel = newLegs;
+        selectedLeg = variant;
+        renderFilteredMaterialOptions('legs'); // ⬅️ to odświeża widok kafelków materiałów nóg
+        updateMaterialTiles(); // ⬅️ MUSI być tutaj!
+
+
+        // Odśwież listę nóg, żeby podświetlić wybrany wariant
+        const legs = allData
+  .filter(d => d.Grupa.toLowerCase() === 'nogi')
+  .filter(noga => {
+    if (!selectedChair || selectedChair.Grupa.toLowerCase() !== 'kubełek') return true;
+    return czyNogaPasujeDoKubełka(noga, selectedChair.Nazwa);
+  });
+
+
+
+// Ustaw pierwszą nogę jeśli jeszcze żadna nie została wybrana
+if (!selectedLeg && legs.length > 0) {
+  setLegModel(legs[0]); // automatycznie ustawia pierwszą pasującą nogę
+}
+    renderOptions('legs-thumbnails', legs, item => {
+  setLegModel(item);
+});    
+
+
+
+        updateSummary();
+
+        // Wymuszenie odświeżenia sceny
+        if (viewer.render) viewer.render();
+        
+        // Ukryj loader po udanym załadowaniu
+        hideModelLoader();
+      } catch (e) {
+        console.error(`BŁĄD ładowania nóg: ${e.message}`, e);
+        // Ukryj loader również przy błędzie
+        hideModelLoader();
+      }
+    }
+
+
+
+    let forceRenderInterval;
+
+    function triggerSceneRefresh() {
+      if (viewer?.camera) {
+        viewer.camera.position.x += 0.00001;
+        viewer.camera.zoom += 0.0001; // ⬅️ mikroskopijny zoom
+        viewer.camera.updateProjectionMatrix();
+      }
+      if (viewer?.renderer?.info) {
+        viewer.renderer.info.reset();
+      }
+      if (viewer?.render) viewer.render();
+    }
+
+
+    function startForceRender(duration = 2000) {
+      clearInterval(forceRenderInterval);
+      forceRenderInterval = setInterval(() => {
+        triggerSceneRefresh();
+      }, 100);
+
+      setTimeout(() => {
+        clearInterval(forceRenderInterval);
+        console.log("🛑 Zakończono wymuszone odświeżanie");
+      }, duration);
+    }
+
+
+
+    const textureLoader = new TextureLoader();
+
+    
+
+    if (
+      selectedChair?.Grupa?.toLowerCase() === 'kubełek' &&
+      variant.TargetMeshOrModel?.toLowerCase().includes('legs') &&
+      variant.WariantModelu
+    ) {
+      // 👉 dla kubełków z podmianą nóg — zmień model nóg
+      setLegModel(variant);
+    } else if (
+      selectedChair &&
+      (selectedChair.Grupa.toLowerCase() !== 'kubełek' || !variant.WariantModelu)
+    ) {
+      // 👉 dla pozostałych krzeseł bez wariantów nóg — wyświetl materiały nóg do wyboru
+      showLegMaterialsForSimpleChairs(selectedChair);
+    }
+
+    // Funkcje preloadera – używamy tego samego model-loader co dla modeli i nóg
+function showPreloader() {
+  showModelLoader('Ładowanie materiału...');
+}
+function hidePreloader() {
+  hideModelLoader();
+}
+
+// Uniwersalne funkcje loadera z zmiennym tekstem
+function showModelLoader(text = 'Ładowanie modelu...') {
+  const el = document.getElementById('model-loader');
+  if (el) {
+    const textEl = el.querySelector('p');
+    if (textEl) textEl.textContent = text;
+    el.style.display = 'flex';
+  }
+}
+
+function hideModelLoader() {
+  const el = document.getElementById('model-loader');
+  if (el) {
+    el.classList.add('fade-out');
+    setTimeout(() => {
+      el.style.display = 'none';
+      el.classList.remove('fade-out');
+      // Przywróć oryginalny tekst
+      const textEl = el.querySelector('p');
+      if (textEl) textEl.textContent = 'Ładowanie modelu...';
+    }, 500);
+  }
+}
+
+// Funkcje loadera materiałów
+function showMaterialLoader(text = 'Ładowanie materiału...') {
+  const el = document.getElementById('material-preloader');
+  if (el) {
+    const textEl = el.querySelector('div');
+    if (textEl) textEl.textContent = text;
+    el.style.display = 'flex';
+  }
+}
+
+function hideMaterialLoader() {
+  const el = document.getElementById('material-preloader');
+  if (el) {
+    el.style.display = 'none';
+  }
+}
+
+    function applyMaterialToMesh(variant, forcedMeshName) {
+      const clone = { ...variant };
+      clone.TargetMeshOrModel = forcedMeshName;
+      console.log(`🎯 Przypisano '${clone.Nazwa}' tylko do mesh '${forcedMeshName}'`);
+      applyMaterial(clone);
+    }
+
+    // Funkcja, która wyświetla kafelki materiałów nóg dla prostych krzeseł
+    function showLegMaterialsForSimpleChairs(chair) {
+      const legsMaterialsContainer = document.getElementById('legs-thumbnails');
+      // Usuń tylko kafelki materiałów (pozostaw warianty nóg)
+      legsMaterialsContainer.querySelectorAll('.material-tile').forEach(tile => tile.remove());
+
+
+      // Pobierz materiały nóg dla danego krzesła (przykład, wymaga dostosowania)
+      const materials = getMaterialsForLegs(chair.defaultLegsId || 'default');
+
+      materials.forEach(mat => {
+        const tile = document.createElement('div');
+        tile.className = 'material-tile';
+        tile.textContent = mat.Nazwa;
+        tile.style.backgroundImage = `url(${mat.Obrazek || 'fallback.png'})`;
+        tile.onclick = () => {
+          onLegVariantClick(mat.DlaModeliNóg || mat.Nazwa);
+          applyLegMaterial(mat);
+        };
+
+        legsMaterialsContainer.appendChild(tile);
+      });
+    }
+
+
+    
+
+
+
+// DOBRE PROGRESYWNE ŁADOWANIE MATERIAŁÓW!!!
+
+async function applyMaterial(variant) {
+  showMaterialLoader('Ładowanie materiału...');
+  try {
+    console.log('📦 variant:', variant);
+
+    if (!currentModelContainer) {
+      console.warn('currentModelContainer jest null lub undefined');
+      hideMaterialLoader();
+      return;
+    }
+
+    if (!variant.TargetMeshOrModel) {
+      console.warn('Brak TargetMeshOrModel w wariancie');
+      hideMaterialLoader();
+      return;
+    }
+
+    const targetNames = variant.TargetMeshOrModel.split(',').map(name => name.trim());
+    const isHex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(variant.Color || variant.Wartość);
+    const folderPath = (!isHex && variant.Wartość.startsWith('textures/')) ? variant.Wartość : `textures/${variant.Wartość}`;
+
+    // Progresywna obsługa wielu meshów - loader znika dopiero po wszystkich meshach
+    const meshPromises = targetNames.map(async (targetName) => {
+      let container;
+      if (targetName.toLowerCase() === 'legs') {
+        if (selectedChair?.Grupa?.toLowerCase() === 'krzesło' || !currentLegModel) {
+          container = currentModelContainer;
+        } else {
+          container = currentLegModel;
+        }
+      } else {
+        container = currentModelContainer;
+      }
+
+      let targetObject = null;
+      container?.traverse(obj => {
+        if (
+          obj.isMesh &&
+          obj.name &&
+          obj.name.toLowerCase().trim() === targetName.toLowerCase().trim()
+        ) {
+          targetObject = obj;
+        }
+      });
+
+      if (!targetObject) {
+        console.warn(`❌ Mesh '${targetName}' nie znaleziony w modelu`);
+        return;
+      }
+
+      if (!targetObject.material) {
+        console.warn(`⚠️ Mesh '${targetName}' nie ma materiału.`);
+        return;
+      }
+
+      // Funkcja do bezpiecznego ładowania tekstury (zwraca null, jeśli nie uda się załadować)
+      async function loadTextureSafe(url) {
+        try {
+          const tex = await textureLoader.loadAsync(url);
+          tex.magFilter = THREE.LinearFilter;
+          tex.minFilter = THREE.LinearMipMapLinearFilter;
+          tex.anisotropy = viewer?.renderer?.capabilities?.getMaxAnisotropy?.() || 4;
+          tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+          tex.encoding = THREE.sRGBEncoding;
+          tex.offset.set(0, 0);
+          tex.repeat.set(1, 1);
+          tex.needsUpdate = true;
+          return tex;
+        } catch {
+          return null;
+        }
+      }
+
+      if (isHex) {
+        // Jeśli kolor HEX – podmień od razu (nie ma tekstur)
+        const material = targetObject.material.clone();
+        material.color.set(variant.Color || variant.Wartość);
+        material.map = null;
+        material.normalMap = null;
+        material.roughnessMap = null;
+        material.metalnessMap = null;
+        material.needsUpdate = true;
+        targetObject.material = material;
+        viewer.render?.();
+      } else if (folderPath && !/\.(jpg|jpeg|png|gif)$/i.test(folderPath)) {
+        // --- PROGRESYWNE ŁADOWANIE ---
+
+        // 1. Najpierw załaduj basecolor
+        let baseColorTex = null;
+        try {
+          baseColorTex = await loadTextureSafe(`${folderPath}/baseColor.jpg`);
+        } catch (err) {
+          console.warn("Błąd ładowania baseColor:", err);
+        }
+
+        // 2. Skopiuj materiał i podepnij basecolor (lub null)
+        const material = targetObject.material.clone();
+        material.map = baseColorTex || null;
+        material.color.set(0xffffff);
+        material.normalMap = null;
+        material.roughnessMap = null;
+        material.metalnessMap = null;
+        material.needsUpdate = true;
+
+        // 3. Metalness i roughness z wariantu
+        function parseValue(val, fallback) {
+          const raw = (val || '')
+            .toString()
+            .trim()
+            .replace(/['"]/g, '')
+            .replace(',', '.');
+          const parsed = parseFloat(raw);
+          return !isNaN(parsed) ? parsed : fallback;
+        }
+        material.metalness = parseValue(variant.Metalness, 0);
+        material.roughness = parseValue(variant.Roughness, 0.814);
+
+        // 4. Podmień materiał dopiero teraz (dopiero po basecolor)
+        targetObject.material = material;
+        if (targetObject.geometry?.computeVertexNormals) {
+          targetObject.geometry.computeVertexNormals();
+        }
+        viewer.render?.();
+
+        // 6. Progresywnie doładowuj pozostałe mapy i podmieniaj "w locie"
+        loadTextureSafe(`${folderPath}/normal.jpg`).then(tex => {
+          if (tex) {
+            tex.encoding = THREE.LinearEncoding;
+            tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+            tex.offset.set(0, 0);
+            tex.repeat.set(1.001, 1.001);
+            material.normalMap = tex;
+            material.needsUpdate = true;
+            targetObject.material = material;
+            viewer.render?.();
+          }
+        });
+
+        loadTextureSafe(`${folderPath}/roughness.jpg`).then(tex => {
+          if (tex) {
+            tex.encoding = THREE.LinearEncoding;
+            tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+            tex.offset.set(0, 0);
+            tex.repeat.set(1.001, 1.001);
+            material.roughnessMap = tex;
+            material.needsUpdate = true;
+            targetObject.material = material;
+            viewer.render?.();
+          }
+        });
+
+        loadTextureSafe(`${folderPath}/metallic.jpg`).then(tex => {
+          if (tex) {
+            tex.encoding = THREE.LinearEncoding;
+            tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+            tex.offset.set(0, 0);
+            tex.repeat.set(1.001, 1.001);
+            material.metalnessMap = tex;
+            material.needsUpdate = true;
+            targetObject.material = material;
+            viewer.render?.();
+          }
+        });
+
+        console.log(`✅ Progresywne ładowanie tekstur na '${targetName}'`);
+        console.log(`🧪 Metalness=${material.metalness}, Roughness=${material.roughness}`);
+      }
+
+      // Zapamiętanie wyboru i odświeżenie sceny
+      selectedMaterials[targetName] = variant;
+      if (targetName === 'legs' || targetName === 'legs_material') {
+        selectedMaterials['legs_material'] = variant;
+      }
+    });
+
+    await Promise.all(meshPromises); // czekaj aż wszystkie meshe ogarną materiał
+hideMaterialLoader();
+    // 🗂️ Automatycznie przypisz Folder do eksportu
+    Object.entries(selectedMaterials).forEach(([key, mat]) => {
+      if (!mat.Folder && typeof mat.Wartość === 'string') {
+        const parts = mat.Wartość.split('/');
+        const last = parts[parts.length - 1];
+        if (last && texturesFilesByFolder?.[last]) {
+          mat.Folder = last;
+          console.log(`📁 Dodano Folder='${last}' do '${key}'`);
+        }
+      }
+    });
+
+    viewer.scene.traverse(obj => {
+      if (obj.isMesh && obj.material) {
+        obj.material.needsUpdate = true;
+      }
+    });
+
+    if (viewer?.camera) {
+      viewer.camera.position.x += 0.00001;
+      viewer.camera.updateProjectionMatrix();
+    }
+
+    if (viewer?.render) viewer.render();
+
+    updateSummary();
+  } catch (e) {
+    hideMaterialLoader();
+    console.error("Błąd w applyMaterial:", e);
+  }
+}
+
+function applyMaterialToSpecificMesh(variant, meshKey) {
+  const clone = { ...variant };
+  clone.TargetMeshOrModel = meshKey;
+  console.log(`🎯 Przypisano '${variant.Nazwa}' tylko do mesh '${meshKey}'`);
+  applyMaterial(clone);
+}
+
+// DOBRE PROGRESYWNE ŁADOWANIE MATERIAŁÓW!!!
+
+
+
+
+
+      function renderOptions(containerId, items, onSelect, isInteractive = true) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        container.innerHTML = '';
+        
+        // Zastosuj filtr wyszukiwania jeśli jest aktywny
+        const filteredItems = currentSearchFilter 
+          ? items.filter(matchesSearchFilter)
+          : items;
+          
+        console.log(`📦 Rendering ${filteredItems.length}/${items.length} items in ${containerId} with filter: "${currentSearchFilter}"`);
+        
+        filteredItems.forEach((item, index) => {
+          const wrapper = document.createElement('div');
+          wrapper.className = 'thumbnail-wrapper';
+          const button = document.createElement('div');
+          button.className = 'thumbnail';
+          button.title = item.Nazwa;
+
+          // PODŚWIETLENIE WYBRANEGO
+          let isSelected = false;
+          if (containerId === 'material-options') {
+            if (item.Grupa && item.Grupa.toLowerCase() === 'materiały_nóg') {
+              isSelected = selectedMaterials['legs_material'] && selectedMaterials['legs_material'].Nazwa === item.Nazwa;
+            } else if (item.TargetMeshOrModel) {
+              const targets = item.TargetMeshOrModel.split(',').map(t => t.trim());
+              isSelected = targets.some(t => selectedMaterials[t] && selectedMaterials[t].Nazwa === item.Nazwa);
+            }
+          } else if (containerId === 'legs-thumbnails') {
+            isSelected = selectedLeg && selectedLeg.Nazwa === item.Nazwa;
+          }
+          if (isSelected) button.classList.add('selected');
+
+          if (isInteractive) {
+            button.addEventListener('click', () => {
+              onSelect(item);
+              container.querySelectorAll('.thumbnail').forEach(t => t.classList.remove('selected'));
+              button.classList.add('selected');
+            });
+          }
+          const img = document.createElement('img');
+          img.src = item.Obrazek && item.Obrazek.length > 4 ? item.Obrazek : 'icons/placeholder.svg';
+          img.alt = item.Nazwa;
+          button.appendChild(img);
+          const caption = document.createElement('div');
+          caption.className = 'thumbnail-caption';
+          caption.textContent = item.Nazwa;
+          wrapper.appendChild(button);
+          wrapper.appendChild(caption);
+          container.appendChild(wrapper);
+        });
+      }
+
+
+
+
+
+      function renderFilteredMaterialOptions(targetMesh) {
+  if (!selectedChair || !selectedChair.Grupa) return;
+
+  const grupa = selectedChair.Grupa.toLowerCase();
+
+  function isAllowedForGroup(entryGroupDocelowa) {
+    if (!entryGroupDocelowa) return false;
+    const values = entryGroupDocelowa.toLowerCase().split(',').map(s => s.trim());
+    return values.includes('wszystkie') || values.includes(grupa) || values.includes('kubełek, krzesło');
+  }
+
+  let materialOptions = [];
+
+  const isLegs = targetMesh === 'legs' || targetMesh === 'legs_material';
+
+  if (isLegs) {
+    materialOptions = allData.filter(d =>
+      d.Grupa?.toLowerCase() === 'materiały_nóg' &&
+      isAllowedForGroup(d.GrupaDocelowa) &&
+      d.Visible?.toLowerCase() !== 'false'
+    );
+
+    if (selectedLeg && selectedLeg.Typ) {
+      materialOptions = materialOptions.filter(mat =>
+        !mat.Typ || mat.Typ.toLowerCase().trim() === selectedLeg.Typ.toLowerCase().trim()
+      );
+    }
+
+    if (selectedLeg && selectedLeg.Nazwa) {
+      const currentLegName = selectedLeg.Nazwa.toLowerCase().trim();
+      materialOptions = materialOptions.filter(mat => {
+        const allowedLegs = mat.DlaModeluNóg
+          ? mat.DlaModeluNóg.split(',').map(s => s.trim().toLowerCase())
+          : [];
+        return allowedLegs.length === 0 || allowedLegs.includes(currentLegName);
+      });
+    }
+
+    if (selectedChair && selectedChair.Nazwa) {
+  const currentChairName = selectedChair.Nazwa.toLowerCase().trim();
+  materialOptions = materialOptions.filter(mat => {
+    // ⛔️ Jeśli pole DlaKrzesła jest puste → odrzucamy
+    if (!mat.DlaKrzesła || mat.DlaKrzesła.trim().length === 0) return false;
+
+    const allowedChairs = mat.DlaKrzesła
+      .split(',')
+      .map(s => s.trim().toLowerCase());
+
+    return allowedChairs.includes(currentChairName);
+  });
+}
+
+
+
+    const groupedByCollection = {};
+    materialOptions.forEach(mat => {
+      const key = mat.Kolekcja?.trim() || 'Inne';
+      if (!groupedByCollection[key]) groupedByCollection[key] = [];
+      groupedByCollection[key].push(mat);
+    });
+
+    renderCollectionsAndMaterials(groupedByCollection, 'legs');
+    return;
+  }
+
+  // 🧵 TKANINY (siedzisko, oparcie itd.)
+  materialOptions = allData.filter(d =>
+    d.Grupa?.toLowerCase() === 'tkanina' &&
+    d.TargetMeshOrModel &&
+    d.TargetMeshOrModel.split(',').map(t => t.trim()).includes(targetMesh) &&
+    isAllowedForGroup(d.GrupaDocelowa) &&
+    d.Visible?.toLowerCase() !== 'false'
+  );
+
+  // Zastosuj filtr wyszukiwania do materiałów nóg
+  if (currentSearchFilter && isLegs) {
+    materialOptions = allData.filter(d =>
+      d.Grupa?.toLowerCase() === 'materiały_nóg' &&
+      isAllowedForGroup(d.GrupaDocelowa) &&
+      d.Visible?.toLowerCase() !== 'false'
+    ).filter(matchesSearchFilter);
+    
+    console.log(`🦵 Filtered leg materials to ${materialOptions.length} for filter: "${currentSearchFilter}"`);
+    
+    // Zastosuj pozostałe filtry nóg
+    if (selectedLeg && selectedLeg.Typ) {
+      materialOptions = materialOptions.filter(mat =>
+        !mat.Typ || mat.Typ.toLowerCase().trim() === selectedLeg.Typ.toLowerCase().trim()
+      );
+    }
+
+    if (selectedLeg && selectedLeg.Nazwa) {
+      const currentLegName = selectedLeg.Nazwa.toLowerCase().trim();
+      materialOptions = materialOptions.filter(mat => {
+        const allowedLegs = mat.DlaModeluNóg
+          ? mat.DlaModeluNóg.split(',').map(s => s.trim().toLowerCase())
+          : [];
+        return allowedLegs.length === 0 || allowedLegs.includes(currentLegName);
+      });
+    }
+
+    if (selectedChair && selectedChair.Nazwa) {
+      const currentChairName = selectedChair.Nazwa.toLowerCase().trim();
+      materialOptions = materialOptions.filter(mat => {
+        if (!mat.DlaKrzesła || mat.DlaKrzesła.trim().length === 0) return false;
+        const allowedChairs = mat.DlaKrzesła.split(',').map(s => s.trim().toLowerCase());
+        return allowedChairs.includes(currentChairName);
+      });
+    }
+
+    const groupedByCollection = {};
+    materialOptions.forEach(mat => {
+      const key = mat.Kolekcja?.trim() || 'Inne';
+      if (!groupedByCollection[key]) groupedByCollection[key] = [];
+      groupedByCollection[key].push(mat);
+    });
+
+    renderCollectionsAndMaterials(groupedByCollection, 'legs');
+    return;
+  }
+
+  // 🧵 TKANINY (siedzisko, oparcie itd.)
+  materialOptions = allData.filter(d =>
+    d.Grupa?.toLowerCase() === 'tkanina' &&
+    d.TargetMeshOrModel &&
+    d.TargetMeshOrModel.split(',').map(t => t.trim()).includes(targetMesh) &&
+    isAllowedForGroup(d.GrupaDocelowa) &&
+    d.Visible?.toLowerCase() !== 'false'
+  );
+
+  // Zastosuj filtr wyszukiwania jeśli jest aktywny
+  if (currentSearchFilter) {
+    materialOptions = materialOptions.filter(matchesSearchFilter);
+    console.log(`🎨 Filtered materials from ${allData.length} to ${materialOptions.length} for filter: "${currentSearchFilter}"`);
+  }
+
+  const groupedByCollection = {};
+  materialOptions.forEach(mat => {
+    const key = mat.Kolekcja?.trim() || 'Inne';
+    if (!groupedByCollection[key]) groupedByCollection[key] = [];
+    groupedByCollection[key].push(mat);
+  });
+
+  renderCollectionsAndMaterials(groupedByCollection, targetMesh);
+}
+
+     
+
+
+
+
+// ✅ Po wygenerowaniu — otwórz ostatnio klikniętą kolekcję
+if (lastOpenedCollection) {
+  const toOpen = container.querySelector(`details[data-kolekcja="${lastOpenedCollection}"]`);
+  if (toOpen) toOpen.open = true;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+      function activateLegsTabAndShowMaterials() {
+        // Podświetl zakładkę "Nogi" po data-key
+        const partTabs = document.querySelectorAll('#part-tabs .thumbnail');
+        partTabs.forEach(tab => tab.classList.remove('selected'));
+        partTabs.forEach(tab => {
+          if (tab.dataset.key === 'legs') {
+            tab.classList.add('selected');
+          }
+        });
+
+        // Pokaż sekcję materiałów i wyświetl wszystkie materiały nóg
+        document.getElementById('materials-section').style.display = 'block';
+        renderFilteredMaterialOptions('legs');
+
+      }
+
+      function renderPartTabs() {
+        const container = document.getElementById('part-tabs');
+        container.innerHTML = '';
+        // Pobierz unikalne elementy do wyboru
+        const allTargets = allData.filter(d => d.TargetMeshOrModel)
+          .flatMap(d => d.TargetMeshOrModel.split(',').map(t => t.trim()));
+        const uniqueTargets = [...new Set(allTargets)];
+        if (uniqueTargets.length === 0) {
+          document.getElementById('parts-section').style.display = 'none';
+          return;
+        }
+        document.getElementById('parts-section').style.display = 'block';
+
+        // Mapowanie nazw technicznych na polskie
+        const POLISH_LABELS = {
+          seat: 'Siedzisko',
+          backseat_inside: 'Oparcie wew.',
+          backseat_outside: 'Oparcie zew.',
+          backseat: 'Siedzisko/Oparcie',
+          legs: 'Nogi'
+        };
+
+        renderOptions('part-tabs', uniqueTargets.map(name => {
+          const key = name.trim().toLowerCase();
+          return {
+            Nazwa: POLISH_LABELS[key] || name.trim(),
+            Obrazek: ELEMENT_ICONS[key] || 'icons/placeholder.svg',
+            _technicalKey: key
+          };
+        }), (item) => {
+          if (item._technicalKey === 'legs') {
+            activateLegsTabAndShowMaterials();
+          } else {
+            // Podświetl klikniętą zakładkę
+            const partTabs = document.querySelectorAll('#part-tabs .thumbnail');
+            partTabs.forEach(tab => tab.classList.remove('selected'));
+            partTabs.forEach(tab => {
+              if (tab.title && tab.title.toLowerCase().includes(item.Nazwa.toLowerCase())) {
+                tab.classList.add('selected');
+              }
+            });
+            document.getElementById('materials-section').style.display = 'block';
+            renderFilteredMaterialOptions(item._technicalKey);
+          }
+        });
+      }
+
+      function updateUI() {
+        const backContainer = document.getElementById('back-to-models-container');
+        backContainer.innerHTML = '';
+        if (selectedChair && (selectedChair.Obrazek || selectedChair.Image)) {
+          // Stwórz ramkę z ikonką i X
+          const btn = document.createElement('div');
+          btn.className = 'back-to-model-btn';
+          btn.title = 'Wróć do wyboru modelu';
+
+          // Ikonka modelu
+          const img = document.createElement('img');
+          img.src = selectedChair.Obrazek || selectedChair.Image;
+          img.alt = selectedChair.Nazwa;
+          btn.appendChild(img);
+
+          // Przycisk X w rogu
+          const xBtn = document.createElement('button');
+          xBtn.className = 'close-x';
+          xBtn.innerHTML = '&times;';
+          xBtn.title = 'Wróć do wyboru modelu';
+          xBtn.onclick = (e) => {
+            e.stopPropagation();
+            showScreen('models');
+          };
+          btn.appendChild(xBtn);
+
+          // Kliknięcie w całą ramkę też wraca do wyboru modelu
+          btn.onclick = () => showScreen('models');
+
+          backContainer.appendChild(btn);
+        }
+
+        const legs = allData.filter(d => {
+  if (d.Grupa.toLowerCase() !== 'nogi') return false;
+  if (!selectedChair || selectedChair.Grupa.toLowerCase() !== 'kubełek') return true;
+  return czyNogaPasujeDoKubełka(d, selectedChair.Nazwa);
+});
+
+
+        renderOptions('legs-thumbnails', legs, item => {
+  setLegModel(item);
+});
+
+
+
+        // Sekcja nóg i materiały nóg – nogi tylko dla kubełków, materiały dla kubełków i krzeseł
+    if (selectedChair && selectedChair.Grupa) {    
+          const grupa = selectedChair.Grupa.toLowerCase();
+
+          if (grupa === 'kubełek') {
+            console.log("Pokazuję nogi i materiały nóg dla kubełka");
+            document.getElementById('legs-section').style.display = 'block';
+            
+
+            // Ustaw pierwszą nogę jeśli jeszcze żadna nie została wybrana
+if (!selectedLeg && legs.length > 0) {
+  setLegModel(legs[0]); // automatycznie ustawia pierwszą pasującą nogę
+}
+
+renderOptions('legs-thumbnails', legs, item => {
+              setLegModel(item);
+            });
+
+            // Ukryj sekcję materiałów, pokaże się po kliknięciu w zakładkę
+            document.getElementById('materials-section').style.display = 'none';
+          } else if (grupa === 'krzesło') {
+            console.log("Ukrywam sekcję nóg dla krzesła");
+            document.getElementById('legs-section').style.display = 'none';
+
+            // Ukryj sekcję materiałów, pokaże się po kliknięciu w zakładkę
+            document.getElementById('materials-section').style.display = 'none';
+          } else {
+            console.log("Ukrywam sekcje nóg i materiałów");
+            document.getElementById('legs-section').style.display = 'none';
+            document.getElementById('materials-section').style.display = 'none';
+          }
+        } else {
+          console.log("Brak wybranego elementu lub grupy");
+          document.getElementById('legs-section').style.display = 'none';
+          document.getElementById('materials-section').style.display = 'none';
+        }
+
+        updateSummary();
+      }
+
+      const visibleData = allData.filter(d =>
+        d.Visible?.toString().trim().length > 0
+      );
+
+
+      async function loadDataFromSheet() {
+        const sheetId = '1lZMJ-4Qd0nDY-7Hl9iV-pJnZSTVzYiA-A3rDq_bC16U';
+        const sheetURL = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=Baza Danych&v=${new Date().getTime()}`;
+        try {
+          const response = await fetch(sheetURL + '?nocache=' + Date.now(), { cache: 'no-store' });
+
+          const csvText = await response.text();
+          const rows = csvText.trim().split('\n');
+          const headers = rows.shift().split(',').map(h => h.trim().replace(/"/g, ''));
+          allData = rows.map(row => {
+            const values = row.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
+            const obj = {};
+            headers.forEach((header, index) => obj[header] = values[index]?.trim().replace(/"/g, '') || '');
+            return obj;
+          }).filter(item => item.Visible?.toLowerCase() !== 'false');
+
+          // Renderuj przyciski kategorii
+          renderCategoryButtons();
+          
+          // Renderuj promocje na starcie
+          renderPromotions();
+          
+          showScreen('models');
+
+          const hdrEntries = allData.filter(d => d.HDR && d.HDRIcon);
+          renderHDROptions(hdrEntries);
+
+
+
+
+
+          // Pokaż loader
+document.getElementById('custom-loader').style.display = 'flex';
+document.getElementById('app').style.visibility = 'hidden';
+
+// Usuń poprzedni model
+if (currentModelContainer) {
+  viewer.scene.remove(currentModelContainer);
+  if (typeof currentModelContainer.dispose === 'function') currentModelContainer.dispose();
+}
+
+// Załaduj nowy model
+currentModelContainer = await viewer.load('chairs/Ava.glb', { autoCenter: true });
+setCameraView(new Vector3(0, 0, 0));
+
+// Resetuj wybory
+selectedChair = null;
+selectedLeg = null;
+selectedMaterials = {};
+userInteracted = false;
+
+// Zaktualizuj podsumowanie
+updateSummary();
+
+// Pokaż scenę i ukryj loader
+document.getElementById('custom-loader').classList.add('fade-out');
+setTimeout(() => {
+  document.getElementById('custom-loader').style.display = 'none';
+  document.getElementById('app').style.visibility = 'visible';
+}, 500);
+
+// Pokaż toolbar
+const toolbar = document.getElementById('bottom-toolbar');
+if (toolbar) {
+  toolbar.style.display = 'flex';
+  toolbar.classList.add('visible');
+}
+
+
+        } catch (e) { console.error("Błąd ładowania danych:", e); document.body.innerHTML = `Błąd ładowania danych: ${e.message}`; }
+      }
+
+      document.getElementById('hdr-toggle')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const panel = document.getElementById('hdr-panel');
+        panel.classList.toggle('hidden');
+        document.getElementById('hdr-panel').style.display = 'block';
+
+      });
+
+
+setDefaultMaterialsFromSheet();
+updateSummary();
+
+
+
+
+      function updateSummary() {
+        const overviewPanel = document.getElementById('config-overview');
+        const overviewIconsDiv = document.getElementById("overview-icons");
+        const overviewDetailsDiv = document.getElementById("overview-details");
+        const overviewTotalPriceSpan = document.getElementById("overview-total-price");
+
+        overviewIconsDiv.innerHTML = '';
+        overviewDetailsDiv.innerHTML = '';
+        overviewTotalPriceSpan.textContent = `0.00 PLN`;
+
+        // Jeśli nie było interakcji, nie pokazuj szczegółów
+        if (!userInteracted) {
+          overviewPanel.style.display = 'block';
+          return;
+        }
+
+        // Kolejność elementów do podsumowania
+        const partOrder = ['seat', 'backseat_inside', 'backseat_outside', 'legs_material', 'backseat'];
+        const partLabels = ['Siedzisko', 'Oparcie wew.', 'Oparcie zew.', 'Nogi', 'Siedzisko/Oparcie'];
+
+        // Ikonka modelu
+        if (userInteracted && selectedChair && (selectedChair.Obrazek || selectedChair.Image)) {
+          const icon = document.createElement('img');
+          icon.src = selectedChair.Obrazek || selectedChair.Image;
+          icon.title = selectedChair.Nazwa;
+          icon.className = 'model-image'; // <-- dodaj tę klasę!
+          overviewIconsDiv.appendChild(icon);
+        }
+        
+
+        // Ikonki materiałów dla każdego elementu
+        partOrder.forEach((partKey, idx) => {
+          const mats = selectedMaterials[partKey];
+if (Array.isArray(mats)) {
+  mats.forEach(mat => {
+    if (mat && (mat.Obrazek || mat.Image)) {
+      const icon = document.createElement('img');
+      icon.src = mat.Obrazek || mat.Image;
+      icon.title = mat.Nazwa;
+      overviewIconsDiv.appendChild(icon);
+    }
+  });
+} else if (mats && (mats.Obrazek || mats.Image)) {
+  // Obsługa starego trybu (pojedynczy materiał)
+  const icon = document.createElement('img');
+  icon.src = mats.Obrazek || mats.Image;
+  icon.title = mats.Nazwa;
+  overviewIconsDiv.appendChild(icon);
+}
+
+        });
+
+        // Ikonka wybranego wariantu nóg (jeśli jest)
+        if (selectedLeg && (selectedLeg.Obrazek || selectedLeg.Image)) {
+          const icon = document.createElement('img');
+          icon.src = selectedLeg.Obrazek || selectedLeg.Image;
+          icon.title = selectedLeg.Nazwa;
+          overviewIconsDiv.appendChild(icon);
+        }
+
+        // Szczegóły i ceny
+        let totalPrice = 0;
+        if (selectedChair && selectedChair.Cena) {
+          const price = parseFloat(selectedChair.Cena) || 0;
+          totalPrice += price;
+          const detailLine = document.createElement('div');
+          detailLine.className = 'detail-item';
+          const label = (selectedChair.Grupa && selectedChair.Grupa.toLowerCase() === 'krzesło') ? 'Krzesło' : 'Model';
+          detailLine.innerHTML = `<span>${label}: ${selectedChair.Nazwa}</span><strong>: ${price.toFixed(2)} PLN</strong>`;
+          overviewDetailsDiv.appendChild(detailLine);
+        }
+        partOrder.forEach((partKey, idx) => {
+          const mat = selectedMaterials[partKey];
+          if (mat) {
+            const price = parseFloat(mat.Cena) || 0;
+            totalPrice += price;
+            const detailLine = document.createElement('div');
+            detailLine.className = 'detail-item';
+            detailLine.innerHTML = `<span>${partLabels[idx]}: ${mat.Nazwa}</span><strong>: ${price.toFixed(2)} PLN</strong>`;
+            overviewDetailsDiv.appendChild(detailLine);
+          }
+        });
+        // Dodano szczegóły wariantu nóg
+        if (selectedLeg) {
+          const price = parseFloat(selectedLeg.Cena) || 0;
+          const detailLine = document.createElement('div');
+          detailLine.className = 'detail-item';
+          detailLine.innerHTML = `<span>Wariant nóg: ${selectedLeg.Nazwa}</span><strong>: ${price.toFixed(2)} PLN</strong>`;
+          overviewDetailsDiv.appendChild(detailLine);
+        }
+        if (selectedLeg) {
+          const price = parseFloat(selectedLeg.Cena) || 0;
+          totalPrice += price;
+        }
+
+        const hr = document.createElement('hr');
+        overviewDetailsDiv.appendChild(hr);
+
+        overviewTotalPriceSpan.textContent = `${totalPrice.toFixed(2)} PLN`;
+
+        window.selectedChair = selectedChair;
+        window.selectedLeg = selectedLeg;
+        window.selectedMaterials = selectedMaterials;
+
+      }
+     
+
+
+      function enforceZoomLimits() {
+        if (viewer && viewer.controls) {
+          viewer.controls.minDistance = MIN_ZOOM_DISTANCE;
+          viewer.controls.maxDistance = MAX_ZOOM_DISTANCE;
+          viewer.controls.enableDamping = true;
+          viewer.controls.dampingFactor = 0.1;
+          viewer.controls.update();
+        }
+      }
+
+      function clampCameraDistance() {
+        if (!viewer || !viewer.scene || !viewer.scene.activeCamera || !viewer.controls) return;
+        const camera = viewer.scene.activeCamera;
+        const target = viewer.controls.target;
+        const pos = camera.position;
+        const dist = pos.distanceTo(target);
+
+        if (dist < MIN_ZOOM_DISTANCE) {
+          // Przesuń kamerę na sferę o promieniu MIN_ZOOM_DISTANCE od targetu
+          const dir = pos.clone().sub(target).normalize();
+          camera.position.copy(target.clone().add(dir.multiplyScalar(MIN_ZOOM_DISTANCE)));
+          camera.updateProjectionMatrix();
+          viewer.controls.update();
+        }
+        if (dist > MAX_ZOOM_DISTANCE) {
+          // Przesuń kamerę na sferę o promieniu MAX_ZOOM_DISTANCE od targetu
+          const dir = pos.clone().sub(target).normalize();
+          camera.position.copy(target.clone().add(dir.multiplyScalar(MAX_ZOOM_DISTANCE)));
+          camera.updateProjectionMatrix();
+          viewer.controls.update();
+        }
+      }
+
+
+      // Nowa funkcja do ograniczeń zoomu w obrębie bańki
+      function forceBubbleZoomLimitsEachFrame() {
+        if (!viewer || !viewer.scene || !viewer.scene.activeCamera) return;
+        const camera = viewer.scene.activeCamera;
+        // Środek bańki – możesz zmienić na inny punkt jeśli trzeba
+        const bubbleCenter = new Vector3(0, 0, 0);
+        const pos = camera.position;
+        const dist = pos.distanceTo(bubbleCenter);
+
+        if (dist < MIN_ZOOM_DISTANCE) {
+          const dir = pos.clone().sub(bubbleCenter).normalize();
+          camera.position.copy(bubbleCenter.clone().add(dir.multiplyScalar(MIN_ZOOM_DISTANCE)));
+          camera.updateProjectionMatrix();
+          if (viewer.controls) viewer.controls.update();
+        }
+        if (dist > MAX_ZOOM_DISTANCE) {
+          const dir = pos.clone().sub(bubbleCenter).normalize();
+          camera.position.copy(bubbleCenter.clone().add(dir.multiplyScalar(MAX_ZOOM_DISTANCE)));
+          camera.updateProjectionMatrix();
+          if (viewer.controls) viewer.controls.update();
+        }
+      }
+
+      // Uruchom sprawdzanie w każdej klatce
+      function animateBubbleZoomLimit() {
+        forceBubbleZoomLimitsEachFrame();
+        requestAnimationFrame(animateBubbleZoomLimit);
+      }
+      animateBubbleZoomLimit();
+
+
+
+
+
+
+
+
+
+      const exportButton = document.getElementById("export-config");
+      const exportPanel = document.getElementById("export-panel");
+
+      exportButton.addEventListener("click", () => {
+        exportPanel.classList.toggle("hidden");
+      });
+
+      // Opcjonalnie – ukrywanie po kliknięciu poza panelem
+      document.addEventListener("click", (e) => {
+        if (!exportPanel.contains(e.target) && !exportButton.contains(e.target)) {
+          exportPanel.classList.add("hidden");
+        }
+      });
+
+      // Obsługa kliknięć eksportu (przykładowo)
+      document.querySelectorAll(".export-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const format = btn.dataset.format;
+          alert(`Eksport jako: ${format.toUpperCase()}`);
+          exportPanel.classList.add("hidden");
+        });
+      });
+
+
+
+
+      // — Obsługa dolnego paska narzędziowego HDR
+
+      function renderHDROptions(entries) {
+        const container = document.getElementById('hdr-options');
+        if (!container) return;
+        container.innerHTML = '';
+
+        entries.forEach(entry => {
+          const img = document.createElement('img');
+          img.src = entry.HDRIcon;
+          img.alt = entry.Nazwa || entry.HDR;
+          img.onerror = () => {
+            img.src = 'icons/placeholder.svg';
+          };
+
+          const thumb = document.createElement('div');
+          thumb.className = 'thumbnail';
+
+
+          thumb.title = entry.Nazwa || entry.HDR;
+          thumb.appendChild(img);
+          thumb.onclick = () => {
+            viewer.setEnvironmentMap(entry.HDR, { isHDR: true });
+            document.getElementById('hdr-panel')?.classList.add('hidden');
+          };
+
+          const caption = document.createElement('div');
+          caption.className = 'thumbnail-caption';
+          caption.textContent = entry.Nazwa || entry.HDR;
+
+          const wrapper = document.createElement('div');
+          wrapper.className = 'thumbnail-wrapper';
+          wrapper.appendChild(thumb);
+          //wrapper.appendChild(caption);
+
+          container.appendChild(wrapper);
+        });
+      }
+
+
+
+      // Sterowanie widocznością panelu
+
+      // Sterowanie widocznością panelu
+      window.addEventListener('DOMContentLoaded', () => {
+        const hdrToggle = document.getElementById('hdr-toggle');
+        const hdrPanel = document.getElementById('hdr-panel');
+        const hdrClose = document.getElementById('hdr-close');
+
+        function toggleHDRPanel() {
+          hdrPanel.classList.toggle('hidden');
+          hdrPanel.style.display = hdrPanel.classList.contains('hidden') ? 'none' : 'block';
+        }
+
+        hdrToggle?.addEventListener('click', (e) => {
+          e.stopPropagation();
+          toggleHDRPanel();
+        });
+
+        hdrPanel?.addEventListener('click', (e) => {
+          e.stopPropagation();
+        });
+
+        document.addEventListener('click', () => {
+          hdrPanel?.classList.add('hidden');
+          hdrPanel.style.display = 'none';
+        });
+
+        hdrClose?.addEventListener('click', (e) => {
+          e.stopPropagation();
+          hdrPanel?.classList.add('hidden');
+          hdrPanel.style.display = 'none';
+        });
+      });
+
+      // Modyfikacja istniejącego kodu obsługi przycisku HDR
+      document.getElementById('hdr-toggle')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const panel = document.getElementById('hdr-panel');
+        panel.classList.toggle('hidden');
+        panel.style.display = panel.classList.contains('hidden') ? 'none' : 'block';
+      });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      // Panel wymiarów
+      document.getElementById('dimensions-show')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        console.log("📐 Kliknięto przycisk wymiarów");
+        showDimensions();
+      });
+
+
+
+
+
+
+
+
+
+
+
+
+
+      // 🔧 Ukrywanie panelu
+      document.getElementById('dimensions-show')?.addEventListener('click', () => {
+        const overlay = document.getElementById('dimension-overlay');
+        const labels = overlay.querySelectorAll('.dimension-label');
+
+        // 🧾 Pobierz z arkusza
+        const item = allData.find(i => {
+          const g = (i.Grupa || '').toLowerCase();
+          return (g === 'krzesło' || g === 'kubełek') && i.Wymiary;
+        });
+
+        const dims = item?.Wymiary?.match(/x\s*=\s*(\d+[\.,]?\d*)\s*cm.*?y\s*=\s*(\d+[\.,]?\d*)\s*cm.*?z\s*=\s*(\d+[\.,]?\d*)\s*cm/i);
+
+        if (dims) {
+          labels[0].textContent = `x = ${dims[1]} cm`;
+          labels[1].textContent = `y = ${dims[2]} cm`;
+          labels[2].textContent = `z = ${dims[3]} cm`;
+        }
+
+        overlay.style.display = 'block';
+
+        // ⏱ Opcjonalnie ukryj po 6 sek.
+        setTimeout(() => overlay.style.display = 'none', 6000);
+      });
+
+
+
+
+
+
+
+      window.addEventListener('load', () => {
+        const showQRBtn = document.getElementById('qr-button').addEventListener('click', showQR);
+
+
+        if (!showQRBtn) return;
+
+        // Pokaż przycisk po załadowaniu strony i UI
+        showQRBtn.style.display = 'flex';
+
+        // Podłącz event do wyświetlenia kodu QR
+        showQRBtn.addEventListener('click', () => {
+          const qrPopup = document.getElementById('qr-popup');
+          const qrContainer = document.getElementById('qrcode');
+          if (!qrPopup || !qrContainer) return;
+
+          qrPopup.style.display = 'block';
+          qrContainer.innerHTML = '';
+
+          new QRCode(qrContainer, {
+            text: window.location.href,
+            width: 200,
+            height: 200,
+          });
+        });
+      });
+
+      function showConfigOverview() {
+        const overviewPanel = document.getElementById('config-overview');
+        overviewPanel.classList.remove('hidden');
+      }
+
+      // Wywołaj tę funkcję w odpowiednim momencie, np. po załadowaniu modelu
+
+
+      document.addEventListener('click', () => {
+        hdrPanel.classList.add('hidden');
+      });
+
+
+
+      function showDimensions() {
+        const dimensionOverlay = document.getElementById('dimension-overlay');
+        dimensionOverlay.style.display = 'block';
+        dimensionOverlay.innerHTML = ''; // Wyczyść poprzednie wymiary
+
+        if (!selectedChair) return;
+
+        // Parsowanie wymiarów z kolumny Wymiary
+        const dimensionsString = selectedChair.Wymiary || '';
+        const dimensionsParsed = {};
+        dimensionsString.split(',').forEach(dim => {
+          const [key, value] = dim.split('=').map(s => s.trim());
+          if (key && value) {
+            dimensionsParsed[key.toLowerCase()] = parseFloat(value);
+          }
+        });
+
+        const dimensions = [
+          { label: 'Szerokość', value: dimensionsParsed.x },
+          { label: 'Głębokość', value: dimensionsParsed.y },
+          { label: 'Wysokość', value: dimensionsParsed.z }
+        ];
+
+        const panel = document.createElement('div');
+        panel.className = 'dimension-panel';
+        panel.style.cssText = `
+  position: fixed;
+  top: 85%;
+  transform: translate(-150%, -50%);
+  left: 50%;
+  background-color: rgba(255, 255, 255, 0.8);
+  padding: 10px;
+  border-radius: 5px;
+  font-size: 14px;
+  font-weight: bold;
+  z-index: 1001;
+`;
+
+
+        dimensions.forEach(dim => {
+          if (dim.value !== undefined) {
+            const dimElement = document.createElement('div');
+            dimElement.textContent = `${dim.label}: ${dim.value} cm`;
+            dimElement.style.marginBottom = '5px';
+            panel.appendChild(dimElement);
+          }
+        });
+
+        dimensionOverlay.appendChild(panel);
+      }
+
+      function hideDimensions() {
+        const dimensionOverlay = document.getElementById('dimension-overlay');
+        dimensionOverlay.style.display = 'none';
+      }
+
+
+
+      // 📦 Ładowanie JSZip
+      async function loadJSZip() {
+        if (!window.JSZip) {
+          await import('https://cdn.jsdelivr.net/npm/jszip@3.10.0/dist/jszip.min.js');
+        }
+      }
+
+      // 📁 Załaduj listę plików tekstur z files.json
+      let texturesFilesByFolder = {};
+      async function loadTexturesFilesList() {
+        try {
+          const res = await fetch('textures/files.json');
+          texturesFilesByFolder = await res.json();
+        } catch (e) {
+          console.error('Błąd ładowania files.json:', e);
+          texturesFilesByFolder = {};
+        }
+      }
+
+      // 📐 Obsługiwane formaty eksportu
+      const modelFormats = ['fbx', 'obj', 'dae'];
+
+      // 🗜️ Główna funkcja eksportu ZIP
+      async function handleExport(format) {
+        if (!window.JSZip) {
+          alert('JSZip niezaładowany!');
+          return;
+        }
+
+        if (!modelFormats.includes(format)) {
+          alert(`Nieobsługiwany format eksportu: ${format}`);
+          return;
+        }
+
+        const zip = new JSZip();
+
+        // 🪑 Eksport głównego modelu krzesła
+        const chairModel = window.selectedChair?.Nazwa || 'BrakModelu';
+        const chairPath = `export/${chairModel}.${format}`;
+
+        try {
+          const res = await fetch(chairPath);
+          if (!res.ok) throw new Error(`Nie znaleziono modelu krzesła: ${chairPath}`);
+          const blob = await res.blob();
+          zip.file(`${chairModel}.${format}`, blob);
+        } catch (e) {
+          alert(e.message);
+          return;
+        }
+
+        // 🦵 Eksport nóg (jeśli wybrano)
+        const legModel = window.selectedLeg?.Nazwa;
+        if (legModel) {
+          const legPath = `export/${legModel}.${format}`;
+          try {
+            const res = await fetch(legPath);
+            if (res.ok) {
+              const blob = await res.blob();
+              zip.file(`${legModel}.${format}`, blob);
+            } else {
+              console.warn(`Nie znaleziono modelu nóg: ${legPath}`);
+            }
+          } catch (e) {
+            console.warn(`Błąd pobierania nóg: ${e.message}`);
+          }
+        }
+
+        // 🎨 Eksport materiałów / tekstur z kolekcją i bez
+        const textureFolderInZip = zip.folder('textures');
+        const materials = Object.values(window.selectedMaterials || {});
+        const collection = window.selectedChair?.Kolekcja?.trim() || '';
+
+        for (const mat of materials) {
+          const folder = mat.Folder || mat.Wartość;
+          const textureFiles = texturesFilesByFolder[folder] || [];
+
+          for (const texFile of textureFiles) {
+            const candidatePaths = [
+              collection ? `textures/${collection}/${folder}/${texFile}` : null,
+              `textures/${folder}/${texFile}`
+            ].filter(Boolean);
+
+            let found = false;
+
+            for (const path of candidatePaths) {
+              try {
+                const res = await fetch(path);
+                if (res.ok) {
+                  const blob = await res.blob();
+                  textureFolderInZip.file(`${folder}/${texFile}`, blob);
+                  found = true;
+                  break;
+                }
+              } catch (e) {
+                console.warn(`❌ Błąd pobierania: ${path}`, e);
+              }
+            }
+
+            if (!found) {
+              console.warn(`⚠️ Nie znaleziono tekstury: ${folder}/${texFile}`);
+            }
+          }
+        }
+
+        // 📦 Finalny zapis ZIP
+        const blob = await zip.generateAsync({ type: 'blob' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `export_${chairModel}_${format}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(a.href);
+      }
+
+      // 🚀 Inicjalizacja tekstur na starcie
+      await loadTexturesFilesList();
+
+      // 🖱️ Obsługa kliknięcia eksportu
+      document.querySelectorAll('.export-btn').forEach(button => {
+        button.addEventListener('click', async () => {
+          await loadJSZip();
+          const format = button.getAttribute('data-format');
+          await handleExport(format);
+        });
+      });
+
+
+
+      function updateMaterialTiles() {
+        const legsMaterialsContainer = document.getElementById('legs-thumbnails');
+        if (!legsMaterialsContainer || !selectedChair || !selectedLeg) return;
+
+        // 🧼 Czyść tylko kafelki materiałów nóg
+        legsMaterialsContainer.querySelectorAll('.material-tile')?.forEach(tile => tile.remove());
+
+        const allEntries = allData;
+
+        const chairType = selectedChair.Grupa?.trim().toLowerCase();       // 'krzesło' lub 'kubełek'
+        const legVariant = selectedLeg.Nazwa?.trim().toLowerCase();       // np. 'regularne'
+
+        const filteredMaterials = allEntries.filter(mat => {
+          // ✅ tylko materiały nóg
+          if (mat.Grupa?.trim().toLowerCase() !== 'materiały_nóg') return false;
+
+          // ✅ czy materiał pasuje do typu krzesła (GrupaDocelowa)
+          const grupaDocelowa = mat.GrupaDocelowa?.toLowerCase() || '';
+          const grupy = grupaDocelowa.split(',').map(g => g.trim());
+          if (!grupy.includes(chairType)) return false;
+
+          // ✅ jeśli krzesło → ignorujemy DlaModeluNóg
+          if (chairType === 'krzesło') return true;
+
+          // ✅ jeśli kubełek → DlaModeluNóg musi zawierać aktualny wariant nóg
+          const dlaModelu = mat.DlaModeluNóg?.toLowerCase().trim();
+          if (!dlaModelu || dlaModelu.length === 0) return false;
+
+          const allowedVariants = dlaModelu.split(',').map(v => v.trim());
+          return allowedVariants.includes(legVariant);
+        });
+
+        filteredMaterials.forEach(mat => {
+          const tile = document.createElement('div');
+          tile.className = 'material-tile';
+          tile.textContent = mat.Nazwa;
+          tile.style.backgroundImage = `url(${mat.Obrazek || 'fallback.png'})`;
+          tile.onclick = () => applyLegMaterial(mat);
+          legsMaterialsContainer.appendChild(tile);
+        });
+
+        console.log(`✅ Pokazano ${filteredMaterials.length} materiałów nóg dla '${chairType}', wariant nóg '${selectedLeg.Nazwa}'`);
+      }
+
+
+
+
+
+      //UKRYWANIE PRZYCISKÓW ELEMENTÓW KRZESŁA
+
+      // kolejność części i ich powiązane nazwy meshów/obiektów
+      const partOrder = ['seat', 'backseat_inside', 'backseat_outside', 'backseat', 'legs_material'];
+
+      // funkcja tworząca i wyświetlająca przyciski części krzesła na podstawie danych wybranego krzesła
+      function renderPartButtons() {
+        const partTabs = document.getElementById('part-tabs');
+        partTabs.innerHTML = ''; // czyścimy zawartość
+
+        if (!selectedChair) {
+          console.warn('renderPartButtons: brak wybranego krzesła');
+          return;
+        }
+
+        const availableElementsRaw = selectedChair['DostępneElementy'] || '';
+        if (!availableElementsRaw.trim()) {
+          console.log('renderPartButtons: brak dostępnych elementów — nie pokazuję nic.');
+          return;
+        }
+
+        const availableParts = availableElementsRaw
+          .split(',')
+          .map(el => el.trim().toLowerCase())
+          .filter(Boolean);
+
+        const partNames = {
+          seat: 'Siedzisko',
+          backseat_inside: 'Oparcie wew.',
+          backseat_outside: 'Oparcie zew.',
+          backseat: 'Siedzisko/Oparcie',
+
+          legs: 'Nogi'
+        };
+
+        Object.keys(ELEMENT_ICONS).forEach(part => {
+          if (availableParts.includes(part)) {
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'thumbnail-wrapper';
+
+            const thumb = document.createElement('div');
+            thumb.className = 'thumbnail';
+            thumb.title = part;
+            thumb.dataset.key = part; // ✅ TO jest potrzebne dla dalszego UI
+
+            thumb.onclick = () => {
+              document.querySelectorAll('#part-tabs .thumbnail').forEach(tab => tab.classList.remove('selected'));
+              thumb.classList.add('selected');
+              document.getElementById('materials-section').style.display = 'block';
+
+              // Pokazuje odpowiednie materiały do klikniętej części
+              renderFilteredMaterialOptions(part);
+            };
+
+            const img = document.createElement('img');
+            img.src = ELEMENT_ICONS[part];
+            img.alt = part;
+
+            thumb.appendChild(img);
+            wrapper.appendChild(thumb);
+
+            const caption = document.createElement('div');
+            caption.className = 'thumbnail-caption';
+            caption.textContent = partNames[part] || part;
+            wrapper.appendChild(caption);
+
+            partTabs.appendChild(wrapper);
+          }
+        });
+      }
+
+
+
+
+      // Przykładowo: gdy zmieniasz krzesło, wywołujesz:
+      renderPartButtons();
+
+
+
+
+      const arButton = document.getElementById('ar-button');
+      if (arButton) {
+        arButton.addEventListener('click', () => {
+          const popup = document.getElementById('ar-popup');
+          if (popup) popup.style.display = 'block';
+        });
+      }
+
+
+const activeCollectionsByMesh = {};
+const materialsByMeshAndCollection = {};
+
+function renderCollectionsAndMaterials(groupedByCollection, targetMesh) {
+  // ⏱️ Zapisz dane materiałów dla danego elementu
+  materialsByMeshAndCollection[targetMesh] = groupedByCollection;
+
+  const iconPanel = document.getElementById('collection-icons');
+  const materialPanel = document.getElementById('material-panel-viewer');
+  if (!iconPanel || !materialPanel) return;
+
+  iconPanel.innerHTML = '';
+  materialPanel.innerHTML = '';
+
+  Object.entries(groupedByCollection).forEach(([kolekcja, materiały]) => {
+    const icon = document.createElement('img');
+
+    // 🎯 Ikony specjalne dla 'legs' i 'backseat'
+    let iconFileName = kolekcja.trim().toLowerCase().replace(/\s+/g, '_');
+
+const basePath = `icons/${iconFileName}.png`;
+
+fetch(basePath, { method: 'HEAD' })
+  .then(res => {
+    icon.src = res.ok ? basePath : 'icons/default.png';
+  })
+  .catch(() => {
+    icon.src = 'icons/default.png';
+  });
+
+
+
+
+    icon.alt = kolekcja;
+    icon.className = 'collection-icon';
+
+    icon.onclick = () => {
+      const isActive = activeCollectionsByMesh[targetMesh] === kolekcja;
+      iconPanel.querySelectorAll('.collection-icon').forEach(i => i.classList.remove('selected'));
+
+      if (isActive) {
+        activeCollectionsByMesh[targetMesh] = null;
+        materialPanel.innerHTML = '';
+        return;
+      }
+
+      activeCollectionsByMesh[targetMesh] = kolekcja;
+      icon.classList.add('selected');
+      materialPanel.innerHTML = '';
+      renderMaterialsInPanel(materiały, targetMesh);
+    };
+
+    iconPanel.appendChild(icon);
+  });
+
+  // ✅ Automatyczne otwarcie zapamiętanej kolekcji
+  const rememberedCollection = activeCollectionsByMesh[targetMesh];
+  const rememberedGroup = materialsByMeshAndCollection[targetMesh] || {};
+  const rememberedMaterials = rememberedGroup[rememberedCollection];
+
+  if (rememberedCollection && rememberedMaterials?.length) {
+    const rememberedIcon = [...iconPanel.querySelectorAll('.collection-icon')].find(
+      i => i.alt === rememberedCollection
+    );
+    if (rememberedIcon) {
+      rememberedIcon.classList.add('selected');
+      renderMaterialsInPanel(rememberedMaterials, targetMesh);
+    }
+  }
+}
+
+
+
+
+
+
+
+
+
+function renderMaterialsInPanel(materiały, targetMesh) {
+  const viewer = document.getElementById('material-panel-viewer');
+  if (!viewer) return;
+  viewer.innerHTML = '';
+
+  materiały.forEach(mat => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'thumbnail-wrapper';
+
+    const button = document.createElement('div');
+    button.className = 'thumbnail';
+    button.title = mat.Nazwa;
+
+    const img = document.createElement('img');
+    img.src = mat.Obrazek || 'icons/placeholder.svg';
+    img.alt = mat.Nazwa;
+    button.appendChild(img);
+
+    const caption = document.createElement('div');
+    caption.className = 'thumbnail-caption';
+    caption.textContent = mat.Nazwa;
+
+    wrapper.appendChild(button);
+    wrapper.appendChild(caption);
+    viewer.appendChild(wrapper);
+
+    button.onclick = () => {
+      applyMaterialToSpecificMesh(mat, targetMesh);
+      viewer.querySelectorAll('.thumbnail').forEach(t => t.classList.remove('selected'));
+      button.classList.add('selected');
+    };
+  });
+}
+
+
+
+ window.addEventListener('orientationchange', () => {
+    const rotateMsg = document.getElementById('rotate-message');
+    if (!rotateMsg) return;
+
+    // ✅ Jeśli poziomo — chowaj komunikat
+    if (window.innerWidth > window.innerHeight) {
+      rotateMsg.style.display = 'none';
+    } else {
+      rotateMsg.style.display = 'flex';
+    }
+  });
+
+  // ✅ Dodatkowy test przy starcie — gdy strona ładuje się w pionie
+  window.addEventListener('load', () => {
+    const rotateMsg = document.getElementById('rotate-message');
+    if (!rotateMsg) return;
+
+    if (window.innerWidth > window.innerHeight) {
+      rotateMsg.style.display = 'none';
+    } else {
+      rotateMsg.style.display = 'flex';
+    }
+  });
+
+
+function updateRotateMessage() {
+  const rotateMsg = document.getElementById('rotate-message');
+  if (!rotateMsg) return;
+
+  const isLandscape = window.innerWidth > window.innerHeight;
+  rotateMsg.style.display = isLandscape ? 'none' : 'flex';
+}
+
+window.addEventListener('orientationchange', updateRotateMessage);
+window.addEventListener('resize', updateRotateMessage);
+window.addEventListener('load', updateRotateMessage);
+
+
+function checkOrientation() {
+  const rotateMsg = document.getElementById('rotate-message');
+  if (!rotateMsg) return;
+
+  const isLandscape = window.innerWidth > window.innerHeight;
+  rotateMsg.style.display = isLandscape ? 'none' : 'flex';
+}
+window.addEventListener('load', checkOrientation);
+window.addEventListener('resize', checkOrientation);
+
+
+
+window.addEventListener('DOMContentLoaded', () => {
+  // przygotowanie canvas i kontenerów
+  
+});
+
+
+function setDefaultMaterialsFromSheet() {
+  if (!Array.isArray(allData) || !window.selectedChair || !selectedChair.Nazwa) return;
+
+  const modelName = selectedChair.Nazwa.trim().toLowerCase();
+  if (typeof window.selectedMaterials !== 'object') window.selectedMaterials = {};
+
+  allData.forEach(row => {
+    const modelMatch = row.Default?.trim().toLowerCase();
+    const targetRaw = row.TargetMeshOrObiect?.trim().toLowerCase();
+    const name = row.Nazwa?.trim();
+    const price = parseFloat(row.Cena) || 0;
+    const image = row.Obrazek || row.Image || '';
+
+    if (!modelMatch || modelMatch !== modelName || !name || !targetRaw) return;
+
+    if (!selectedMaterials[targetRaw]) selectedMaterials[targetRaw] = [];
+
+    selectedMaterials[targetRaw].push({
+      Nazwa: name,
+      Cena: price,
+      Obrazek: image
+    });
+  });
+}
+
+
+
+
+
+
+
+
+
+
+      init();
+
+      // Globalna zmienna do filtrowania kafelków w sidebarze
+      let currentSearchFilter = '';
+
+      // Funkcja do ustawiania filtra wyszukiwania
+      function setSearchFilter(query) {
+        currentSearchFilter = query.toLowerCase().trim();
+        console.log('🔍 Search filter set to:', currentSearchFilter);
+        
+        // Aktualizuj wskaźnik filtra
+        const indicator = document.getElementById('search-filter-indicator');
+        const filterText = document.getElementById('search-filter-text');
+        const clearButton = document.getElementById('clear-search-filter');
+        
+        if (currentSearchFilter) {
+          filterText.textContent = `"${query}"`;
+          indicator.style.display = 'block';
+        } else {
+          indicator.style.display = 'none';
+        }
+        
+        // Obsługa przycisku czyszczenia filtra
+        if (clearButton && !clearButton.hasAttribute('data-listener')) {
+          clearButton.addEventListener('click', () => {
+            setSearchFilter('');
+            // Wyczyść także pole wyszukiwania jeśli jest otwarte
+            const searchInput = document.getElementById('search-input');
+            if (searchInput) searchInput.value = '';
+            const searchResults = document.getElementById('search-results');
+            if (searchResults) searchResults.innerHTML = '';
+          });
+          clearButton.setAttribute('data-listener', 'true');
+        }
+        
+        // Odśwież wszystkie sekcje kafelków
+        refreshAllTiles();
+      }
+
+      // Funkcja sprawdzająca czy element pasuje do filtra
+      function matchesSearchFilter(item) {
+        if (!currentSearchFilter) return true;
+        
+        const searchableFields = [
+          item.Nazwa,
+          item.Grupa,
+          item.Kategoria,
+          item.Kolekcja,
+          item.Typ,
+          item.Opis
+        ];
+        
+        // Jeśli filtr zawiera spacje, traktuj jako listę nazw do wyszukania
+        if (currentSearchFilter.includes(' ')) {
+          const searchTerms = currentSearchFilter.split(' ').filter(term => term.trim().length > 0);
+          return searchTerms.some(term => 
+            searchableFields.some(field => 
+              field && field.toLowerCase().includes(term.toLowerCase())
+            )
+          );
+        } else {
+          // Pojedynczy termin wyszukiwania
+        return searchableFields.some(field => 
+          field && field.toLowerCase().includes(currentSearchFilter)
+        );
+        }
+      }
+
+      // Funkcja licząca relevance dla elementu względem filtra
+      function getRelevance(item, filter) {
+        if (!filter) return 0;
+        let relevance = 0;
+        const searchTerm = filter.toLowerCase().trim();
+        const searchableFields = [
+          { field: item.Nazwa, weight: 10 },
+          { field: item.Grupa, weight: 8 },
+          { field: item.Kategoria, weight: 8 },
+          { field: item.Kolekcja, weight: 6 },
+          { field: item.Typ, weight: 4 },
+          { field: item.Opis, weight: 2 }
+        ];
+        searchableFields.forEach(({ field, weight }) => {
+          if (field && field.toLowerCase().includes(searchTerm)) {
+            relevance += weight;
+            if (field.toLowerCase().startsWith(searchTerm)) {
+              relevance += weight;
+            }
+          }
+        });
+        return relevance;
+      }
+
+      // Funkcja renderująca przyciski kategorii
+      function renderCategoryButtons() {
+        if (!allData || !Array.isArray(allData)) return;
+        
+        const container = document.getElementById('category-buttons-container');
+        if (!container) return;
+        
+        container.innerHTML = '';
+        
+        // Znajdź wszystkie unikalne kategorie i rozdziel je jeśli są połączone
+        const allCategories = allData
+          .filter(item => item.Kategoria && item.Typ === 'model')
+          .flatMap(item => {
+            // Rozdziel kategorie połączone przecinkami
+            return item.Kategoria.split(',').map(cat => cat.trim()).filter(cat => cat.length > 0);
+          });
+        
+        const categories = [...new Set(allCategories)];
+        
+        console.log('🏷️ Found categories:', categories);
+        
+        // Dodaj przycisk "Wszystkie"
+        const allButton = document.createElement('button');
+        allButton.className = 'category-button active';
+        allButton.textContent = 'Wszystkie';
+        allButton.onclick = () => {
+          document.querySelectorAll('.category-button').forEach(btn => btn.classList.remove('active'));
+          allButton.classList.add('active');
+          renderAllModels();
+        };
+        container.appendChild(allButton);
+        
+        // Dodaj przyciski dla każdej kategorii
+        categories.forEach(category => {
+          const button = document.createElement('button');
+          button.className = 'category-button';
+          button.textContent = category;
+          
+          // Sprawdź czy kategoria ma promocje
+          const hasPromotion = allData.some(item => 
+            item.Typ === 'model' && 
+            item.Promocja && 
+            item.Promocja.trim() !== '' &&
+            item.Kategoria &&
+            // Sprawdź czy kategoria elementu zawiera aktualną kategorię
+            item.Kategoria.split(',').map(cat => cat.trim()).includes(category)
+          );
+          
+          if (hasPromotion) {
+            button.classList.add('promotion');
+          }
+          
+          button.onclick = () => {
+            document.querySelectorAll('.category-button').forEach(btn => btn.classList.remove('active'));
+            button.classList.add('active');
+            renderModelsByCategory(category);
+          };
+          
+          container.appendChild(button);
+        });
+      }
+
+      // Funkcja renderująca wszystkie modele
+      function renderAllModels() {
+        const models = allData.filter(item => 
+          item.Typ && item.Typ.toLowerCase() === 'model' &&
+          item.Kategoria // Pokazuj wszystkie modele które mają kategorię
+        );
+        console.log('🏷️ Showing all models:', models.map(m => ({ Nazwa: m.Nazwa, Kategoria: m.Kategoria })));
+        renderOptions('model-thumbnails', models, item => loadModel(item));
+      }
+
+      // Funkcja renderująca modele według kategorii
+      function renderModelsByCategory(category) {
+        const models = allData.filter(item => 
+          item.Typ && item.Typ.toLowerCase() === 'model' &&
+          item.Kategoria && 
+          // Sprawdź czy kategoria elementu zawiera wybraną kategorię (obsługa kategorii rozdzielonych przecinkami)
+          item.Kategoria.split(',').map(cat => cat.trim()).includes(category)
+        );
+        console.log(`🏷️ Showing models for category "${category}":`, models.map(m => m.Nazwa));
+        renderOptions('model-thumbnails', models, item => loadModel(item));
+      }
+
+      // Funkcja renderująca promocje na starcie
+      function renderPromotions() {
+        const promotionalModels = allData.filter(item => 
+          item.Typ && item.Typ.toLowerCase() === 'model' &&
+          item.Promocja && item.Promocja.trim() !== ''
+        );
+        
+        if (promotionalModels.length > 0) {
+          renderOptions('model-thumbnails', promotionalModels, item => loadModel(item));
+          
+          // Aktywuj przycisk "Wszystkie" po wyświetleniu promocji
+          setTimeout(() => {
+            const allButton = document.querySelector('.category-button');
+            if (allButton) {
+              document.querySelectorAll('.category-button').forEach(btn => btn.classList.remove('active'));
+              allButton.classList.add('active');
+            }
+          }, 100);
+        }
+      }
+
+      // Funkcja odświeżająca wszystkie kafelki z filtrem
+      function refreshAllTiles() {
+        console.log('🔄 Refreshing all tiles with filter:', currentSearchFilter);
+        
+        // Odśwież modele główne (krzesła/kubełki)
+        if (allData && Array.isArray(allData)) {
+            console.log('🔍 Available groups:', [...new Set(allData.map(d => d.Grupa))]);
+            const filteredByGroup = allData.filter(d => 
+              d.Kategoria && // Pokaż wszystkie modele które mają kategorię
+              d.Typ && 
+              d.Typ.toLowerCase() === 'model'
+            );
+            console.log('🔍 Filtered models before search filter:', filteredByGroup.map(d => ({ Nazwa: d.Nazwa, Grupa: d.Grupa, Kategoria: d.Kategoria, Typ: d.Typ })));
+            const mainModels = filteredByGroup.filter(matchesSearchFilter);
+            console.log('🔍 After search filter:', mainModels.map(d => ({ Nazwa: d.Nazwa, Grupa: d.Grupa })));
+          if (currentSearchFilter) {
+            mainModels.sort((a, b) => getRelevance(b, currentSearchFilter) - getRelevance(a, currentSearchFilter));
+          }
+          console.log('🔍 Rendering main models:', mainModels.length, 'with filter:', currentSearchFilter);
+          renderOptions('model-thumbnails', mainModels, item => loadModel(item));
+        }
+        
+        // Odśwież kafelki nóg jeśli są widoczne
+        const legsSection = document.getElementById('legs-section');
+        if (legsSection && legsSection.style.display !== 'none' && selectedChair) {
+          const legs = allData
+            .filter(d => d.Grupa.toLowerCase() === 'nogi')
+            .filter(d => !selectedChair || selectedChair.Grupa.toLowerCase() !== 'kubełek' || czyNogaPasujeDoKubełka(d, selectedChair.Nazwa))
+            .filter(matchesSearchFilter);
+          renderOptions('legs-thumbnails', legs, item => setLegModel(item));
+        }
+        
+        // Odśwież materiały jeśli są widoczne
+        const materialsSection = document.getElementById('materials-section');
+        if (materialsSection && materialsSection.style.display !== 'none') {
+          // Znajdź aktywną zakładkę części
+          const activeTab = document.querySelector('#part-tabs .thumbnail.selected');
+          if (activeTab) {
+            const targetMesh = activeTab.dataset.key;
+            renderFilteredMaterialOptions(targetMesh);
+          }
+        }
+      }
+
+      // Funkcjonalność wyszukiwania
+      function initializeSearch() {
+        console.log('🔍 Initializing search...');
+        console.log('DOM ready state:', document.readyState);
+        console.log('Available elements in DOM:', {
+          searchToggle: document.getElementById('search-toggle'),
+          searchPanel: document.getElementById('search-panel'),
+          searchInput: document.getElementById('search-input'),
+          searchResults: document.getElementById('search-results')
+        });
+        
+        const searchToggle = document.getElementById('search-toggle');
+        const searchPanel = document.getElementById('search-panel');
+        const searchInput = document.getElementById('search-input');
+        const searchResults = document.getElementById('search-results');
+        
+        console.log('Elements found:', {
+          toggle: !!searchToggle,
+          panel: !!searchPanel,
+          input: !!searchInput,
+          results: !!searchResults
+        });
+        
+        let isSearchOpen = false;
+
+        if (!searchToggle || !searchPanel) {
+          console.error('❌ Search elements not found');
+          console.log('HTML content around search:', document.getElementById('search-container')?.innerHTML);
+          return;
+        }
+
+        console.log('✅ Setting up search event listeners');
+        console.log('Initial panel styles:', {
+          position: window.getComputedStyle(searchPanel).position,
+          right: window.getComputedStyle(searchPanel).right,
+          opacity: window.getComputedStyle(searchPanel).opacity,
+          visibility: window.getComputedStyle(searchPanel).visibility,
+          zIndex: window.getComputedStyle(searchPanel).zIndex
+        });
+
+        // Toggle panel wyszukiwania
+        searchToggle.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log('🔍 Search toggle clicked!', {
+            wasOpen: isSearchOpen,
+            willBeOpen: !isSearchOpen,
+            currentClasses: searchPanel.className
+          });
+          
+          isSearchOpen = !isSearchOpen;
+          
+          if (isSearchOpen) {
+            searchPanel.classList.add('active');
+            // Wymusz style bezpośrednio dla pewności
+            searchPanel.style.right = '20px';
+            searchPanel.style.opacity = '1';
+            searchPanel.style.visibility = 'visible';
+            console.log('🔍 Panel opened');
+            setTimeout(() => searchInput && searchInput.focus(), 200);
+          } else {
+            searchPanel.classList.remove('active');
+            searchPanel.style.right = '-320px';
+            searchPanel.style.opacity = '0';
+            searchPanel.style.visibility = 'hidden';
+            console.log('🔍 Panel closed');
+            if (searchInput) searchInput.value = '';
+            if (searchResults) searchResults.innerHTML = '';
+            // Wyczyść filtr kafelków
+            setSearchFilter('');
+          }
+          
+          console.log('Panel state after toggle:', {
+            classes: searchPanel.className,
+            computedStyles: {
+              right: window.getComputedStyle(searchPanel).right,
+              opacity: window.getComputedStyle(searchPanel).opacity,
+              visibility: window.getComputedStyle(searchPanel).visibility
+            }
+          });
+        });
+
+        // Zamknij panel przy kliknięciu poza nim
+        document.addEventListener('click', (e) => {
+          if (!searchPanel.contains(e.target) && !searchToggle.contains(e.target)) {
+            if (isSearchOpen) {
+              isSearchOpen = false;
+              searchPanel.classList.remove('active');
+              searchPanel.style.right = '-320px';
+              searchPanel.style.opacity = '0';
+              searchPanel.style.visibility = 'hidden';
+              if (searchInput) searchInput.value = '';
+              if (searchResults) searchResults.innerHTML = '';
+              // Wyczyść filtr kafelków
+              setSearchFilter('');
+            }
+          }
+        });
+
+        // Funkcja wyszukiwania
+        function performSearch(query) {
+          if (!query.trim() || !allData) return [];
+          
+          const searchTerm = query.toLowerCase().trim();
+          const results = [];
+
+          console.log('🔍 Searching for:', searchTerm, 'in', allData.length, 'items');
+
+          // 1. Wyszukaj modele krzesła (Typ === 'model')
+          const modelItems = allData.filter(item => 
+            item.Typ && item.Typ.toLowerCase() === 'model'
+          );
+
+          console.log('🔍 Found', modelItems.length, 'model items out of', allData.length, 'total items');
+
+          modelItems.forEach(item => {
+            let relevance = 0;
+            const searchableFields = [
+              { field: item.Nazwa, weight: 10 },
+              { field: item.Grupa, weight: 8 },
+              { field: item.Kolekcja, weight: 6 },
+              { field: item.Typ, weight: 4 },
+              { field: item.Opis, weight: 2 }
+            ];
+
+            searchableFields.forEach(({ field, weight }) => {
+              if (field && field.toLowerCase().includes(searchTerm)) {
+                relevance += weight;
+                if (field.toLowerCase().startsWith(searchTerm)) {
+                  relevance += weight; // Bonus za dopasowanie od początku
+                }
+              }
+            });
+
+            if (relevance > 0) {
+              console.log('🔍 Found match:', item.Nazwa, 'Grupa:', item.Grupa, 'Kategoria:', item.Kategoria, 'relevance:', relevance);
+              // Dodaj informację o typie dla rozróżnienia w UI
+              item.searchType = 'chair';
+              results.push({ item, relevance });
+            }
+          });
+
+          console.log('🔍 Total results:', results.length);
+          // 2. Wyszukaj materiały nóg (Grupa === 'materiały_nóg')
+          const legMaterials = allData.filter(item => 
+            item.Grupa && item.Grupa.toLowerCase() === 'materiały_nóg'
+          );
+
+          legMaterials.forEach(item => {
+            let relevance = 0;
+            const searchableFields = [
+              { field: item.Nazwa, weight: 10 },
+              { field: item.Grupa, weight: 8 },
+              { field: item.Kategoria, weight: 8 },
+              { field: item.Kolekcja, weight: 6 },
+              { field: item.Typ, weight: 4 },
+              { field: item.Opis, weight: 2 }
+            ];
+
+            searchableFields.forEach(({ field, weight }) => {
+              if (field && field.toLowerCase().includes(searchTerm)) {
+                relevance += weight;
+                if (field.toLowerCase().startsWith(searchTerm)) {
+                  relevance += weight;
+                }
+              }
+            });
+
+            if (relevance > 0) {
+              console.log('🔍 Found leg material match:', item.Nazwa, 'Grupa:', item.Grupa, 'Kategoria:', item.Kategoria, 'relevance:', relevance);
+              // Dodaj informację o typie dla rozróżnienia w UI
+              item.searchType = 'leg-material';
+              results.push({ item, relevance });
+            }
+          });
+
+          // 3. Wyszukaj nogi (Grupa === 'nogi')
+          const legs = allData.filter(item => 
+            item.Grupa && item.Grupa.toLowerCase() === 'nogi'
+          );
+
+          legs.forEach(item => {
+            let relevance = 0;
+            const searchableFields = [
+              { field: item.Nazwa, weight: 10 },
+              { field: item.Grupa, weight: 8 },
+              { field: item.Kategoria, weight: 8 },
+              { field: item.Kolekcja, weight: 6 },
+              { field: item.Typ, weight: 4 },
+              { field: item.Opis, weight: 2 }
+            ];
+
+            searchableFields.forEach(({ field, weight }) => {
+              if (field && field.toLowerCase().includes(searchTerm)) {
+                relevance += weight;
+                if (field.toLowerCase().startsWith(searchTerm)) {
+                  relevance += weight;
+                }
+              }
+            });
+
+            if (relevance > 0) {
+              console.log('🔍 Found leg match:', item.Nazwa, 'Grupa:', item.Grupa, 'Kategoria:', item.Kategoria, 'relevance:', relevance);
+              // Dodaj informację o typie dla rozróżnienia w UI
+              item.searchType = 'leg';
+              results.push({ item, relevance });
+            }
+          });
+
+          return results
+            .sort((a, b) => b.relevance - a.relevance)
+            .slice(0, 10)
+            .map(r => r.item);
+        }
+
+        // Handler wpisywania w pole wyszukiwania
+        searchInput.addEventListener('input', (e) => {
+          const query = e.target.value;
+          searchResults.innerHTML = '';
+
+          // Ustaw filtr dla kafelków w sidebarze
+          setSearchFilter(query);
+
+          if (query.trim().length < 2) {
+            // Jeśli zapytanie za krótkie, wyczyść tylko wyniki popup'a ale zostaw filtr
+            return;
+          }
+
+          const results = performSearch(query);
+          
+          if (results.length === 0) {
+            const noResultsDiv = document.createElement('div');
+            noResultsDiv.className = 'search-result-item text-only';
+            noResultsDiv.innerHTML = '<div class="result-name">Brak wyników</div>';
+            noResultsDiv.style.cursor = 'default';
+            noResultsDiv.style.opacity = '0.7';
+            searchResults.appendChild(noResultsDiv);
+            return;
+          }
+
+          results.forEach(item => {
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'search-result-item';
+            
+            const name = item.Nazwa || 'Bez nazwy';
+            const category = item.Kategoria || item.Grupa || '';
+            const image = item.Obrazek || item.Image;
+            
+            // Dodaj etykietę typu elementu
+            let typeLabel = '';
+            if (item.searchType === 'chair') {
+              typeLabel = 'Krzesło';
+            } else if (item.searchType === 'leg-material') {
+              typeLabel = 'Materiał nóg';
+            } else if (item.searchType === 'leg') {
+              typeLabel = 'Nogi';
+            }
+            
+            if (image) {
+              // Kafelek z obrazkiem
+              resultDiv.innerHTML = `
+                <img src="${image}" alt="${name}" onerror="this.style.display='none'">
+                <div class="result-name">${name}</div>
+                <div class="result-category">${category}</div>
+                ${typeLabel ? `<div class="result-type">${typeLabel}</div>` : ''}
+              `;
+            } else {
+              // Fallback tekstowy dla elementów bez obrazków
+              resultDiv.className += ' text-only';
+              resultDiv.innerHTML = `
+                <div class="result-name">${name}</div>
+                <div class="result-category">${category}</div>
+                ${typeLabel ? `<div class="result-type">${typeLabel}</div>` : ''}
+              `;
+            }
+
+            resultDiv.addEventListener('click', () => {
+              selectSearchResult(item, query);
+              isSearchOpen = false;
+              searchPanel.classList.remove('active');
+              searchPanel.style.right = '-320px';
+              searchPanel.style.opacity = '0';
+              searchPanel.style.visibility = 'hidden';
+              if (searchInput) searchInput.value = '';
+              if (searchResults) searchResults.innerHTML = '';
+              // Wyczyść filtr kafelków po wyborze wyniku
+              setSearchFilter('');
+            });
+
+            searchResults.appendChild(resultDiv);
+          });
+        });
+
+        // Obsługa Enter w polu wyszukiwania
+        searchInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            const firstResult = searchResults.querySelector('.search-result-item:not([style*="cursor: default"])');
+            if (firstResult) {
+              firstResult.click();
+            }
+          }
+        });
+      }
+
+      // Funkcja obsługi wybranego wyniku wyszukiwania
+      function selectSearchResult(item, query) {
+        // Pokaż modal wyboru
+        showSearchChoiceModal(item, query);
+      }
+
+      // Funkcja pokazywania modala wyboru
+      function showSearchChoiceModal(item, query) {
+        const modal = document.getElementById('search-choice-modal');
+        const itemImg = document.getElementById('search-choice-item-img');
+        const itemName = document.getElementById('search-choice-item-name');
+        const itemCategory = document.getElementById('search-choice-item-category');
+        const viewOptionsBtn = document.getElementById('search-choice-view-options');
+        const goToChairBtn = document.getElementById('search-choice-go-to-chair');
+
+        // Ustaw dane elementu
+        const name = item.Nazwa || 'Bez nazwy';
+        const category = item.Kategoria || item.Grupa || '';
+        const image = item.Obrazek || item.Image;
+        
+        itemName.textContent = name;
+        itemCategory.textContent = category;
+        
+        if (image) {
+          itemImg.src = image;
+          itemImg.style.display = 'block';
+        } else {
+          itemImg.style.display = 'none';
+        }
+
+        // Pokaż modal
+        modal.classList.add('active');
+
+        // Dostosuj przyciski w zależności od typu elementu
+        if (item.searchType === 'chair') {
+          goToChairBtn.style.display = 'block';
+          goToChairBtn.textContent = 'Przejdź do krzesła';
+          viewOptionsBtn.style.flex = '';
+        } else if (item.searchType === 'leg-material') {
+          goToChairBtn.style.display = 'block';
+          goToChairBtn.textContent = 'Pokaż kompatybilne krzesła';
+          viewOptionsBtn.style.flex = '';
+        } else if (item.searchType === 'leg') {
+          goToChairBtn.style.display = 'block';
+          goToChairBtn.textContent = 'Pokaż kompatybilne krzesła';
+          viewOptionsBtn.style.flex = '';
+        } else {
+          // Fallback na starą logikę
+          const group = item.Grupa?.toLowerCase();
+        if (group === 'krzesło' || group === 'kubełek') {
+            goToChairBtn.style.display = 'block';
+            goToChairBtn.textContent = 'Przejdź do krzesła';
+            viewOptionsBtn.style.flex = '';
+          } else if (group === 'tkanina' || group === 'materiały_nóg') {
+            goToChairBtn.style.display = 'block';
+            goToChairBtn.textContent = 'Zastosuj materiał';
+            viewOptionsBtn.style.flex = '';
+          } else if (group === 'nogi') {
+            goToChairBtn.style.display = 'block';
+            goToChairBtn.textContent = 'Zastosuj nogi';
+            viewOptionsBtn.style.flex = '';
+          } else {
+            goToChairBtn.style.display = 'none';
+            viewOptionsBtn.style.flex = '1';
+          }
+        }
+
+        // Obsługa przycisku "Wyniki wyszukiwania"
+        viewOptionsBtn.onclick = () => {
+          modal.classList.remove('active');
+          document.removeEventListener('keydown', handleEscape);
+          // Pokaż welcome screen
+          const welcomeScreen = document.getElementById('welcome-screen');
+          if (welcomeScreen) {
+            welcomeScreen.style.display = 'flex';
+          }
+          // Przełącz na ekran modeli, żeby pokazać kafelki
+          showScreen('search-results');
+          // Ustaw filtr wyszukiwania na query (fraza z inputa)
+          setSearchFilter(query);
+          // Odśwież wszystkie kafelki z nowym filtrem
+          refreshAllTiles();
+          // Zamknij panel wyszukiwania
+          const searchPanel = document.getElementById('search-panel');
+          const searchInput = document.getElementById('search-input');
+          if (searchPanel) {
+            searchPanel.classList.remove('active');
+            searchPanel.style.right = '-320px';
+            searchPanel.style.opacity = '0';
+            searchPanel.style.visibility = 'hidden';
+          }
+          if (searchInput) searchInput.value = '';
+          // Wyczyść wyniki wyszukiwania w panelu
+          const searchResults = document.getElementById('search-results');
+          if (searchResults) searchResults.innerHTML = '';
+        };
+
+        // Obsługa przycisku "Przejdź do krzesła"
+        goToChairBtn.onclick = () => {
+          modal.classList.remove('active');
+          document.removeEventListener('keydown', handleEscape);
+          // Zamknij panel wyszukiwania
+          const searchPanel = document.getElementById('search-panel');
+          const searchInput = document.getElementById('search-input');
+          if (searchPanel) {
+            searchPanel.classList.remove('active');
+            searchPanel.style.right = '-320px';
+            searchPanel.style.opacity = '0';
+            searchPanel.style.visibility = 'hidden';
+          }
+          if (searchInput) searchInput.value = '';
+          // Wyczyść filtr wyszukiwania
+          setSearchFilter('');
+          // Wykonaj oryginalną logikę
+          executeSearchResultAction(item);
+          // Odśwież wszystkie kafelki bez filtra
+          refreshAllTiles();
+          // Ukryj welcome screen
+          const welcomeScreen = document.getElementById('welcome-screen');
+          if (welcomeScreen) {
+            welcomeScreen.style.display = 'none';
+          }
+        };
+
+        // Zamknij modal przy kliknięciu poza nim
+        modal.onclick = (e) => {
+          if (e.target === modal) {
+            modal.classList.remove('active');
+            document.removeEventListener('keydown', handleEscape);
+          }
+        };
+
+        // Zamknij modal przy naciśnięciu Escape
+        const handleEscape = (e) => {
+          if (e.key === 'Escape') {
+            modal.classList.remove('active');
+            document.removeEventListener('keydown', handleEscape);
+          }
+        };
+        document.addEventListener('keydown', handleEscape);
+      }
+
+      // Funkcja wykonująca akcję po wyborze w modalu
+      function executeSearchResultAction(item) {
+        // Sprawdź typ elementu na podstawie searchType
+        if (item.searchType === 'chair') {
+          // Wybierz model krzesła
+          loadModel(item);
+        } else if (item.searchType === 'leg-material') {
+          // Jeśli to materiał nóg, pokaż krzesła które mogą mieć ten materiał
+          showChairsWithMaterial(item);
+        } else if (item.searchType === 'leg') {
+          // Jeśli to nogi, pokaż krzesła które mogą mieć te nogi
+          showChairsWithLegs(item);
+        } else {
+          // Fallback na starą logikę
+          const group = item.Grupa?.toLowerCase();
+          
+          if (group === 'krzesło' || group === 'kubełek') {
+          loadModel(item);
+        } else if (group === 'tkanina' || group === 'materiały_nóg') {
+          if (selectedChair) {
+            if (item.TargetMeshOrModel) {
+              applyMaterial(item);
+            }
+            showScreen('config');
+          } else {
+            alert('Najpierw wybierz model krzesła');
+          }
+        } else if (group === 'nogi') {
+          if (selectedChair && selectedChair.Grupa?.toLowerCase() === 'kubełek') {
+            setLegModel(item);
+            showScreen('config');
+          } else {
+            alert('Nogi można wybierać tylko dla kubełków');
+            }
+          }
+        }
+      }
+
+      // Funkcja pokazująca krzesła z określonym materiałem nóg
+      function showChairsWithMaterial(material) {
+        console.log('🔍 Looking for chairs compatible with material:', material.Nazwa);
+        console.log('🔍 Material data:', material);
+        
+        // Znajdź krzesła które mogą mieć ten materiał
+        const allChairs = allData.filter(item => 
+          item.Typ && item.Typ.toLowerCase() === 'model' &&
+          item.Kategoria && item.Kategoria.toLowerCase().includes('krzesła')
+        );
+        
+        console.log('🔍 All chairs found:', allChairs.map(c => ({ Nazwa: c.Nazwa, Grupa: c.Grupa })));
+        
+        const compatibleChairs = allChairs.filter(chair => {
+          // Sprawdź czy materiał jest kompatybilny z krzesłem
+          if (!material.DlaKrzesła) {
+            console.log('🔍 No DlaKrzesła field for material:', material.Nazwa);
+            return false;
+          }
+          
+          const materialChairs = material.DlaKrzesła.toLowerCase().split(',').map(s => s.trim());
+          const chairName = chair.Nazwa.toLowerCase().trim();
+          
+          console.log('🔍 Checking chair:', chairName, 'against material chairs:', materialChairs);
+          
+          return materialChairs.some(materialChair => 
+            materialChair.includes(chairName) || chairName.includes(materialChair)
+          );
+        });
+
+        console.log('🔍 Compatible chairs:', compatibleChairs.map(c => c.Nazwa));
+
+        if (compatibleChairs.length > 0) {
+          // Pokaż welcome screen
+          const welcomeScreen = document.getElementById('welcome-screen');
+          if (welcomeScreen) {
+            welcomeScreen.style.display = 'flex';
+          }
+          showScreen('search-results');
+          
+          // Bezpośrednio wyświetl kompatybilne krzesła
+          console.log('🔍 Directly rendering compatible chairs:', compatibleChairs.map(c => c.Nazwa));
+          // Wyczyść kontener i wyświetl kompatybilne krzesła
+          const container = document.getElementById('model-thumbnails');
+          if (container) {
+            container.innerHTML = '';
+            compatibleChairs.forEach(item => {
+              const wrapper = document.createElement('div');
+              wrapper.className = 'thumbnail-wrapper';
+              const button = document.createElement('div');
+              button.className = 'thumbnail';
+              button.title = item.Nazwa;
+              
+              const img = document.createElement('img');
+              img.src = item.Obrazek && item.Obrazek.length > 4 ? item.Obrazek : 'icons/placeholder.svg';
+              img.alt = item.Nazwa;
+              button.appendChild(img);
+              
+              const caption = document.createElement('div');
+              caption.className = 'thumbnail-caption';
+              caption.textContent = item.Nazwa;
+              
+              wrapper.appendChild(button);
+              wrapper.appendChild(caption);
+              container.appendChild(wrapper);
+              
+              button.addEventListener('click', () => loadModel(item));
+            });
+          }
+          
+          alert(`Znaleziono ${compatibleChairs.length} krzeseł kompatybilnych z materiałem "${material.Nazwa}": ${compatibleChairs.map(c => c.Nazwa).join(', ')}`);
+        } else {
+          alert(`Nie znaleziono krzeseł kompatybilnych z materiałem "${material.Nazwa}"`);
+        }
+      }
+
+      // Funkcja pokazująca krzesła z określonymi nogami
+      function showChairsWithLegs(legs) {
+        console.log('🔍 Looking for chairs compatible with legs:', legs.Nazwa);
+        console.log('🔍 Legs data:', legs);
+        
+        // Znajdź krzesła które mogą mieć te nogi
+        const allChairs = allData.filter(item => 
+          item.Typ && item.Typ.toLowerCase() === 'model' &&
+          item.Kategoria && item.Kategoria.toLowerCase().includes('krzesła')
+        );
+        
+        console.log('🔍 All chairs found:', allChairs.map(c => ({ Nazwa: c.Nazwa, Grupa: c.Grupa })));
+        
+        const compatibleChairs = allChairs.filter(chair => {
+          // Sprawdź czy nogi są kompatybilne z krzesłem
+          if (!legs.DlaModeluNóg) {
+            console.log('🔍 No DlaModeluNóg field for legs:', legs.Nazwa);
+            return false;
+          }
+          
+          const legChairs = legs.DlaModeluNóg.toLowerCase().split(',').map(s => s.trim());
+          const chairName = chair.Nazwa.toLowerCase().trim();
+          
+          console.log('🔍 Checking chair:', chairName, 'against leg chairs:', legChairs);
+          
+          return legChairs.some(legChair => 
+            legChair.includes(chairName) || chairName.includes(legChair)
+          );
+        });
+
+        console.log('🔍 Compatible chairs:', compatibleChairs.map(c => c.Nazwa));
+
+        if (compatibleChairs.length > 0) {
+          // Pokaż welcome screen
+          const welcomeScreen = document.getElementById('welcome-screen');
+          if (welcomeScreen) {
+            welcomeScreen.style.display = 'flex';
+          }
+          showScreen('search-results');
+          
+          // Bezpośrednio wyświetl kompatybilne krzesła
+          console.log('🔍 Directly rendering compatible chairs:', compatibleChairs.map(c => c.Nazwa));
+          // Wyczyść kontener i wyświetl kompatybilne krzesła
+          const container = document.getElementById('model-thumbnails');
+          if (container) {
+            container.innerHTML = '';
+            compatibleChairs.forEach(item => {
+              const wrapper = document.createElement('div');
+              wrapper.className = 'thumbnail-wrapper';
+              const button = document.createElement('div');
+              button.className = 'thumbnail';
+              button.title = item.Nazwa;
+              
+              const img = document.createElement('img');
+              img.src = item.Obrazek && item.Obrazek.length > 4 ? item.Obrazek : 'icons/placeholder.svg';
+              img.alt = item.Nazwa;
+              button.appendChild(img);
+              
+              const caption = document.createElement('div');
+              caption.className = 'thumbnail-caption';
+              caption.textContent = item.Nazwa;
+              
+              wrapper.appendChild(button);
+              wrapper.appendChild(caption);
+              container.appendChild(wrapper);
+              
+              button.addEventListener('click', () => loadModel(item));
+            });
+          }
+          
+          alert(`Znaleziono ${compatibleChairs.length} krzeseł kompatybilnych z nogami "${legs.Nazwa}": ${compatibleChairs.map(c => c.Nazwa).join(', ')}`);
+        } else {
+          alert(`Nie znaleziono krzeseł kompatybilnych z nogami "${legs.Nazwa}"`);
+        }
+      }
+
+      // Inicjalizuj wyszukiwanie po załadowaniu danych
+      window.addEventListener('load', () => {
+        setTimeout(initializeSearch, 500);
+      });
+
+      // Dodatkowa inicjalizacja po DOM
+      document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(initializeSearch, 100);
+      });
+
+      // Jeszcze jedna inicjalizacja na wszelki wypadek
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => initializeSearch());
+      } else {
+        // DOM już załadowany
+        setTimeout(initializeSearch, 50);
+      }
+
+    
+
+      // Sprawdzenie czy strona została załadowana z cache
+      window.addEventListener('load', function() {
+        // Sprawdź czy to było nawigacja z cache
+        const navigationEntries = performance.getEntriesByType('navigation');
+        if (navigationEntries.length > 0) {
+          const nav = navigationEntries[0];
+          // Jeśli transferSize jest 0 lub bardzo mały, prawdopodobnie z cache
+          if (nav.transferSize < 1000 && nav.type === 'reload') {
+            console.log('Page loaded from cache, forcing hard reload...');
+            // Opóźnienie aby nie powodować pętli
+            setTimeout(() => {
+              window.location.reload(true);
+            }, 100);
+            return;
+          }
+        }
+      });
+
+      // Funkcja czyszczenia cache
+      function clearAllCaches() {
+        if ('caches' in window) {
+          caches.keys().then(cacheNames => {
+            cacheNames.forEach(cacheName => {
+              caches.delete(cacheName);
+              console.log('Cleared cache:', cacheName);
+            });
+          });
+        }
+      }
+
+      // Funkcja wymuszenia aktualizacji SW
+      function forceSwUpdate() {
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(registrations => {
+            registrations.forEach(registration => {
+              registration.update();
+            });
+          });
+        }
+      }
+
+      // Sprawdzenie czy strona była odświeżona normalnie (nie hard refresh)
+      const perfEntries = performance.getEntriesByType('navigation');
+      if (perfEntries.length > 0) {
+        const navType = perfEntries[0].type;
+        if (navType === 'reload' || navType === 'navigate') {
+          console.log('Clearing caches on normal reload...');
+          clearAllCaches();
+          forceSwUpdate();
+        }
+      }
+
+      // Rejestracja Service Workera z obsługą aktualizacji
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('service-worker.js')
+          .then(registration => {
+            console.log('Service Worker registered');
+            
+            // Sprawdź aktualizacje
+            registration.addEventListener('updatefound', () => {
+              const newWorker = registration.installing;
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  console.log('New SW available, reloading...');
+                  window.location.reload();
+                }
+              });
+            });
+          })
+          .catch(err => console.error('SW registration failed:', err));
+
+        // Słuchaj komunikatów od SW
+        navigator.serviceWorker.addEventListener('message', event => {
+          if (event.data.type === 'CACHE_UPDATED') {
+            console.log('Cache updated, reloading...');
+            window.location.reload();
+          }
+        });
+      }
+
+      // Pokaż/ukryj popup
+      const emailModal = document.getElementById('emailModal');
+      const closeBtn = emailModal.querySelector('.close-button');
+      const buyButton = document.getElementById('buy-button');
+      const emailForm = document.getElementById('emailForm');
+      const successMessage = document.getElementById('success-message');
+
+      buyButton.addEventListener('click', () => {
+        emailModal.classList.remove('hidden');
+        emailModal.classList.add('visible');
+        successMessage.classList.remove('visible'); // ukryj komunikat na otwarciu
+        successMessage.classList.add('hidden');
+      });
+
+      closeBtn.addEventListener('click', () => {
+        emailModal.classList.remove('visible');
+        emailModal.classList.add('hidden');
+      });
+
+      emailModal.addEventListener('click', (e) => {
+        if (e.target === emailModal) {
+          emailModal.classList.remove('visible');
+          emailModal.classList.add('hidden');
+        }
+      });
+
+      emailForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+
+        // Tutaj wysyłka danych formularza (jeśli masz backend)
+        // Można dodać fetch lub EmailJS
+
+        // Po wysłaniu:
+        emailModal.classList.remove('visible');
+        emailModal.classList.add('hidden');
+
+        successMessage.classList.remove('hidden');
+        successMessage.classList.add('visible');
+
+        setTimeout(() => {
+          successMessage.classList.remove('visible');
+          successMessage.classList.add('hidden');
+        }, 3000);
+
+        emailForm.reset(); // wyczyść formularz
+      });
+
+
+      const btn = document.getElementById('dimensions-show');
+      if (btn) {
+        btn.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log("📐 Kliknięto przycisk wymiarów");
+          toggleDimensions();
+        };
+      }
+
+
+      // Po inicjalizacji (czyli gdy masz już modele i przyciski):
+      document.querySelectorAll(".export-btn").forEach(button => {
+        button.addEventListener("click", () => {
+          const format = button.getAttribute("data-format");
+          handleExport(format);
+        });
+      });
+
+
+
+  </script>
+</body>
+
+</html>
