@@ -7005,10 +7005,87 @@ updateSummary();
             // remove the param to avoid loops on back
             url.searchParams.delete('open_ar');
             window.history.replaceState({}, '', url.toString());
-            openArFlow();
+            try { showArLoading('Ładowanie trybu AR...'); } catch(_) {}
+            // Use the same mobile AR routine
+            if (typeof openArWebXRMobile === 'function') openArWebXRMobile(); else openArFlow();
           }
         } catch {}
       })();
+
+      // ===== AR Loading Overlay (spinner + progress bar) =====
+      function ensureArLoadingOverlay() {
+        let ov = document.getElementById('__ar_loading_overlay');
+        if (ov) return ov;
+        // Inline keyframes for spinner
+        let style = document.getElementById('__ar_loading_style');
+        if (!style) {
+          style = document.createElement('style');
+          style.id = '__ar_loading_style';
+          style.textContent = '@keyframes __ar_spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}';
+          document.head.appendChild(style);
+        }
+        ov = document.createElement('div');
+        ov.id = '__ar_loading_overlay';
+        ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:99999;display:none;align-items:center;justify-content:center;backdrop-filter:blur(3px)';
+        const card = document.createElement('div');
+        card.style.cssText = 'width:320px;max-width:86vw;background:#fff;border-radius:16px;padding:20px 18px;box-shadow:0 10px 30px rgba(0,0,0,.35);text-align:center;color:#222';
+        const logo = document.createElement('img');
+        logo.src = 'icons/FK_logo.png';
+        logo.alt = 'Logo';
+        logo.style.cssText = 'width:120px;height:auto;margin:6px auto 8px;display:block;object-fit:contain';
+        const msg = document.createElement('div');
+        msg.id = '__ar_loading_text';
+        msg.textContent = 'Ładowanie trybu AR...';
+        msg.style.cssText = 'margin:6px 0 10px;font-weight:600;font-size:15px';
+        const spinner = document.createElement('div');
+        spinner.style.cssText = 'margin:8px auto 12px;width:36px;height:36px;border-radius:50%;border:4px solid #e5e7eb;border-top-color:#007AFF;animation:__ar_spin .9s linear infinite';
+        const barWrap = document.createElement('div');
+        barWrap.style.cssText = 'height:10px;background:#eef0f3;border-radius:999px;overflow:hidden;width:100%';
+        const bar = document.createElement('div');
+        bar.id = '__ar_loading_bar';
+        bar.style.cssText = 'height:100%;width:6%;background:linear-gradient(90deg,#007AFF,#00C2FF);border-radius:999px;transition:width 200ms ease';
+        barWrap.appendChild(bar);
+        const hint = document.createElement('div');
+        hint.textContent = 'Proszę czekać...';
+        hint.style.cssText = 'margin-top:8px;font-size:12px;color:#666';
+        card.appendChild(logo);
+        card.appendChild(msg);
+        card.appendChild(spinner);
+        card.appendChild(barWrap);
+        card.appendChild(hint);
+        ov.appendChild(card);
+        document.body.appendChild(ov);
+        return ov;
+      }
+
+      function showArLoading(text) {
+        const ov = ensureArLoadingOverlay();
+        const msg = document.getElementById('__ar_loading_text');
+        if (msg && text) msg.textContent = text;
+        const bar = document.getElementById('__ar_loading_bar');
+        if (bar) {
+          let pct = 6;
+          clearInterval(window.__ar_loading_timer);
+          window.__ar_loading_timer = setInterval(() => {
+            pct = Math.min(pct + Math.max(1, (92 - pct) * 0.06), 92);
+            bar.style.width = pct + '%';
+          }, 160);
+        }
+        ov.style.display = 'flex';
+      }
+
+      function updateArLoadingProgress(pct) {
+        const bar = document.getElementById('__ar_loading_bar');
+        if (!bar) return;
+        const clamped = Math.max(0, Math.min(100, pct));
+        bar.style.width = clamped + '%';
+      }
+
+      function hideArLoading() {
+        clearInterval(window.__ar_loading_timer);
+        const ov = document.getElementById('__ar_loading_overlay');
+        if (ov) ov.style.display = 'none';
+      }
 
       // ===== Mobile AR (WebXR on Android GLB, Quick Look on iOS USDZ) =====
       async function preloadModelViewerScriptForAndroid() {
@@ -7033,8 +7110,10 @@ updateSummary();
       }
 
   async function openArWebXRMobile() {
+        try { showArLoading('Ładowanie trybu AR...'); } catch(_) {}
         const curChair = (typeof selectedChair !== 'undefined' && selectedChair && selectedChair.Nazwa) ? selectedChair : window.selectedChair;
         if (!curChair || !curChair.Nazwa) {
+          hideArLoading();
           alert('Najpierw wybierz krzesło z konfiguratora');
           return;
         }
@@ -7065,7 +7144,8 @@ updateSummary();
             return null;
           };
           usdz = await pickUsdz();
-          if (!usdz) { alert('Brak dostępnego pliku USDZ dla iOS.'); return; }
+          if (!usdz) { hideArLoading(); alert('Brak dostępnego pliku USDZ dla iOS.'); return; }
+          try { showArLoading('Otwieranie trybu AR (iOS)...'); } catch(_) {}
           const link = document.createElement('a');
           link.setAttribute('rel', 'ar');
           link.setAttribute('href', toAbsUrl(usdz));
@@ -7074,14 +7154,19 @@ updateSummary();
           img.style.display = 'none';
           link.appendChild(img);
           document.body.appendChild(link);
-          try { link.click(); } catch(_) {}
+          let hid = false;
+          const done = () => { if (!hid) { hideArLoading(); hid = true; } };
+          const onVis = () => { if (document.visibilityState === 'hidden') done(); };
+          document.addEventListener('visibilitychange', onVis, { once: true });
+          window.addEventListener('pagehide', done, { once: true });
+          try { link.click(); } catch(_) { done(); }
           setTimeout(() => { try { link.remove(); } catch(_) {} }, 1500);
           return;
         }
 
         // Android: WebXR via model-viewer with fallback to Scene Viewer
         if (typeof isAndroid === 'function' && isAndroid()) {
-          if (!glb) { alert(`Brak pliku GLB dla AR dla modelu: ${curChair?.Nazwa || ''}`); return; }
+          if (!glb) { hideArLoading(); alert(`Brak pliku GLB dla AR dla modelu: ${curChair?.Nazwa || ''}`); return; }
           await preloadModelViewerScriptForAndroid();
           try {
             let mv = document.getElementById('__mv_ar');
@@ -7096,18 +7181,37 @@ updateSummary();
               document.body.appendChild(mv);
             }
             mv.setAttribute('src', toAbsUrl(glb));
+            const onProgress = (ev) => {
+              const p = ev?.detail?.totalProgress;
+              if (typeof p === 'number' && p >= 0 && p <= 1) updateArLoadingProgress(6 + Math.round(p * 88));
+            };
+            const onArStatus = (ev) => {
+              const s = ev?.detail?.status || '';
+              if (s === 'session-started' || s === 'failed' || s === 'not-presenting') {
+                hideArLoading();
+                mv.removeEventListener('progress', onProgress);
+                mv.removeEventListener('ar-status', onArStatus);
+              }
+            };
+            try { mv.removeEventListener('progress', onProgress); } catch(_) {}
+            try { mv.removeEventListener('ar-status', onArStatus); } catch(_) {}
+            mv.addEventListener('progress', onProgress);
+            mv.addEventListener('ar-status', onArStatus);
             if (typeof mv.activateAR === 'function') {
               mv.activateAR();
             } else {
               const title = encodeURIComponent(curChair?.Nazwa || 'Model');
               const file = encodeURIComponent(toAbsUrl(glb));
               window.location.href = `https://arvr.google.com/scene-viewer/1.0?file=${file}&mode=ar_only&title=${title}`;
+              setTimeout(() => hideArLoading(), 1000);
             }
           } catch (e) {
             console.warn('model-viewer AR error:', e);
+            hideArLoading();
           }
           return;
         }
+        hideArLoading();
       }
 
       // Wire bottom AR button (desktop shows QR via existing UI elsewhere)
