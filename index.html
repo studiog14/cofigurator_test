@@ -3275,23 +3275,21 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
             viewBtn.style.background = 'linear-gradient(135deg, #F5C842, #E5B432)';
           });
 
-      // Click -> Go to ar.html on mobile; desktop shows QR to ar.html
+      // Click -> Mobile: open native AR; Desktop: show QR to AR landing (no desktop behavior change)
           viewBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
             try {
-        // Ensure we have a selected chair before proceeding (prefer live var, fallback to window)
-        const curChair = (typeof selectedChair !== 'undefined' && selectedChair && selectedChair.Nazwa) ? selectedChair : window.selectedChair;
-        if (!curChair?.Nazwa) {
-                alert('Najpierw wybierz krzesło z konfiguratora');
+              const isDesk = (typeof isDesktop === 'function') ? isDesktop() : !(typeof isIOS==='function'&&isIOS()) && !(typeof isAndroid==='function'&&isAndroid());
+              if (isDesk) {
+                // Desktop unchanged – show QR to AR landing page
+                const url = (typeof buildArHtmlUrl === 'function') ? buildArHtmlUrl() : 'ar_viewer.html';
+                if (typeof showQrWithUrl === 'function') showQrWithUrl(url);
                 return;
               }
-              const asyncUrl = (typeof buildArHtmlUrlAsync === 'function') ? await buildArHtmlUrlAsync() : null;
-              const url = asyncUrl || ((typeof buildArHtmlUrl === 'function') ? buildArHtmlUrl() : 'ar.html');
-              console.log('Opening AR with URL:', url);
-              if (typeof isDesktop === 'function' && isDesktop()) {
-                if (typeof showQrWithUrl === 'function') showQrWithUrl(url);
-              } else {
-                window.location.href = url;
+
+              // Mobile – open native AR flow
+              if (typeof openArFlow === 'function') {
+                await openArFlow();
               }
             } catch(err){ console.warn('AR open error:', err); }
           });
@@ -6946,121 +6944,36 @@ updateSummary();
       }
 
       async function openArFlow() {
-        // Try in-page WebXR first
-        const xrSupported = !!(navigator.xr && await navigator.xr.isSessionSupported?.('immersive-ar'));
-        if (xrSupported && window.THREE && viewer && viewer.renderer && viewer.canvas) {
-          try {
-            await startInlineWebXR();
+        try {
+          // Ensure a chair is selected
+          const curChair = (typeof selectedChair !== 'undefined' && selectedChair && selectedChair.Nazwa) ? selectedChair : window.selectedChair;
+          if (!curChair?.Nazwa) {
+            alert('Najpierw wybierz krzesło z konfiguratora');
             return;
-          } catch (err) {
-            console.warn('Inline WebXR failed, falling back to native AR:', err);
-          }
-        }
-        // Native AR fallback
-        const { glb, usdzCandidates } = getCurrentArAssets();
-        if (isAndroid() && glb) {
-          window.location.href = buildSceneViewerUrl(glb);
-          return;
-        }
-        if (isIOS()) {
-          const usdz = usdzCandidates[0];
-          if (usdz) { window.location.href = buildQuickLookUrl(usdz); return; }
-        }
-        openArPopup();
-      }
-
-      // Inline WebXR AR inside the same page using existing ThreeViewer
-      let xrState = { session: null, refSpace: null, hitTestSource: null, placed: false, modelAnchor: null };
-      async function startInlineWebXR() {
-        const canvas = viewer.canvas || viewer.renderer?.domElement;
-        if (!canvas) throw new Error('No canvas for WebXR');
-
-        // Request session with DOM overlay to keep UI active
-        const session = await navigator.xr.requestSession('immersive-ar', {
-          requiredFeatures: ['hit-test', 'local-floor'],
-          optionalFeatures: ['dom-overlay'],
-          domOverlay: { root: document.body }
-        });
-        xrState.session = session;
-
-        // Hook renderer to XR
-        const renderer = viewer.renderer;
-        renderer.xr.enabled = true;
-        await renderer.xr.setSession(session);
-
-        // Show inline controls
-        const exitBtn = document.getElementById('xr-exit-btn');
-        const reticle = document.getElementById('xr-reticle');
-        exitBtn.style.display = 'block';
-        reticle.style.display = 'block';
-        exitBtn.onclick = () => endInlineWebXR();
-
-        // Reference space
-        const refSpace = await session.requestReferenceSpace('local-floor');
-        xrState.refSpace = refSpace;
-
-        // Hit test source from viewer pose
-        const viewerSpace = await session.requestReferenceSpace('viewer');
-        const hitTestSource = await session.requestHitTestSource?.({ space: viewerSpace });
-        xrState.hitTestSource = hitTestSource;
-
-        // Tap to place model
-        const onSelect = () => { xrState.placed = true; };
-        session.addEventListener('select', onSelect);
-
-        session.addEventListener('end', () => {
-          session.removeEventListener('select', onSelect);
-          endInlineWebXR();
-        });
-
-        // Animation loop
-        const clock = new THREE.Clock();
-        renderer.setAnimationLoop((t, frame) => {
-          if (!frame) return;
-          const pose = frame.getViewerPose(refSpace);
-          if (!pose) return;
-
-          if (xrState.hitTestSource) {
-            const results = frame.getHitTestResults(xrState.hitTestSource);
-            if (results && results.length) {
-              const hit = results[0];
-              const mat = new THREE.Matrix4().fromArray(hit.getPose(refSpace).transform.matrix);
-              // Position reticle overlay roughly at screen center by leaving CSS; we keep 3D placement for model
-              if (xrState.placed && viewer.scene) {
-                if (!xrState.modelAnchor && viewer.scene.children?.length) {
-                  // Place current model container at hit pose
-                  const obj = currentModelContainer || viewer.scene;
-                  obj.matrixAutoUpdate = false;
-                  obj.matrix.copy(mat);
-                  obj.updateMatrixWorld(true);
-                  xrState.modelAnchor = obj;
-                } else if (xrState.modelAnchor) {
-                  xrState.modelAnchor.matrix.copy(mat);
-                  xrState.modelAnchor.updateMatrixWorld(true);
-                }
-              }
-            }
           }
 
-          // Keep your usual render path
-          if (viewer.render) viewer.render();
-        });
+          // Resolve best-available asset for platform without HEAD latency
+          const assets = (typeof getCurrentArAssets === 'function') ? getCurrentArAssets() : null;
+          const glb = assets?.glb || (Array.isArray(assets?.glbCandidates) ? assets.glbCandidates[0] : null);
+          const usdz = Array.isArray(assets?.usdzCandidates) ? assets.usdzCandidates[0] : null;
+
+          if (typeof isAndroid === 'function' && isAndroid()) {
+            if (glb) { window.location.href = buildSceneViewerUrl(glb); return; }
+          }
+          if (typeof isIOS === 'function' && isIOS()) {
+            if (usdz) { window.location.href = buildQuickLookUrl(usdz); return; }
+          }
+
+          // Fallback: open landing page that routes to native AR
+          const url = (typeof buildArHtmlUrl === 'function') ? buildArHtmlUrl() : 'ar_viewer.html';
+          window.location.href = url;
+        } catch (e) {
+          console.warn('openArFlow error:', e);
+          try { openArPopup(); } catch {}
+        }
       }
 
-      async function endInlineWebXR() {
-        const renderer = viewer?.renderer;
-        const session = xrState.session;
-        try { document.getElementById('xr-exit-btn').style.display = 'none'; } catch {}
-        try { document.getElementById('xr-reticle').style.display = 'none'; } catch {}
-        if (renderer) {
-          renderer.setAnimationLoop(null);
-          renderer.xr.enabled = false;
-        }
-        if (session) {
-          try { await session.end(); } catch {}
-        }
-        xrState = { session: null, refSpace: null, hitTestSource: null, placed: false, modelAnchor: null };
-      }
+  // Inline WebXR removed for reliability. If needed later, we can re-enable it behind a feature flag.
 
       // Auto-open AR on mobile when landing from desktop QR
       (function handleArLanding() {
