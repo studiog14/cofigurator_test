@@ -3,401 +3,78 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <title>AR — Konfigurator</title>
-  <link rel="manifest" href="manifest.json" />
-  <link rel="apple-touch-icon" href="icons/favicon.png" />
+  <title>AR — Zobacz w pomieszczeniu</title>
   <link rel="icon" href="icons/favicon.png" />
-  <script type="importmap">
-    {
-      "imports": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.157.0/build/three.module.js"
-      }
-    }
-  </script>
   <style>
-    html, body { height:100%; margin:0; background:#000; font-family: Arial, sans-serif; }
-    #xr-loading { 
-      position: fixed; inset: 0; z-index: 3001; 
-      display: flex; align-items: center; justify-content: center; 
-      background: rgba(0,0,0,0.45); 
-    }
-    #xr-loading .inner { display: flex; flex-direction: column; align-items: center; }
-    #xr-loading .spinner { 
-      width: 48px; height: 48px; border-radius: 50%; 
-      border: 4px solid rgba(255,255,255,0.25); 
-      border-top-color: #fff; 
-      animation: xrspin 1s linear infinite; 
-    }
-    #xr-loading p { color: #fff; margin-top: 12px; font-size: 14px; }
-    @keyframes xrspin { to { transform: rotate(360deg); } }
-    
-    #xr-exit-btn { 
-      position: fixed; bottom: 20px; right: 20px; z-index: 3002; 
-      background: rgba(0,0,0,0.65); color: #fff; border: 0; 
-      border-radius: 10px; padding: 12px 16px; font-size: 14px; 
-      display: none; 
-    }
-    
-    #xr-reticle-2d { 
-      position: fixed; left: 50%; top: 50%; 
-      width: 40px; height: 40px; margin: -20px 0 0 -20px; 
-      z-index: 3001; border-radius: 50%; 
-      border: 2px solid rgba(255,215,0,0.9); 
-      box-shadow: 0 0 8px rgba(255,215,0,0.6); 
-      display: none; pointer-events: none; 
-    }
-    
-    #ar-unsupported { 
-      position: fixed; inset: 0; display: none; 
-      align-items: center; justify-content: center; 
-      background: #000; color:#fff; z-index: 3003; 
-      text-align:center; padding: 20px; 
-    }
-    #ar-unsupported a { color:#fff; text-decoration: underline; }
-    
-    #ar-ui { 
-      position: fixed; left: 0; right: 0; bottom: 0; z-index: 3004; 
-      display: flex; gap: 8px; padding: 10px; justify-content: center; 
-      background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 35%); 
-    }
-    #ar-ui button { 
-      background: rgba(0,0,0,0.65); color:#fff; border:0; 
-      border-radius: 10px; padding:10px 12px; font-size: 14px; 
-    }
-
-    /* Mini konfigurator w AR (MVP: wybór modelu) */
-    #config-toggle {
-      position: fixed; top: 16px; left: 16px; z-index: 3005;
-      background: rgba(0,0,0,0.65); color:#fff; border: 0; border-radius: 10px;
-      padding: 10px 12px; font-size: 14px;
-    }
-    #config-panel {
-      position: fixed; top: 16px; left: 16px; z-index: 3006;
-      width: 320px; max-height: 70vh; overflow: auto; display: none;
-      background: rgba(20,20,20,0.92); color: #fff; border-radius: 12px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.4); padding: 12px;
-    }
-    #config-panel h4 { margin: 0 0 8px 0; font-size: 16px; }
-    #config-search { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #333; background:#111; color:#fff; }
-    #config-list { margin-top: 10px; display: grid; grid-template-columns: 1fr; gap: 6px; }
-    .cfg-item { display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 8px; background:#141414; border: 1px solid #333; cursor: pointer; }
-    .cfg-item:hover { background:#1e1e1e; }
-    .cfg-item img { width: 40px; height: 40px; object-fit: contain; border-radius: 6px; background:#000; }
-    .cfg-item .name { font-size: 14px; font-weight: 600; color:#fff; }
-    .cfg-close { position:absolute; top:8px; right:10px; background:none; border:0; color:#bbb; font-size:20px; cursor:pointer; }
-
-    /* Diagnostics (optional) */
-    #ar-diagnostics { position: fixed; bottom: 70px; left: 10px; z-index: 3004; color:#ddd; font-size: 12px; opacity: 0.85; }
-
-    /* Start overlay to require user gesture (camera permission on iOS) */
-    #xr-start {
-      position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; 
-      background: linear-gradient(180deg, #000 0%, #111 100%); color: #fff; z-index: 4000;
-      flex-direction: column; gap: 14px;
-    }
-    #xr-start button { background: #1e88e5; color:#fff; border:0; border-radius: 12px; padding: 12px 18px; font-size: 16px; }
+    html, body { height: 100%; margin: 0; background: #000; font-family: system-ui, Arial, sans-serif; }
+    #wrap { position: fixed; inset: 0; display: grid; place-items: center; }
+    #start { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,0.85); z-index: 10; }
+    #start .box { text-align: center; color: #fff; padding: 16px; }
+    #start button { background: #1e88e5; color: #fff; border: 0; border-radius: 12px; padding: 12px 18px; font-size: 16px; }
+    model-viewer { width: 1px; height: 1px; opacity: 0; position: absolute; left: -9999px; }
+    .back { position: fixed; top: 12px; left: 12px; z-index: 11; background: rgba(0,0,0,0.6); color:#fff; border:0; border-radius:10px; padding:8px 12px; }
   </style>
+  <!-- Stable model-viewer (v3.x) -->
+  <script type="module" src="https://unpkg.com/@google/model-viewer@3.3.0/dist/model-viewer.min.js"></script>
+  <script nomodule src="https://unpkg.com/@google/model-viewer@3.3.0/dist/model-viewer-legacy.js"></script>
 </head>
 <body>
-  <div id="xr-start">
-    <div style="max-width: 85%; text-align: center;">
-      <h2 style="margin:0 0 8px 0; font-size: 20px;">AR — Zobacz w pomieszczeniu</h2>
-      <p style="margin:0; opacity:0.9;">Dotknij, aby uruchomić aparat i wejść w tryb AR.</p>
+  <button class="back" onclick="history.length>1?history.back():location.assign('index.html')">← Wróć</button>
+  <div id="wrap">
+    <div id="start">
+      <div class="box">
+        <h2 style="margin:0 0 8px 0;">Zobacz w pomieszczeniu</h2>
+        <p style="margin:0 0 12px 0; opacity:0.9;">Dotknij, aby otworzyć widok AR.</p>
+        <button id="open-ar">Otwórz AR</button>
+      </div>
     </div>
-    <button id="xr-start-btn">Rozpocznij AR</button>
-  </div>
-  <div id="xr-loading">
-    <div class="inner">
-      <div class="spinner"></div>
-      <p>Uruchamianie AR…</p>
-    </div>
-  </div>
-  
-  <div id="xr-reticle-2d"></div>
-  <button id="xr-exit-btn">Zakończ AR</button>
-  
-  <div id="ar-unsupported">
-    <div>
-  <h3>AR nie jest dostępne</h3>
-  <p>Ta przeglądarka nie wspiera WebXR AR.</p>
-  <p>Na iOS włącz WebXR w Safari → Advanced → Experimental Features.</p>
-      <p>
-        <button id="open-native-ar" style="display:none; background:#1e88e5;color:#fff;border:0;border-radius:10px;padding:10px 14px;">
-          Otwórz w trybie natywnym
-        </button>
-      </p>
-  <p><a href="index.html">Wróć do konfiguratora</a></p>
-    </div>
-  </div>
-  
-  <div id="ar-ui" style="display:none">
-  <button id="btn-rotate">Obróć 15°</button>
-    <button id="btn-scale-up">Skaluj +</button>
-    <button id="btn-scale-down">Skaluj -</button>
+
+    <!-- Invisible viewer used only to trigger native AR (Scene Viewer / Quick Look) -->
+    <model-viewer id="mv"
+      ar
+      ar-modes="scene-viewer quick-look webxr"
+      ar-scale="fixed"
+      camera-controls
+      poster="icons/AR_icon.png"
+      exposure="1.0"
+    ></model-viewer>
   </div>
 
-  <button id="config-toggle">Konfiguracja</button>
-  <div id="config-panel">
-    <button class="cfg-close" id="cfg-close" title="Zamknij">×</button>
-    <h4>Wybierz model</h4>
-    <input id="config-search" placeholder="Szukaj…" />
-    <div id="config-list"></div>
-  </div>
+  <script>
+    // Minimal platform flags
+    const ua = navigator.userAgent || '';
+    const isAndroid = /Android/i.test(ua);
+    const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
-  <div id="ar-diagnostics" style="display:none"></div>
-
-  <!-- Hidden Quick Look launcher for iOS (auto-clicked to skip white poster UI) -->
-  <a id="ql-link" rel="ar" href="#" style="display:none">
-    <img id="ql-poster" src="icons/AR_icon.png" alt="poster" style="display:none" />
-  </a>
-
-  <script type="module">
-    import * as THREE from 'three';
-    import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.157.0/examples/jsm/loaders/GLTFLoader.js';
-    import { USDZLoader } from 'https://cdn.jsdelivr.net/npm/three@0.157.0/examples/jsm/loaders/USDZLoader.js';
-
-  console.log('AR.html z WebXR uruchamia się...');
-
-  // Pobierz model z URL lub localStorage
+    // Read ?model= from URL and map to src (GLB) and ios-src (USDZ)
     const url = new URL(window.location.href);
-    const paramModel = url.searchParams.get('model');
-    let modelUrl = paramModel || localStorage.getItem('ar:lastModel') || 'chairs/Tulla-2.glb';
-  // Ustal platformę (tylko do diagnostyki i ewentualnych obejść)
-  const ua = navigator.userAgent || '';
-  const isAndroid = /Android/i.test(ua);
-  const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  const isMobile = isAndroid || isIOS;
-    
-    try { 
-      localStorage.setItem('ar:lastModel', modelUrl); 
-    } catch(e) { 
-      console.warn('localStorage niedostpny'); 
-    }
+    const model = url.searchParams.get('model') || 'chairs/Tulla-2.glb';
+    const base = model.replace(/\.(glb|gltf|usdz)$/i, '');
+    const glb = base + '.glb';
+    // Prefer -2 variant for USDZ if provided model points to -2
+    const usdz = /-2\.(glb|gltf|usdz)$/i.test(model) ? base + '.usdz' : (base + '.usdz');
 
-  console.log('Ładowanie modelu (initial):', modelUrl);
+    const mv = document.getElementById('mv');
+    mv.src = glb;
+    mv.setAttribute('ios-src', usdz);
 
-    // Setup Three.js z WebXR
-    const renderer = new THREE.WebGLRenderer({ 
-      antialias: true, 
-      alpha: true, 
-      powerPreference: 'high-performance' 
+    // AR open button
+    document.getElementById('open-ar').addEventListener('click', () => {
+      // model-viewer handles correct native AR based on platform
+      mv.activateAR();
     });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    
-  // Włączenie WebXR
-    renderer.xr.enabled = true;
-    
-    document.body.appendChild(renderer.domElement);
 
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.01, 50);
-    
-    // Dodaj podstawowe owietlenie
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.0));
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
-    dirLight.position.set(1, 1, 1);
-    scene.add(dirLight);
-
-    // Elementy UI
-    const loading = document.getElementById('xr-loading');
-    const exitBtn = document.getElementById('xr-exit-btn');
-    const reticle = document.getElementById('xr-reticle-2d');
-    const unsupported = document.getElementById('ar-unsupported');
-    const nativeBtn = document.getElementById('open-native-ar');
-    const arUI = document.getElementById('ar-ui');
-    const btnRotate = document.getElementById('btn-rotate');
-    const btnScaleUp = document.getElementById('btn-scale-up');
-    const btnScaleDown = document.getElementById('btn-scale-down');
-
-    // Stan AR
-    let xrState = { 
-      session: null, 
-      refSpace: null, 
-      hitTestSource: null, 
-      placed: false, 
-      model: null,
-      lastHitMatrix: null
-    };
-
-    // Loadery
-    const gltfLoader = new GLTFLoader();
-    const usdzLoader = new USDZLoader();
-    
-  async function loadModel(uri) {
-      return new Promise((resolve, reject) => {
-    const src = encodeURI(uri);
-    console.log('Ładowanie modelu:', src);
-    const isUSDZ = /\.usdz$/i.test(src);
-        if (isUSDZ) {
-          console.log('Wykryto USDZ — używam USDZLoader');
-          usdzLoader.load(
-      src,
-            (group) => {
-              const root = group;
-              // Podstawowa optymalizacja
-              root.traverse((child) => {
-                if (child.isMesh) { child.castShadow = false; child.receiveShadow = false; }
-              });
-              if (root.scale.length() < 0.001) root.scale.setScalar(0.01);
-              console.log('USDZ załadowany pomyślnie');
-              resolve(root);
-            },
-            (progress) => { /* brak standaryzowanego progressu dla USDZ */ },
-            (error) => {
-              console.error('Błąd ładowania USDZ:', error);
-              reject(error);
-            }
-          );
-        } else {
-          gltfLoader.load(
-            src,
-            (gltf) => {
-              const root = gltf.scene || gltf.scenes?.[0];
-              if (!root) { reject(new Error('Brak sceny w GLB')); return; }
-              root.traverse((child) => { if (child.isMesh) { child.castShadow = false; child.receiveShadow = false; } });
-              if (root.scale.length() < 0.001) root.scale.setScalar(0.01);
-              console.log('GLB załadowany pomyślnie');
-              resolve(root);
-            },
-            (progress) => { console.log('Postęp ładowania:', Math.round(progress.loaded / (progress.total||1) * 100) + '%'); },
-            (error) => { console.error('Błąd ładowania GLB:', error); reject(error); }
-          );
-        }
-      });
-    }
-
-    // Obsuga zmiany rozmiaru okna
-    function onResize() {
-      const w = window.innerWidth;
-      const h = window.innerHeight;
-      renderer.setSize(w, h);
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-    }
-    window.addEventListener('resize', onResize, { passive: true });
-
-  // Główna funkcja AR z WebXR
-    async function startAR() {
-      try {
-          // Prepare UI states
-          loading.style.display = 'flex';
-          exitBtn.style.display = 'none';
-          arUI.style.display = 'none';
-          reticle.style.display = 'none';
-  console.log('Uruchamianie AR z WebXR...');
-
-    // iOS WebXR-first: if GLB provided, try to switch to matching USDZ for better fidelity
-    if (isIOS && /\.(glb|gltf)$/i.test(modelUrl)) {
-      try {
-        const maybeUsdz = await resolveUsdzCandidate(modelUrl);
-        if (maybeUsdz) {
-          console.log('iOS: switching to USDZ for WebXR:', maybeUsdz);
-          modelUrl = maybeUsdz;
-        }
-      } catch(e) { console.warn('iOS USDZ resolution failed, using original:', e); }
-    }
-
-  // Sprawdź wsparcie WebXR (Android + iOS fallback)
-  const supported = !!(navigator.xr && await navigator.xr.isSessionSupported?.('immersive-ar'));
-        
-  if (!supported) {
-          console.log('WebXR AR nie jest wspierany, pokazuję fallback');
-          loading.style.display = 'none';
-          
-          // iOS: jeśli brak WebXR (często przez brak HTTPS/secure context), spróbuj Quick Look automatycznie
-          if (isIOS) {
-            if (!window.isSecureContext) {
-              console.warn('Brak secure context — iOS WebXR wymaga HTTPS. Uruchamiam Quick Look.');
-            }
-            const usdz = await resolveUsdzCandidate(modelUrl);
-            if (usdz) {
-              await openQuickLook(usdz, await resolvePosterForModel());
-              return;
-            }
-          }
-
-          unsupported.style.display = 'flex';
-          // Setup natywny AR fallback (ostatnia deska ratunku)
-          if (nativeBtn) {
-            if (isAndroid) {
-              // Android Scene Viewer
-              const title = encodeURIComponent(modelUrl.split('/').pop() || 'Model');
-              const fileAbs = encodeURIComponent(new URL(modelUrl, window.location.href).toString());
-              const sceneViewerUrl = `https://arvr.google.com/scene-viewer/1.0?file=${fileAbs}&mode=ar_only&title=${title}`;
-              
-              nativeBtn.style.display = 'inline-block';
-              nativeBtn.onclick = () => { 
-                window.location.href = sceneViewerUrl; 
-              };
-            } else if (isIOS) {
-              // iOS: Quick Look fallback, jeśli istnieje USDZ (gdy auto nie zadziałało)
-              const usdz = await resolveUsdzCandidate(modelUrl);
-              if (usdz) {
-                nativeBtn.style.display = 'inline-block';
-                nativeBtn.onclick = () => { window.location.href = new URL(usdz, window.location.href).toString(); };
-              }
-            }
-          }
-          return;
-        }
-
-    // Wstępnie załaduj model (.glb lub .usdz) — WebXR uruchamiamy na obu platformach
-        let modelRoot = null;
-        try {
-          console.log('Loading model for WebXR:', modelUrl);
-          modelRoot = await loadModel(modelUrl);
-        } catch(e) {
-          console.error('Nie udało się załadować modelu dla WebXR:', e);
-          // Jeśli próbujemy USDZ i padło – spróbuj automatycznie GLB o tej samej bazie nazwy
-          try {
-            const base = modelUrl.replace(/\.usdz$/i, '').replace(/\.(glb|gltf)$/i,'');
-            const alt = `${base}.glb`;
-            console.log('Próba alternatywy GLB:', alt);
-            modelRoot = await loadModel(alt);
-          } catch(e2) {
-            console.error('Alternatywa GLB też nie działa:', e2);
-            // iOS: Auto Quick Look, jeśli mamy USDZ
-            if (isIOS) {
-              const usdz = await resolveUsdzCandidate(modelUrl);
-              if (usdz) {
-                loading.style.display = 'none';
-                await openQuickLook(usdz, await resolvePosterForModel());
-                return;
-              }
-            }
-            // Android fallback UI
-            loading.style.display = 'none';
-            unsupported.style.display = 'flex';
-            if (nativeBtn && isAndroid) {
-              const title = encodeURIComponent(modelUrl.split('/').pop() || 'Model');
-              const fileAbs = encodeURIComponent(new URL(modelUrl.replace(/\.usdz$/i,'.glb'), window.location.href).toString());
-              const sceneViewerUrl = `https://arvr.google.com/scene-viewer/1.0?file=${fileAbs}&mode=ar_only&title=${title}`;
-              nativeBtn.style.display = 'inline-block';
-              nativeBtn.onclick = () => { window.location.href = sceneViewerUrl; };
-            }
-            return;
-          }
-        }
-
-  // Utworzenie sesji AR WebXR
-  console.log('Tworzenie sesji WebXR AR...');
-        const session = await navigator.xr.requestSession('immersive-ar', {
-          requiredFeatures: ['hit-test', 'local'],
-          optionalFeatures: ['local-floor', 'dom-overlay'],
-          domOverlay: { root: document.body }
-        });
-        
-        xrState.session = session;
-        await renderer.xr.setSession(session);
-
-  console.log('Sesja WebXR AR uruchomiona!');
-
-  // Show only reticle initially; reveal UI after placement
-  reticle.style.display = 'block';
+    // Basic AR status logging
+    mv.addEventListener('ar-status', (ev) => {
+      console.log('model-viewer ar-status:', ev.detail.status);
+      // Hide start overlay once AR starts
+      if (ev.detail.status === 'session-started' || ev.detail.status === 'quick-look-browser') {
+        document.getElementById('start').style.display = 'none';
+      }
+    });
+  </script>
+</body>
+</html>
         
         // Setup obsugi wyjcia
         exitBtn.onclick = endAR;
