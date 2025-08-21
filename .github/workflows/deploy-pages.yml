@@ -11,13 +11,17 @@ permissions:
   id-token: write
 
 concurrency:
-  # Scope concurrency to branch so multiple branches don't cancel each other
-  group: pages-${{ github.ref }}
-  # Do not cancel an in-progress deployment when a new push arrives
-  cancel-in-progress: false
+  # Use a single group for Pages to prevent conflicting deployments
+  group: "pages"
+  # Cancel older runs if a new commit arrives
+  cancel-in-progress: true
 
 jobs:
   deploy:
+    permissions:
+      pages: write
+      id-token: write
+      contents: read
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -33,6 +37,7 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: .
+          if-no-files-found: error
 
       - name: Deploy to GitHub Pages
         id: deployment
