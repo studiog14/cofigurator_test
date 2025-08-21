@@ -6881,11 +6881,19 @@ updateSummary();
             if (!chosen && Array.isArray(assets?.usdzCandidates)) {
               for (const u of assets.usdzCandidates) { if (await headOk(u)) { chosen = u; break; } }
             }
-          } else if (preferUSDZ) {
-            // iOS: prefer USDZ first for WebXR
+          if (preferUSDZ) {
+            // iOS: prefer USDZ first for Quick Look
             if (Array.isArray(assets?.usdzCandidates)) {
-              for (const u of assets.usdzCandidates) { if (await headOk(u)) { chosen = u; break; } }
+              for (const u of assets.usdzCandidates) { 
+                console.log('Checking USDZ candidate:', u);
+                if (await headOk(u)) { 
+                  chosen = u; 
+                  console.log('Selected USDZ for iOS:', u);
+                  break; 
+                } 
+              }
             }
+            // Fallback to GLB if no USDZ
             if (!chosen) {
               const glbList = Array.isArray(assets?.glbCandidates) ? assets.glbCandidates : (assets?.glb ? [assets.glb] : []);
               for (const g of glbList) { if (await headOk(g)) { chosen = g; break; } }

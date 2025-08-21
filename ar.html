@@ -136,7 +136,7 @@
 
   <!-- Hidden Quick Look launcher for iOS (auto-clicked to skip white poster UI) -->
   <a id="ql-link" rel="ar" href="#" style="display:none">
-    <img id="ql-poster" src="icons/AR_icon.png" alt="poster" />
+    <img id="ql-poster" src="icons/AR_icon.png" alt="poster" style="display:none" />
   </a>
 
   <script type="module">
@@ -270,7 +270,21 @@
         loading.style.display = 'flex';
   console.log('Uruchamianie AR z WebXR...');
 
-  // Sprawdź wsparcie WebXR (iOS i Android)
+  // iOS: prefer Quick Look auto-launch, Android: WebXR
+  if (isIOS) {
+    console.log('iOS detected - trying Quick Look with USDZ');
+    const usdz = await resolveUsdzCandidate(modelUrl);
+    if (usdz) {
+      console.log('USDZ found:', usdz);
+      await openQuickLook(usdz, await resolvePosterForModel());
+      loading.style.display = 'none';
+      return; // Exit early - no WebXR on iOS
+    } else {
+      console.warn('No USDZ found for iOS, trying WebXR fallback');
+    }
+  }
+
+  // Sprawdź wsparcie WebXR (Android + iOS fallback)
   const supported = !!(navigator.xr && await navigator.xr.isSessionSupported?.('immersive-ar'));
         
         if (!supported) {
@@ -572,9 +586,31 @@
       // Szukaj USDZ odpowiadającego bazie nazwy
       try {
         const base = fromUrl.replace(/\.(glb|gltf|usdz)$/i,'');
-        const tries = [ `${base}.usdz`, `${base}-2.usdz`, `${base.replace(/\s+/g,'_')}.usdz` ];
-        for (const t of tries) { if (await headOk(t)) return t; }
-      } catch {}
+        const name = base.split('/').pop() || '';
+        
+        // Try multiple naming patterns for USDZ
+        const tries = [ 
+          `${base}.usdz`, 
+          `${base}-2.usdz`, 
+          `chairs/${name}.usdz`,
+          `chairs/${name}-2.usdz`,
+          `chairs/Tulla-2.usdz` // Known working fallback
+        ];
+        
+        console.log('Searching for USDZ candidates:', tries);
+        
+        for (const t of tries) { 
+          console.log('Checking:', t);
+          if (await headOk(t)) {
+            console.log('Found USDZ:', t);
+            return t; 
+          }
+        }
+        
+        console.warn('No USDZ found for:', fromUrl);
+      } catch(e) {
+        console.error('Error resolving USDZ:', e);
+      }
       return null;
     }
 
@@ -591,28 +627,50 @@
         const link = document.getElementById('ql-link');
         const img = document.getElementById('ql-poster');
         const abs = new URL(usdzUrl, window.location.href).toString();
-        // Opcje Quick Look przez fragment (część jest wspierana w nowszych iOS)
-        const opts = `#allowsContentScaling=1&canonicalWebPageURL=${encodeURIComponent(window.location.href)}`;
+        
+        // Quick Look options to improve experience
+        const opts = `#allowsContentScaling=1&canonicalWebPageURL=${encodeURIComponent(window.location.href)}&checkoutTitle=${encodeURIComponent('AR Model')}&checkoutSubtitle=${encodeURIComponent('Zobacz w rzeczywistości')}`;
+        
         link.setAttribute('href', abs + opts);
-        if (img && posterUrl) img.src = posterUrl;
+        if (img && posterUrl) {
+          img.src = posterUrl;
+          img.style.display = 'none'; // Hide poster to avoid white background
+        }
 
-        // Szybkie kliknięcie, aby ominąć biały ekran i domyślne przyciski
-        setTimeout(() => {
-          try { link.click(); } catch {}
-        }, 50);
-
-        // Diagnostyka: obserwuj widoczność, aby wiedzieć, kiedy AR się otwiera/zamyka
-        document.addEventListener('visibilitychange', () => {
+        console.log('Opening Quick Look with URL:', abs + opts);
+        
+        // Immediate click to bypass white poster screen
+        link.click();
+        
+        // Show our custom UI while Quick Look is loading
+        setDiagnostics('Uruchamianie Quick Look AR...');
+        
+        // Monitor visibility changes to track AR state
+        const handleVisibilityChange = () => {
           if (document.hidden) {
-            // AR Quick Look otwarty
-            setDiagnostics('Quick Look otwarty');
+            setDiagnostics('Quick Look AR aktywny');
           } else {
-            // Quick Look zamknięty
-            setDiagnostics('Quick Look zamknięty');
+            setDiagnostics('Powrót z Quick Look AR');
+            // Show our configurator UI when returning
+            if (cfgPanel) cfgPanel.style.display = 'none';
           }
-        }, { once: true });
+        };
+        
+        document.addEventListener('visibilitychange', handleVisibilityChange, { once: false });
+        
+        // Cleanup after 10 seconds
+        setTimeout(() => {
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+        }, 10000);
+        
       } catch(e) {
-        console.warn('Nie udało się otworzyć Quick Look:', e);
+        console.error('Failed to open Quick Look:', e);
+        // Fallback to direct URL navigation
+        try {
+          window.location.href = new URL(usdzUrl, window.location.href).toString();
+        } catch(e2) {
+          console.error('Direct navigation also failed:', e2);
+        }
       }
     }
 
