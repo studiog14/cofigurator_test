@@ -59,6 +59,30 @@
       background: rgba(0,0,0,0.65); color:#fff; border:0; 
       border-radius: 10px; padding:10px 12px; font-size: 14px; 
     }
+
+    /* Mini konfigurator w AR (MVP: wybór modelu) */
+    #config-toggle {
+      position: fixed; top: 16px; left: 16px; z-index: 3005;
+      background: rgba(0,0,0,0.65); color:#fff; border: 0; border-radius: 10px;
+      padding: 10px 12px; font-size: 14px;
+    }
+    #config-panel {
+      position: fixed; top: 16px; left: 16px; z-index: 3006;
+      width: 320px; max-height: 70vh; overflow: auto; display: none;
+      background: rgba(20,20,20,0.92); color: #fff; border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4); padding: 12px;
+    }
+    #config-panel h4 { margin: 0 0 8px 0; font-size: 16px; }
+    #config-search { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #333; background:#111; color:#fff; }
+    #config-list { margin-top: 10px; display: grid; grid-template-columns: 1fr; gap: 6px; }
+    .cfg-item { display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 8px; background:#141414; border: 1px solid #333; cursor: pointer; }
+    .cfg-item:hover { background:#1e1e1e; }
+    .cfg-item img { width: 40px; height: 40px; object-fit: contain; border-radius: 6px; background:#000; }
+    .cfg-item .name { font-size: 14px; font-weight: 600; color:#fff; }
+    .cfg-close { position:absolute; top:8px; right:10px; background:none; border:0; color:#bbb; font-size:20px; cursor:pointer; }
+
+    /* Diagnostics (optional) */
+    #ar-diagnostics { position: fixed; bottom: 70px; left: 10px; z-index: 3004; color:#ddd; font-size: 12px; opacity: 0.85; }
   </style>
 </head>
 <body>
@@ -91,6 +115,16 @@
     <button id="btn-scale-up">Skaluj +</button>
     <button id="btn-scale-down">Skaluj -</button>
   </div>
+
+  <button id="config-toggle">Konfiguracja</button>
+  <div id="config-panel">
+    <button class="cfg-close" id="cfg-close" title="Zamknij">×</button>
+    <h4>Wybierz model</h4>
+    <input id="config-search" placeholder="Szukaj…" />
+    <div id="config-list"></div>
+  </div>
+
+  <div id="ar-diagnostics" style="display:none"></div>
 
   <script type="module">
     import * as THREE from 'https://unpkg.com/three@0.157.0/build/three.module.js';
@@ -163,14 +197,15 @@
     const gltfLoader = new GLTFLoader();
     const usdzLoader = new USDZLoader();
     
-    async function loadModel(uri) {
+  async function loadModel(uri) {
       return new Promise((resolve, reject) => {
-        console.log('Ładowanie GLTF:', uri);
-        const isUSDZ = /\.usdz$/i.test(uri);
+    const src = encodeURI(uri);
+    console.log('Ładowanie modelu:', src);
+    const isUSDZ = /\.usdz$/i.test(src);
         if (isUSDZ) {
           console.log('Wykryto USDZ — używam USDZLoader');
           usdzLoader.load(
-            uri,
+      src,
             (group) => {
               const root = group;
               // Podstawowa optymalizacja
@@ -189,7 +224,7 @@
           );
         } else {
           gltfLoader.load(
-            uri,
+      src,
             (gltf) => {
               const root = gltf.scene || gltf.scenes?.[0];
               if (!root) { reject(new Error('Brak sceny w GLB')); return; }
@@ -457,6 +492,90 @@
 
     // ?? Auto-start AR gdy strona si aduje
     startAR();
+
+    // ===== Mini konfigurator (MVP: wybór modelu) =====
+    const cfgToggle = document.getElementById('config-toggle');
+    const cfgPanel = document.getElementById('config-panel');
+    const cfgClose = document.getElementById('cfg-close');
+    const cfgSearch = document.getElementById('config-search');
+    const cfgList = document.getElementById('config-list');
+    const diag = document.getElementById('ar-diagnostics');
+
+    function setDiagnostics(text) {
+      if (!diag) return;
+      diag.style.display = 'block';
+      diag.textContent = text;
+    }
+
+    cfgToggle?.addEventListener('click', () => {
+      cfgPanel.style.display = cfgPanel.style.display === 'none' || cfgPanel.style.display === '' ? 'block' : 'none';
+    });
+    cfgClose?.addEventListener('click', () => { cfgPanel.style.display = 'none'; });
+
+    const SHEET_ID = '1ftI8CkA2Itav_h45KOap__JYtup28V1FiBmpP0p_Cjc';
+    const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Baza Danych`;
+    let sheetData = [];
+
+    async function loadSheet() {
+      try {
+        const res = await fetch(SHEET_URL + '&v=' + Date.now(), { cache: 'no-store' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const csv = await res.text();
+        const rows = csv.trim().split('\n');
+        const headers = (rows.shift() || '').match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g).map(h=>h.replace(/"/g,'').trim());
+        sheetData = rows.map(r => {
+          const vals = r.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
+          const o = {}; headers.forEach((h,i)=> o[h] = (vals[i]||'').replace(/"/g,'').trim()); return o;
+        }).filter(it => (it.Visible||'').toLowerCase() !== 'false');
+        renderList('');
+      } catch(e) {
+        console.warn('Nie udało się wczytać arkusza do AR UI:', e);
+      }
+    }
+
+    function renderList(filter) {
+      if (!cfgList) return;
+      cfgList.innerHTML = '';
+      const q = (filter||'').toLowerCase();
+      const models = sheetData.filter(it => (it.Typ||'').toLowerCase()==='model' && (!q || (it.Nazwa||'').toLowerCase().includes(q)));
+      models.slice(0,100).forEach(m => {
+        const div = document.createElement('div');
+        div.className = 'cfg-item';
+        const img = document.createElement('img'); img.src = m.Obrazek || 'icons/AR_icon.png'; img.alt = m.Nazwa||''; div.appendChild(img);
+        const name = document.createElement('div'); name.className='name'; name.textContent = m.Nazwa || ''; div.appendChild(name);
+        div.onclick = () => chooseModel(m.Nazwa);
+        cfgList.appendChild(div);
+      });
+    }
+
+    cfgSearch?.addEventListener('input', e => renderList(e.target.value));
+    loadSheet();
+
+    async function headOk(p) { try { const r= await fetch(p,{method:'HEAD'}); return r.ok; } catch { return false; } }
+
+    async function chooseModel(name) {
+      // Zbuduj listę kandydatów jak w index.html, zależnie od platformy
+      const norm = (s)=> s.normalize?.('NFD').replace(/\p{Diacritic}/gu,'').replace(/[^\w\s-]/g,'').trim();
+      const bases = Array.from(new Set([
+        name,
+        norm(name),
+        norm(name).replace(/\s+/g,' '),
+        norm(name).replace(/\s+/g,''),
+        norm(name).replace(/\s+/g,'-'),
+        norm(name).replace(/\s+/g,'_')
+      ].filter(Boolean)));
+      const dirs=['chairs','models'];
+      const glbs=[]; const usdz=[];
+      for (const d of dirs) { for (const b of bases) { glbs.push(`${d}/${b}.glb`, `${d}/${b}-2.glb`); usdz.push(`${d}/${b}.usdz`, `${d}/${b}-2.usdz`); } }
+      let chosen=null;
+      if (isAndroid) { for (const g of glbs) { if (await headOk(g)) { chosen=g; break; } } if (!chosen) { for (const u of usdz) { if (await headOk(u)) { chosen=u; break; } } }
+      } else if (isIOS) { for (const u of usdz) { if (await headOk(u)) { chosen=u; break; } } if (!chosen) { for (const g of glbs) { if (await headOk(g)) { chosen=g; break; } } }
+      } else { for (const g of glbs) { if (await headOk(g)) { chosen=g; break; } } if (!chosen) { for (const u of usdz) { if (await headOk(u)) { chosen=u; break; } } }
+      }
+      if (!chosen) { alert('Nie znaleziono plików dla: ' + name); return; }
+      // Przeładuj stronę z nowym parametrem (najszybsze i najstabilniejsze w AR)
+      const next = new URL(window.location.href); next.searchParams.set('model', chosen); window.location.href = next.toString();
+    }
   </script>
 </body>
 </html>
