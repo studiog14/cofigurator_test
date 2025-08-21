@@ -6939,6 +6939,8 @@ updateSummary();
         try {
           const u = new URL(window.location.href);
           u.searchParams.delete('open_ar');
+          // Mark return for post-AR overlay
+          u.searchParams.set('ar_return', '1');
           backLink = encodeURIComponent(u.toString());
         } catch { backLink = encodeURIComponent(window.location.href); }
         // Add link param so Scene Viewer shows a bottom-left CTA chip to return
@@ -6949,13 +6951,18 @@ updateSummary();
         const abs = new URL(usdzUrl, window.location.href);
         // Preserve existing hash params and append/override Quick Look ones
         const hashParams = new URLSearchParams(abs.hash ? abs.hash.slice(1) : '');
-        const returnUrl = (() => {
+        let returnUrl = (() => {
           try {
             const u = new URL(window.location.href);
             u.searchParams.delete('open_ar');
             return u.toString();
           } catch { return window.location.href; }
         })();
+        try {
+          const u2 = new URL(returnUrl);
+          u2.searchParams.set('ar_return', '1');
+          returnUrl = u2.toString();
+        } catch {}
         hashParams.set('callToAction', 'Powrót do konfiguratora');
         hashParams.set('link', returnUrl);
         abs.hash = hashParams.toString();
@@ -7149,6 +7156,59 @@ updateSummary();
         if (prevClose) prevClose.style.display = 'none';
       }
 
+      // ===== Pre-/Post-AR overlays (test mode via ?ar_pre=1 and ar_return=1) =====
+      function ensureArPreOverlay(){
+        let el = document.getElementById('ar-pre-overlay');
+        if (!el) {
+          el = document.createElement('div');
+          el.id = 'ar-pre-overlay';
+          el.style.cssText = 'position:fixed;inset:0;background:rgba(255,255,255,0.96);backdrop-filter:saturate(1.1) blur(2px);'
+            + 'z-index:2147483600;display:none;align-items:center;justify-content:center;';
+          el.innerHTML = `
+            <div style="width:92%;max-width:420px;background:#fff;border-radius:18px;box-shadow:0 12px 36px rgba(0,0,0,.18);padding:22px;text-align:center;border:1px solid rgba(0,0,0,.06)">
+              <img src="icons/FK_logo.png" alt="FK" style="height:40px;width:auto;object-fit:contain;margin-bottom:8px;"/>
+              <h3 style="margin:6px 0 10px;font-size:18px;color:#222">Zobacz w pomieszczeniu</h3>
+              <p style="margin:0 0 16px;color:#555;font-size:14px">Upewnij się, że masz dobre oświetlenie i skieruj telefon na podłogę, aby umieścić krzesło.</p>
+              <div style="display:flex;gap:10px;justify-content:center;align-items:center;margin-top:6px;">
+                <button id="ar-pre-cancel" style="background:#eee;color:#333;border:none;border-radius:12px;padding:10px 14px;font-weight:700;">Powrót do konfiguratora</button>
+                <button id="ar-pre-go" style="background:#F5C842;color:#333;border:none;border-radius:12px;padding:10px 14px;font-weight:800;">Wejdź do AR</button>
+              </div>
+            </div>`;
+          document.body.appendChild(el);
+          const cancel = el.querySelector('#ar-pre-cancel');
+          const go = el.querySelector('#ar-pre-go');
+          cancel?.addEventListener('click', ()=> hideArPreOverlay());
+          go?.addEventListener('click', ()=> { hideArPreOverlay(); openArWebXRMobile(); });
+        }
+        return el;
+      }
+      function showArPreOverlay(){ const el = ensureArPreOverlay(); el.style.display='flex'; }
+      function hideArPreOverlay(){ const el = document.getElementById('ar-pre-overlay'); if (el) el.style.display='none'; }
+
+      function ensureArPostOverlay(){
+        let el = document.getElementById('ar-post-overlay');
+        if (!el) {
+          el = document.createElement('div');
+          el.id = 'ar-post-overlay';
+          el.style.cssText = 'position:fixed;inset:0;background:rgba(255,255,255,0.96);backdrop-filter:saturate(1.1) blur(2px);'
+            + 'z-index:2147483600;display:none;align-items:center;justify-content:center;';
+          el.innerHTML = `
+            <div style="width:92%;max-width:420px;background:#fff;border-radius:18px;box-shadow:0 12px 36px rgba(0,0,0,.18);padding:22px;text-align:center;border:1px solid rgba(0,0,0,.06)">
+              <img src="icons/FK_logo.png" alt="FK" style="height:40px;width:auto;object-fit:contain;margin-bottom:8px;"/>
+              <h3 style="margin:6px 0 10px;font-size:18px;color:#222">Zakończono podgląd AR</h3>
+              <p style="margin:0 0 16px;color:#555;font-size:14px">Wróć do konfiguratora, aby zmienić wariant lub udostępnij konfigurację.</p>
+              <div style="display:flex;gap:10px;justify-content:center;align-items:center;margin-top:6px;">
+                <button id="ar-post-back" style="background:#F5C842;color:#333;border:none;border-radius:12px;padding:10px 14px;font-weight:800;">Wróć do edycji</button>
+              </div>
+            </div>`;
+          document.body.appendChild(el);
+          el.querySelector('#ar-post-back')?.addEventListener('click', ()=> hideArPostOverlay());
+        }
+        return el;
+      }
+      function showArPostOverlay(){ const el = ensureArPostOverlay(); el.style.display='flex'; }
+      function hideArPostOverlay(){ const el = document.getElementById('ar-post-overlay'); if (el) el.style.display='none'; }
+
   async function openArWebXRMobile() {
         try { showModelLoader('Ładowanie trybu AR...'); } catch(_) {}
         const curChair = (typeof selectedChair !== 'undefined' && selectedChair && selectedChair.Nazwa) ? selectedChair : window.selectedChair;
@@ -7285,7 +7345,11 @@ updateSummary();
         if (arBtn && !arBtn._arBound) {
           arBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (typeof isIOS === 'function' && isIOS() || (typeof isAndroid === 'function' && isAndroid())) {
+            const u = new URL(window.location.href);
+            const usePre = u.searchParams.get('ar_pre') === '1';
+            if (usePre) {
+              showArPreOverlay();
+            } else if (typeof isIOS === 'function' && isIOS() || (typeof isAndroid === 'function' && isAndroid())) {
               openArWebXRMobile();
             } else if (typeof showQrWithUrl === 'function' && typeof buildArLandingUrl === 'function') {
               const u = new URL(buildArLandingUrl(), window.location.href);
@@ -7301,7 +7365,18 @@ updateSummary();
           el._arBound = true;
         };
         const viewBtn = document.getElementById('view-in-room-button');
-        if (viewBtn) bindView(viewBtn);
+        if (viewBtn) {
+          const u = new URL(window.location.href);
+          const usePre = u.searchParams.get('ar_pre') === '1';
+          if (usePre) {
+            if (!viewBtn._arBound) {
+              viewBtn.addEventListener('click', (e)=>{ e.stopPropagation(); showArPreOverlay(); });
+              viewBtn._arBound = true;
+            }
+          } else {
+            bindView(viewBtn);
+          }
+        }
         // If it's injected later, observe and bind once
         const mo = new MutationObserver(() => {
           const vb = document.getElementById('view-in-room-button');
@@ -7316,6 +7391,12 @@ updateSummary();
           const u = new URL(window.location.href);
           if (u.searchParams.get('ar_ui_preview') === '1') {
             showArOverlayPreview();
+          }
+          if (u.searchParams.get('ar_return') === '1') {
+            // Clean the param and show Post-AR overlay
+            u.searchParams.delete('ar_return');
+            try { window.history.replaceState({}, '', u.toString()); } catch {}
+            showArPostOverlay();
           }
         } catch(_) {}
       })();
