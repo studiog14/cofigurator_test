@@ -4625,6 +4625,18 @@ function hideModelLoader() {
   }
 }
 
+// Opcjonalna aktualizacja paska postępu dla model-loader (wykorzystywana też przez AR)
+function updateModelLoaderProgress(percent) {
+  const el = document.getElementById('model-loader');
+  if (!el) return;
+  const bar = el.querySelector('.progress-container .progress-bar');
+  if (!bar) return;
+  // Zatrzymaj animację i ustaw szerokość wg procentu
+  bar.style.animation = 'none';
+  const clamped = Math.max(0, Math.min(100, Number(percent) || 0));
+  bar.style.width = clamped + '%';
+}
+
 // Funkcje loadera materiałów
 function showMaterialLoader(text = 'Ładowanie materiału...') {
   const el = document.getElementById('model-loader');
@@ -7157,10 +7169,10 @@ updateSummary();
       }
 
   async function openArWebXRMobile() {
-        try { showArLoading('Ładowanie trybu AR...'); } catch(_) {}
+        try { showModelLoader('Ładowanie trybu AR...'); } catch(_) {}
         const curChair = (typeof selectedChair !== 'undefined' && selectedChair && selectedChair.Nazwa) ? selectedChair : window.selectedChair;
         if (!curChair || !curChair.Nazwa) {
-          hideArLoading();
+          hideModelLoader();
           alert('Najpierw wybierz krzesło z konfiguratora');
           return;
         }
@@ -7170,7 +7182,7 @@ updateSummary();
   let usdz = Array.isArray(assets?.usdzCandidates) ? assets.usdzCandidates[0] : null;
 
         // iOS: Quick Look USDZ
-        if (typeof isIOS === 'function' && isIOS()) {
+  if (typeof isIOS === 'function' && isIOS()) {
           // Pick a real USDZ to avoid Quick Look hanging on a 404
           const pickUsdz = async () => {
             const list = Array.isArray(assets?.usdzCandidates) ? assets.usdzCandidates : (usdz ? [usdz] : []);
@@ -7191,8 +7203,8 @@ updateSummary();
             return null;
           };
           usdz = await pickUsdz();
-          if (!usdz) { hideArLoading(); alert('Brak dostępnego pliku USDZ dla iOS.'); return; }
-          try { showArLoading('Otwieranie trybu AR (iOS)...'); } catch(_) {}
+          if (!usdz) { hideModelLoader(); alert('Brak dostępnego pliku USDZ dla iOS.'); return; }
+          try { showModelLoader('Otwieranie trybu AR (iOS)...'); } catch(_) {}
           const link = document.createElement('a');
           link.setAttribute('rel', 'ar');
           link.setAttribute('href', toAbsUrl(usdz));
@@ -7202,7 +7214,7 @@ updateSummary();
           link.appendChild(img);
           document.body.appendChild(link);
           let hid = false;
-          const done = () => { if (!hid) { hideArLoading(); hid = true; } };
+          const done = () => { if (!hid) { hideModelLoader(); hid = true; } };
           const onVis = () => { if (document.visibilityState === 'hidden') done(); };
           document.addEventListener('visibilitychange', onVis, { once: true });
           window.addEventListener('pagehide', done, { once: true });
@@ -7213,7 +7225,7 @@ updateSummary();
 
         // Android: WebXR via model-viewer with fallback to Scene Viewer
         if (typeof isAndroid === 'function' && isAndroid()) {
-          if (!glb) { hideArLoading(); alert(`Brak pliku GLB dla AR dla modelu: ${curChair?.Nazwa || ''}`); return; }
+          if (!glb) { hideModelLoader(); alert(`Brak pliku GLB dla AR dla modelu: ${curChair?.Nazwa || ''}`); return; }
           await preloadModelViewerScriptForAndroid();
           try {
             let mv = document.getElementById('__mv_ar');
@@ -7241,17 +7253,16 @@ updateSummary();
             }
             const onProgress = (ev) => {
               const p = ev?.detail?.totalProgress;
-              if (typeof p === 'number' && p >= 0 && p <= 1) updateArLoadingProgress(6 + Math.round(p * 88));
+              if (typeof p === 'number' && p >= 0 && p <= 1) updateModelLoaderProgress(6 + Math.round(p * 88));
             };
             const onArStatus = (ev) => {
               const s = ev?.detail?.status || '';
               if (s === 'session-started') {
-                // Show custom back button while in AR
                 if (backBtn) backBtn.style.display = 'block';
+                hideModelLoader();
               }
               if (s === 'failed' || s === 'not-presenting') {
-                // Hide loader and back button when AR ends or fails
-                hideArLoading();
+                hideModelLoader();
                 if (backBtn) backBtn.style.display = 'none';
                 mv.removeEventListener('progress', onProgress);
                 mv.removeEventListener('ar-status', onArStatus);
@@ -7267,15 +7278,15 @@ updateSummary();
               const title = encodeURIComponent(curChair?.Nazwa || 'Model');
               const file = encodeURIComponent(toAbsUrl(glb));
               window.location.href = `https://arvr.google.com/scene-viewer/1.0?file=${file}&mode=ar_only&title=${title}`;
-              setTimeout(() => hideArLoading(), 1000);
+              setTimeout(() => hideModelLoader(), 1000);
             }
           } catch (e) {
             console.warn('model-viewer AR error:', e);
-            hideArLoading();
+            hideModelLoader();
           }
           return;
         }
-        hideArLoading();
+        hideModelLoader();
       }
 
       // Wire bottom AR button (desktop shows QR via existing UI elsewhere)
