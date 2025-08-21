@@ -94,53 +94,19 @@
 
   <script type="module">
     import * as THREE from 'https://unpkg.com/three@0.157.0/build/three.module.js';
-    import { GLTFLoader } from 'https://unpkg.com/three@0.157.0/examples/jsm/loaders/GLTFLoader.js';
+  import { GLTFLoader } from 'https://unpkg.com/three@0.157.0/examples/jsm/loaders/GLTFLoader.js';
+  import { USDZLoader } from 'https://unpkg.com/three@0.157.0/examples/jsm/loaders/USDZLoader.js';
 
   console.log('AR.html z WebXR uruchamia się...');
 
-    // Pobierz model z URL lub localStorage
+  // Pobierz model z URL lub localStorage
     const url = new URL(window.location.href);
     const paramModel = url.searchParams.get('model');
     let modelUrl = paramModel || localStorage.getItem('ar:lastModel') || 'chairs/Tulla-2.glb';
-    // Detekcja platformy
-    const ua = navigator.userAgent || '';
-    const isAndroid = /Android/i.test(ua);
-    const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-
-    // iOS: preferuj USDZ (Quick Look) i przekieruj bez uruchamiania WebXR
-    if (isIOS) {
-      const toAbs = (p)=> new URL(p, window.location.href).toString();
-      const tryHead = async (p)=> { try { const r = await fetch(p, { method:'HEAD' }); return r.ok; } catch { return false; } };
-      // Zestaw kandydatów dla wybranej nazwy (na podstawie ?model lub lastModel)
-      const raw = (paramModel || modelUrl || '').replace(/^.*\/(?!$)/,'').replace(/\.(glb|usdz)$/i,'');
-      const bases = Array.from(new Set([
-        raw,
-        raw.replace(/_/g,' '),
-        raw.replace(/\s+/g,'_'),
-        raw.replace(/\s+/g,'-'),
-        raw.replace(/\s+/g,'')
-      ].filter(Boolean)));
-      const dirs = ['chairs','models'];
-      const usdzCandidates = [];
-      for (const d of dirs) { for (const b of bases) { usdzCandidates.push(`${d}/${b}.usdz`, `${d}/${b}-2.usdz`); } }
-      if (!usdzCandidates.includes('chairs/Tulla-2.usdz')) usdzCandidates.push('chairs/Tulla-2.usdz');
-
-      let chosenUsdZ = null;
-      for (const u of usdzCandidates) { if (await tryHead(u)) { chosenUsdZ = u; break; } }
-      if (chosenUsdZ) {
-        console.log('iOS Quick Look redirect to:', chosenUsdZ);
-        window.location.replace(toAbs(chosenUsdZ));
-        // Zatrzymaj dalszą inicjalizację WebXR
-      }
-      // Jeśli brak USDZ — spróbuj GLB z WebXR poniżej (best-effort)
-    }
-
-    // Jeśli podano USDZ i nie jesteśmy na iOS, spróbuj dopasować odpowiadający GLB (WebXR wymaga GLB)
-    if (/\.usdz$/i.test(modelUrl) && !isIOS) {
-      const base = modelUrl.replace(/\.usdz$/i, '');
-      const candidates = [ `${base}.glb`, `${base.replace(/-?2$/,'')}.glb`, `${base.replace(/_/g,' ') }.glb` ];
-      for (const c of candidates) { try { const res = await fetch(c, { method: 'HEAD' }); if (res.ok) { modelUrl = c; break; } } catch(_) {} }
-    }
+  // Ustal platformę (tylko do diagnostyki i ewentualnych obejść)
+  const ua = navigator.userAgent || '';
+  const isAndroid = /Android/i.test(ua);
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     
     try { 
       localStorage.setItem('ar:lastModel', modelUrl); 
@@ -193,45 +159,49 @@
       model: null 
     };
 
-    // GLTF Loader
+    // Loadery
     const gltfLoader = new GLTFLoader();
+    const usdzLoader = new USDZLoader();
     
     async function loadModel(uri) {
       return new Promise((resolve, reject) => {
         console.log('Ładowanie GLTF:', uri);
-        gltfLoader.load(
-          uri,
-          (gltf) => {
-            const root = gltf.scene || gltf.scenes?.[0];
-            if (!root) { 
-              reject(new Error('Brak sceny w GLB')); 
-              return; 
+        const isUSDZ = /\.usdz$/i.test(uri);
+        if (isUSDZ) {
+          console.log('Wykryto USDZ — używam USDZLoader');
+          usdzLoader.load(
+            uri,
+            (group) => {
+              const root = group;
+              // Podstawowa optymalizacja
+              root.traverse((child) => {
+                if (child.isMesh) { child.castShadow = false; child.receiveShadow = false; }
+              });
+              if (root.scale.length() < 0.001) root.scale.setScalar(0.01);
+              console.log('USDZ załadowany pomyślnie');
+              resolve(root);
+            },
+            (progress) => { /* brak standaryzowanego progressu dla USDZ */ },
+            (error) => {
+              console.error('Błąd ładowania USDZ:', error);
+              reject(error);
             }
-            
-            // Optymalizacja dla AR
-            root.traverse((child) => {
-              if (child.isMesh) {
-                child.castShadow = false;
-                child.receiveShadow = false;
-              }
-            });
-            
-            // Zapewnij rozsądną skalę
-            if (root.scale.length() < 0.001) {
-              root.scale.setScalar(0.01);
-            }
-            
-            console.log('Model załadowany pomyślnie');
-            resolve(root);
-          },
-          (progress) => {
-            console.log('Postęp ładowania:', Math.round(progress.loaded / progress.total * 100) + '%');
-          },
-          (error) => {
-            console.error('Błąd ładowania GLTF:', error);
-            reject(error);
-          }
-        );
+          );
+        } else {
+          gltfLoader.load(
+            uri,
+            (gltf) => {
+              const root = gltf.scene || gltf.scenes?.[0];
+              if (!root) { reject(new Error('Brak sceny w GLB')); return; }
+              root.traverse((child) => { if (child.isMesh) { child.castShadow = false; child.receiveShadow = false; } });
+              if (root.scale.length() < 0.001) root.scale.setScalar(0.01);
+              console.log('GLB załadowany pomyślnie');
+              resolve(root);
+            },
+            (progress) => { console.log('Postęp ładowania:', Math.round(progress.loaded / (progress.total||1) * 100) + '%'); },
+            (error) => { console.error('Błąd ładowania GLB:', error); reject(error); }
+          );
+        }
       });
     }
 
@@ -252,15 +222,14 @@
   console.log('Uruchamianie AR z WebXR...');
 
   // Sprawdź wsparcie WebXR
-        const supported = !!(navigator.xr && await navigator.xr.isSessionSupported?.('immersive-ar'));
+  const supported = !!(navigator.xr && await navigator.xr.isSessionSupported?.('immersive-ar'));
         
         if (!supported) {
           console.log('WebXR AR nie jest wspierany, pokazuję fallback');
           loading.style.display = 'none';
           unsupported.style.display = 'flex';
           
-          // Setup natywny AR fallback
-          
+          // Setup natywny AR fallback (ostatnia deska ratunku)
           if (nativeBtn) {
             if (isAndroid) {
               // Android Scene Viewer
@@ -306,7 +275,7 @@
           return;
         }
 
-        // Wstępnie załaduj model (musi być GLB dla WebXR)
+    // Wstępnie załaduj model (.glb lub .usdz) — WebXR uruchamiamy na obu platformach
         let modelRoot = null;
         try {
           modelRoot = await loadModel(modelUrl);
@@ -318,7 +287,7 @@
           if (nativeBtn) {
             if (isAndroid) {
               const title = encodeURIComponent(modelUrl.split('/').pop() || 'Model');
-              const fileAbs = encodeURIComponent(new URL(modelUrl.replace(/\.usdz$/i,'.glb'), window.location.href).toString());
+      const fileAbs = encodeURIComponent(new URL(modelUrl.replace(/\.usdz$/i,'.glb'), window.location.href).toString());
               const sceneViewerUrl = `https://arvr.google.com/scene-viewer/1.0?file=${fileAbs}&mode=ar_only&title=${title}`;
               nativeBtn.style.display = 'inline-block';
               nativeBtn.onclick = () => { window.location.href = sceneViewerUrl; };
