@@ -6808,18 +6808,18 @@ updateSummary();
         // Prefer live selectedChair var; fallback to window.selectedChair
         const curChair = (typeof selectedChair !== 'undefined' && selectedChair && selectedChair.Nazwa) ? selectedChair : window.selectedChair;
         const raw = (curChair?.Nazwa || '').trim();
+        if (!raw) return { glb: null, glbCandidates: [], usdzCandidates: [] };
         const strip = (s)=> (typeof stripBrackets==='function'? stripBrackets(s): s);
         const baseRaw = strip(raw);
         const norm = (s)=> s
           .normalize?.('NFD').replace(/\p{Diacritic}/gu,'')
           .replace(/[^\w\s-]/g,'').trim();
+        const baseClean = norm(baseRaw);
         const bases = Array.from(new Set([
-          baseRaw,
-          norm(baseRaw),
-          norm(baseRaw).replace(/\s+/g,' '),
-          norm(baseRaw).replace(/\s+/g,''),
-          norm(baseRaw).replace(/\s+/g,'-'),
-          norm(baseRaw).replace(/\s+/g,'_')
+          baseClean,
+          baseClean.replace(/\s+/g,''),
+          baseClean.replace(/\s+/g,'-'),
+          baseClean.replace(/\s+/g,'_')
         ].filter(Boolean)));
 
         // Generate candidate paths preserving order of best match first
@@ -6835,8 +6835,7 @@ updateSummary();
             usdzCandidates.push(`${dir}/${b}-2.usdz`);
           }
         }
-        // Last-resort demo fallback to keep flow working in dev
-        if (!usdzCandidates.includes('chairs/Tulla-2.usdz')) usdzCandidates.push('chairs/Tulla-2.usdz');
+  // No generic fallback here; we want the chosen chair or a clear error
         return {
           glb: glbCandidates[0] || null,
           glbCandidates,
@@ -7049,10 +7048,20 @@ updateSummary();
           // Pick a real USDZ to avoid Quick Look hanging on a 404
           const pickUsdz = async () => {
             const list = Array.isArray(assets?.usdzCandidates) ? assets.usdzCandidates : (usdz ? [usdz] : []);
-            const headOk = async (p) => {
-              try { const r = await fetch(toAbsUrl(p), { method: 'HEAD' }); return r.ok; } catch { return false; }
+            const exists = async (p) => {
+              const url = toAbsUrl(p);
+              try {
+                const rh = await fetch(url, { method: 'HEAD', cache: 'no-store' });
+                if (rh.ok) return true;
+              } catch {}
+              // Some static hosts mishandle HEAD; try a tiny GET
+              try {
+                const rg = await fetch(url, { method: 'GET', cache: 'no-store' });
+                return rg.ok;
+              } catch {}
+              return false;
             };
-            for (const c of list) { if (await headOk(c)) return c; }
+            for (const c of list) { if (await exists(c)) return c; }
             return null;
           };
           usdz = await pickUsdz();
@@ -7072,7 +7081,7 @@ updateSummary();
 
         // Android: WebXR via model-viewer with fallback to Scene Viewer
         if (typeof isAndroid === 'function' && isAndroid()) {
-          if (!glb) { alert('Brak pliku GLB dla AR.'); return; }
+          if (!glb) { alert(`Brak pliku GLB dla AR dla modelu: ${curChair?.Nazwa || ''}`); return; }
           await preloadModelViewerScriptForAndroid();
           try {
             let mv = document.getElementById('__mv_ar');
@@ -10483,6 +10492,28 @@ function setDefaultMaterialsFromSheet() {
           handleExport(format);
         });
       });
+
+      // Keep AR asset candidates in sync with the currently selected chair
+      (function keepArAssetsSynced() {
+        const recompute = () => {
+          try { window.__arAssets = (typeof getCurrentArAssets === 'function') ? getCurrentArAssets() : null; } catch { window.__arAssets = null; }
+        };
+        recompute();
+        // Hook into loadModel if available
+        if (typeof window.loadModel === 'function') {
+          const orig = window.loadModel;
+          window.loadModel = function(...args) {
+            const r = orig.apply(this, args);
+            setTimeout(recompute, 0);
+            return r;
+          };
+        }
+        // Also observe changes to selected chair name in DOM to be safe
+        const mo = new MutationObserver(() => setTimeout(recompute, 0));
+        mo.observe(document.body, { childList: true, subtree: true });
+        // Recompute on visibility changes
+        document.addEventListener('visibilitychange', () => setTimeout(recompute, 0));
+      })();
 
       // Funkcje instalacji PWA
       window.showInstallInstructions = function() {
