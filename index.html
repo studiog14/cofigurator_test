@@ -6881,7 +6881,7 @@ updateSummary();
             if (!chosen && Array.isArray(assets?.usdzCandidates)) {
               for (const u of assets.usdzCandidates) { if (await headOk(u)) { chosen = u; break; } }
             }
-          if (preferUSDZ) {
+          } else if (preferUSDZ) {
             // iOS: prefer USDZ first for Quick Look
             if (Array.isArray(assets?.usdzCandidates)) {
               for (const u of assets.usdzCandidates) { 
