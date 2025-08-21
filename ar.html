@@ -91,9 +91,24 @@
 
     /* Diagnostics (optional) */
     #ar-diagnostics { position: fixed; bottom: 70px; left: 10px; z-index: 3004; color:#ddd; font-size: 12px; opacity: 0.85; }
+
+    /* Start overlay to require user gesture (camera permission on iOS) */
+    #xr-start {
+      position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; 
+      background: linear-gradient(180deg, #000 0%, #111 100%); color: #fff; z-index: 4000;
+      flex-direction: column; gap: 14px;
+    }
+    #xr-start button { background: #1e88e5; color:#fff; border:0; border-radius: 12px; padding: 12px 18px; font-size: 16px; }
   </style>
 </head>
 <body>
+  <div id="xr-start">
+    <div style="max-width: 85%; text-align: center;">
+      <h2 style="margin:0 0 8px 0; font-size: 20px;">AR — Zobacz w pomieszczeniu</h2>
+      <p style="margin:0; opacity:0.9;">Dotknij, aby uruchomić aparat i wejść w tryb AR.</p>
+    </div>
+    <button id="xr-start-btn">Rozpocznij AR</button>
+  </div>
   <div id="xr-loading">
     <div class="inner">
       <div class="spinner"></div>
@@ -162,7 +177,7 @@
       console.warn('localStorage niedostpny'); 
     }
 
-  console.log('Ładowanie modelu:', modelUrl);
+  console.log('Ładowanie modelu (initial):', modelUrl);
 
     // Setup Three.js z WebXR
     const renderer = new THREE.WebGLRenderer({ 
@@ -204,7 +219,8 @@
       refSpace: null, 
       hitTestSource: null, 
       placed: false, 
-      model: null 
+      model: null,
+      lastHitMatrix: null
     };
 
     // Loadery
@@ -267,27 +283,28 @@
   // Główna funkcja AR z WebXR
     async function startAR() {
       try {
-        loading.style.display = 'flex';
+          // Prepare UI states
+          loading.style.display = 'flex';
+          exitBtn.style.display = 'none';
+          arUI.style.display = 'none';
+          reticle.style.display = 'none';
   console.log('Uruchamianie AR z WebXR...');
 
-  // iOS: prefer Quick Look auto-launch, Android: WebXR
-  if (isIOS) {
-    console.log('iOS detected - trying Quick Look with USDZ');
-    const usdz = await resolveUsdzCandidate(modelUrl);
-    if (usdz) {
-      console.log('USDZ found:', usdz);
-      await openQuickLook(usdz, await resolvePosterForModel());
-      loading.style.display = 'none';
-      return; // Exit early - no WebXR on iOS
-    } else {
-      console.warn('No USDZ found for iOS, trying WebXR fallback');
+    // iOS WebXR-first: if GLB provided, try to switch to matching USDZ for better fidelity
+    if (isIOS && /\.(glb|gltf)$/i.test(modelUrl)) {
+      try {
+        const maybeUsdz = await resolveUsdzCandidate(modelUrl);
+        if (maybeUsdz) {
+          console.log('iOS: switching to USDZ for WebXR:', maybeUsdz);
+          modelUrl = maybeUsdz;
+        }
+      } catch(e) { console.warn('iOS USDZ resolution failed, using original:', e); }
     }
-  }
 
   // Sprawdź wsparcie WebXR (Android + iOS fallback)
   const supported = !!(navigator.xr && await navigator.xr.isSessionSupported?.('immersive-ar'));
         
-        if (!supported) {
+  if (!supported) {
           console.log('WebXR AR nie jest wspierany, pokazuję fallback');
           loading.style.display = 'none';
           
@@ -331,7 +348,7 @@
     // Wstępnie załaduj model (.glb lub .usdz) — WebXR uruchamiamy na obu platformach
         let modelRoot = null;
         try {
-          console.log('Loading model:', modelUrl);
+          console.log('Loading model for WebXR:', modelUrl);
           modelRoot = await loadModel(modelUrl);
         } catch(e) {
           console.error('Nie udało się załadować modelu dla WebXR:', e);
@@ -379,10 +396,8 @@
 
   console.log('Sesja WebXR AR uruchomiona!');
 
-        // Poka UI AR
-        exitBtn.style.display = 'block';
-        reticle.style.display = 'block';
-        arUI.style.display = 'flex';
+  // Show only reticle initially; reveal UI after placement
+  reticle.style.display = 'block';
         
         // Setup obsugi wyjcia
         exitBtn.onclick = endAR;
@@ -396,7 +411,7 @@
           space: viewerSpace 
         });
 
-        // Add model to scene immediately (no need to wait for hit test)
+  // Add model to scene immediately (preview in front); user will place it
         if (modelRoot) {
           xrState.model = modelRoot;
           scene.add(modelRoot);
@@ -408,8 +423,26 @@
         // Event listenery
         session.addEventListener('end', () => { endAR(); });
         session.addEventListener('select', () => { 
-          console.log('Select event - umieszczanie modelu');
+          console.log('Select event - próba umieszczenia modelu');
+          if (xrState.model && xrState.lastHitMatrix) {
+            xrState.model.matrixAutoUpdate = false;
+            xrState.model.matrix.copy(xrState.lastHitMatrix);
+            xrState.model.updateMatrixWorld(true);
+            console.log('Model ustawiony na wykrytej powierzchni');
+          } else {
+            // If no hit, keep it in front
+            if (xrState.model) {
+              xrState.model.matrixAutoUpdate = true;
+              xrState.model.position.set(0, 0, -1.2);
+            }
+          }
           xrState.placed = true; 
+          // Reveal AR UI after placement, hide reticle, show exit
+          try {
+            reticle.style.display = 'none';
+            arUI.style.display = 'flex';
+            exitBtn.style.display = 'block';
+          } catch(_) {}
         });
 
         // Setup kontrolek UI
@@ -441,25 +474,27 @@
           const pose = frame.getViewerPose(refSpace);
           if (!pose) return;
           
-          // Hit testing - wykrywanie powierzchni
-          if (xrState.hitTestSource && xrState.placed) {
+          // Hit testing - wykrywanie powierzchni (przed umieszczeniem obiektu)
+          if (xrState.hitTestSource && !xrState.placed) {
             const results = frame.getHitTestResults(xrState.hitTestSource);
             if (results && results.length > 0) {
               const hit = results[0];
               const hitPose = hit.getPose(refSpace);
-              
-              if (hitPose && xrState.model) {
-                // Umieść model na pozycji hit
-                const matrix = new THREE.Matrix4().fromArray(hitPose.transform.matrix);
-                xrState.model.matrixAutoUpdate = false;
-                xrState.model.matrix.copy(matrix);
-                xrState.model.updateMatrixWorld(true);
+              if (hitPose) {
+                // Cache hit pose matrix to place model on select
+                xrState.lastHitMatrix = new THREE.Matrix4().fromArray(hitPose.transform.matrix);
+                // Show reticle since we have a valid plane
+                if (reticle.style.display !== 'block') reticle.style.display = 'block';
               }
+            } else {
+              // Hide reticle if no plane found
+              if (reticle.style.display !== 'none') reticle.style.display = 'none';
             }
           }
           
           renderer.render(scene, camera);
-        });        loading.style.display = 'none';
+        });
+        loading.style.display = 'none';
   console.log('WebXR AR sesja uruchomiona pomyślnie!');
         
       } catch(error) {
@@ -513,8 +548,19 @@
       }
     }
 
-    // ?? Auto-start AR gdy strona si aduje
-    startAR();
+    // Start AR only after user gesture to ensure camera permission prompt (esp. iOS)
+    const startOverlay = document.getElementById('xr-start');
+    const startBtn = document.getElementById('xr-start-btn');
+    startBtn?.addEventListener('click', async () => {
+      try {
+        startOverlay.style.display = 'none';
+        await startAR();
+      } catch(e) {
+        console.error('Start AR failed:', e);
+        startOverlay.style.display = 'flex';
+        alert('Nie udało się uruchomić AR: ' + (e?.message||e));
+      }
+    });
 
     // ===== Mini konfigurator (MVP: wybór modelu) =====
     const cfgToggle = document.getElementById('config-toggle');
