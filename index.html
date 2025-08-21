@@ -7011,6 +7011,120 @@ updateSummary();
         } catch {}
       })();
 
+      // ===== Mobile AR (WebXR on Android GLB, Quick Look on iOS USDZ) =====
+      async function preloadModelViewerScriptForAndroid() {
+        try {
+          if (!(typeof isAndroid === 'function' && isAndroid())) return;
+          if (window.customElements && window.customElements.get && window.customElements.get('model-viewer')) return;
+          if (document.getElementById('__mv_script')) return;
+          await new Promise((resolve, reject) => {
+            const s = document.createElement('script');
+            s.id = '__mv_script';
+            s.type = 'module';
+            s.src = 'https://cdn.jsdelivr.net/npm/@google/model-viewer@v3.3.0/dist/model-viewer.min.js';
+            s.onload = resolve;
+            s.onerror = () => reject(new Error('model-viewer failed to load'));
+            document.head.appendChild(s);
+          });
+        } catch (_) {}
+      }
+
+      function toAbsUrl(pathOrUrl) {
+        try { return new URL(pathOrUrl, window.location.href).toString(); } catch { return pathOrUrl; }
+      }
+
+      async function openArWebXRMobile() {
+        const curChair = (typeof selectedChair !== 'undefined' && selectedChair && selectedChair.Nazwa) ? selectedChair : window.selectedChair;
+        if (!curChair || !curChair.Nazwa) {
+          alert('Najpierw wybierz krzesło z konfiguratora');
+          return;
+        }
+
+        const assets = (typeof getCurrentArAssets === 'function') ? getCurrentArAssets() : null;
+        const glb = assets?.glb || (Array.isArray(assets?.glbCandidates) ? assets.glbCandidates[0] : null);
+        const usdz = Array.isArray(assets?.usdzCandidates) ? assets.usdzCandidates[0] : null;
+
+        // iOS: Quick Look USDZ
+        if (typeof isIOS === 'function' && isIOS()) {
+          if (!usdz) { alert('Brak pliku USDZ dla iOS.'); return; }
+          const link = document.createElement('a');
+          link.setAttribute('rel', 'ar');
+          link.setAttribute('href', toAbsUrl(usdz));
+          const img = document.createElement('img');
+          img.alt = '';
+          img.style.display = 'none';
+          link.appendChild(img);
+          document.body.appendChild(link);
+          try { link.click(); } catch(_) {}
+          setTimeout(() => { try { link.remove(); } catch(_) {} }, 1500);
+          return;
+        }
+
+        // Android: WebXR via model-viewer with fallback to Scene Viewer
+        if (typeof isAndroid === 'function' && isAndroid()) {
+          if (!glb) { alert('Brak pliku GLB dla AR.'); return; }
+          await preloadModelViewerScriptForAndroid();
+          try {
+            let mv = document.getElementById('__mv_ar');
+            if (!mv) {
+              mv = document.createElement('model-viewer');
+              mv.id = '__mv_ar';
+              mv.setAttribute('ar', '');
+              mv.setAttribute('ar-modes', 'webxr scene-viewer');
+              mv.setAttribute('reveal', 'manual');
+              mv.setAttribute('camera-controls', '');
+              mv.setAttribute('style', 'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;');
+              document.body.appendChild(mv);
+            }
+            mv.setAttribute('src', toAbsUrl(glb));
+            if (typeof mv.activateAR === 'function') {
+              mv.activateAR();
+            } else {
+              const title = encodeURIComponent(curChair?.Nazwa || 'Model');
+              const file = encodeURIComponent(toAbsUrl(glb));
+              window.location.href = `https://arvr.google.com/scene-viewer/1.0?file=${file}&mode=ar_only&title=${title}`;
+            }
+          } catch (e) {
+            console.warn('model-viewer AR error:', e);
+          }
+          return;
+        }
+      }
+
+      // Wire bottom AR button (desktop shows QR via existing UI elsewhere)
+      (function wireArButtons() {
+        const arBtn = document.getElementById('ar-button');
+        if (arBtn && !arBtn._arBound) {
+          arBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (typeof isIOS === 'function' && isIOS() || (typeof isAndroid === 'function' && isAndroid())) {
+              openArWebXRMobile();
+            } else if (typeof showQrWithUrl === 'function' && typeof buildArLandingUrl === 'function') {
+              const u = new URL(buildArLandingUrl(), window.location.href);
+              u.searchParams.set('open_ar', '1');
+              showQrWithUrl(u.toString());
+            }
+          });
+          arBtn._arBound = true;
+        }
+        const bindView = (el) => {
+          if (!el || el._arBound) return;
+          el.addEventListener('click', (e) => { e.stopPropagation(); openArWebXRMobile(); });
+          el._arBound = true;
+        };
+        const viewBtn = document.getElementById('view-in-room-button');
+        if (viewBtn) bindView(viewBtn);
+        // If it's injected later, observe and bind once
+        const mo = new MutationObserver(() => {
+          const vb = document.getElementById('view-in-room-button');
+          if (vb) { bindView(vb); mo.disconnect(); }
+        });
+        mo.observe(document.body, { childList: true, subtree: true });
+      })();
+
+      // Preload script early on Android
+      window.addEventListener('DOMContentLoaded', () => { preloadModelViewerScriptForAndroid(); });
+
       // Przycisk powrotu do kategorii
       document.getElementById('back-to-categories')?.addEventListener('click', (e) => {
         e.stopPropagation();
