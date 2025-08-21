@@ -6,7 +6,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <title>AR � Konfigurator</title>
+  <title>AR — Konfigurator</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="icons/favicon.png" />
   <style>
@@ -74,20 +74,20 @@
   
   <div id="ar-unsupported">
     <div>
-      <h3>AR nie jest dostpne</h3>
-      <p>Ta przegldarka nie wspiera WebXR AR.</p>
-      <p>Na iOS wcz WebXR w Safari � Advanced � Experimental Features.</p>
+  <h3>AR nie jest dostępne</h3>
+  <p>Ta przeglądarka nie wspiera WebXR AR.</p>
+  <p>Na iOS włącz WebXR w Safari → Advanced → Experimental Features.</p>
       <p>
         <button id="open-native-ar" style="display:none; background:#1e88e5;color:#fff;border:0;border-radius:10px;padding:10px 14px;">
-          Otw�rz w trybie natywnym
+          Otwórz w trybie natywnym
         </button>
       </p>
-      <p><a href="index.html">Wr� do konfiguratora</a></p>
+  <p><a href="index.html">Wróć do konfiguratora</a></p>
     </div>
   </div>
   
   <div id="ar-ui" style="display:none">
-    <button id="btn-rotate">Obr� 15�</button>
+  <button id="btn-rotate">Obróć 15°</button>
     <button id="btn-scale-up">Skaluj +</button>
     <button id="btn-scale-down">Skaluj -</button>
   </div>
@@ -101,7 +101,22 @@
     // Pobierz model z URL lub localStorage
     const url = new URL(window.location.href);
     const paramModel = url.searchParams.get('model');
-    const modelUrl = paramModel || localStorage.getItem('ar:lastModel') || 'chairs/Tulla-2.glb';
+    let modelUrl = paramModel || localStorage.getItem('ar:lastModel') || 'chairs/Tulla-2.glb';
+    // Jeśli podano USDZ, spróbuj dopasować odpowiadający GLB (WebXR wymaga GLB)
+    if (/\.usdz$/i.test(modelUrl)) {
+      const base = modelUrl.replace(/\.usdz$/i, '');
+      const candidates = [
+        `${base}.glb`,
+        `${base.replace(/-?2$/,'')}.glb`,
+        `${base.replace(/_/g,' ') }.glb`,
+      ];
+      for (const c of candidates) {
+        try {
+          const res = await fetch(c, { method: 'HEAD' });
+          if (res.ok) { modelUrl = c; break; }
+        } catch(_) {}
+      }
+    }
     
     try { 
       localStorage.setItem('ar:lastModel', modelUrl); 
@@ -270,13 +285,38 @@
           return;
         }
 
-        // Wstępnie załaduj model
+        // Wstępnie załaduj model (musi być GLB dla WebXR)
         let modelRoot = null;
         try {
           modelRoot = await loadModel(modelUrl);
         } catch(e) {
-          console.error('Nie udało się załadować modelu:', e);
-          alert('Nie udało się załadować modelu: ' + modelUrl);
+          console.error('Nie udało się załadować GLB dla WebXR:', e);
+          // Spróbuj natywnego AR jako awaryjne rozwiązanie
+          const ua = navigator.userAgent || '';
+          const isAndroid = /Android/i.test(ua);
+          const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+          loading.style.display = 'none';
+          unsupported.style.display = 'flex';
+          if (nativeBtn) {
+            if (isAndroid) {
+              const title = encodeURIComponent(modelUrl.split('/').pop() || 'Model');
+              const fileAbs = encodeURIComponent(new URL(modelUrl.replace(/\.usdz$/i,'.glb'), window.location.href).toString());
+              const sceneViewerUrl = `https://arvr.google.com/scene-viewer/1.0?file=${fileAbs}&mode=ar_only&title=${title}`;
+              nativeBtn.style.display = 'inline-block';
+              nativeBtn.onclick = () => { window.location.href = sceneViewerUrl; };
+            } else if (isIOS) {
+              const base = modelUrl.replace(/\.glb$/i, '');
+              const candidates = [ `${base}.usdz`, `${base}-2.usdz`, `${base.replace(/\s+/g,'_')}.usdz`, `chairs/Tulla-2.usdz` ];
+              let chosen = null;
+              for (const candidate of candidates) {
+                try { const res = await fetch(candidate, { method: 'HEAD' }); if (res.ok) { chosen = candidate; break; } } catch(_) {}
+              }
+              if (chosen) {
+                nativeBtn.style.display = 'inline-block';
+                nativeBtn.onclick = () => { window.location.href = new URL(chosen, window.location.href).toString(); };
+              }
+            }
+          }
           return;
         }
 
@@ -380,7 +420,7 @@
       } catch(error) {
   console.error('Błąd uruchamiania AR:', error);
         loading.style.display = 'none';
-        alert('Nie udao si uruchomi AR: ' + error.message);
+        alert('Nie udało się uruchomić AR: ' + error.message);
       }
     }
 

@@ -4028,7 +4028,7 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
       }
     }
 
-    function renderMobileRightPanelList(selectedCategory = 'Wszystkie') {
+  function renderMobileRightPanelList(selectedCategory = 'Wszystkie') {
       if (!isMobileMode()) return;
       const right = document.getElementById('mobile-right-panel');
       if (!right) return;
@@ -4047,12 +4047,27 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
 
       const categories = [...new Set((allData||[]).filter(i=>i.Kategoria && i.Typ==='model').map(i=>i.Kategoria))];
       const pills = ['Wszystkie','Promocje','Bestsellery',...categories];
-      function setActive(el){ Array.from(catDiv.children).forEach(b=>b.classList.remove('active')); el.classList.add('active'); }
+      function setActive(el){
+        // Usuń aktywność ze WSZYSTKICH przycisków kategorii w całej aplikacji
+        document.querySelectorAll('.category-button.active').forEach(b => b.classList.remove('active'));
+        // Zresetuj style przycisków (żółte/standardowe), aby nie pozostawały podświetlone
+        document.querySelectorAll('.category-button').forEach(btn => {
+          btn.style.background = 'white';
+          btn.style.color = btn.classList.contains('promotion') ? '#FF6B6B' : '#333';
+        });
+        // Ustaw aktywny na lokalnym pigułkowym przycisku
+        Array.from(catDiv.children).forEach(b=>b.classList.remove('active'));
+        el.classList.add('active');
+      }
       pills.forEach(cat => {
         const btn = document.createElement('button');
         btn.className = 'category-button';
         btn.textContent = cat;
-        btn.onclick = function(){ renderList(cat); setActive(btn); };
+        btn.onclick = function(){
+          try { window.__userCategoryPicked = true; } catch(_){}
+          renderList(cat);
+          setActive(btn);
+        };
         if (cat===selectedCategory) btn.classList.add('active');
         catDiv.appendChild(btn);
       });
