@@ -551,12 +551,50 @@
     // Start AR only after user gesture to ensure camera permission prompt (esp. iOS)
     const startOverlay = document.getElementById('xr-start');
     const startBtn = document.getElementById('xr-start-btn');
+    function quickLookImmediateGuess() {
+      // Guess a USDZ path synchronously to keep within the user gesture
+      const cur = modelUrl || '';
+      let guess = cur;
+      if (/\.(glb|gltf)$/i.test(cur)) {
+        guess = cur.replace(/\.(glb|gltf)$/i, '.usdz');
+      }
+      // Prefer -2 variant if base likely exists
+      if (!/-2\.usdz$/i.test(guess)) {
+        const base = guess.replace(/\.usdz$/i, '');
+        guess = `${base}-2.usdz`;
+      }
+      // Final fallback that we know exists in repo
+      if (!/\.usdz$/i.test(guess)) guess = 'chairs/Tulla-2.usdz';
+      try {
+        const abs = new URL(guess, window.location.href).toString();
+        window.location.href = abs; // Direct navigation opens Quick Look
+      } catch(_) {
+        window.location.href = 'chairs/Tulla-2.usdz';
+      }
+    }
+
     startBtn?.addEventListener('click', async () => {
       try {
+        // iOS: if WebXR is likely unavailable (no navigator.xr or insecure), jump straight to Quick Look
+        const likelyNoXR = !window.isSecureContext || !navigator.xr || typeof navigator.xr.isSessionSupported !== 'function';
+        if (isIOS && likelyNoXR) {
+          quickLookImmediateGuess();
+          return;
+        }
+
         startOverlay.style.display = 'none';
         await startAR();
+
+        // Safety fallback for iOS: if session did not start within 2s, try Quick Look
+        if (isIOS && (!xrState.session)) {
+          setTimeout(() => {
+            if (!xrState.session) quickLookImmediateGuess();
+          }, 2000);
+        }
       } catch(e) {
         console.error('Start AR failed:', e);
+        // Last resort on iOS
+        if (isIOS) { quickLookImmediateGuess(); return; }
         startOverlay.style.display = 'flex';
         alert('Nie udało się uruchomić AR: ' + (e?.message||e));
       }
