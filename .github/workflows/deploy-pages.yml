@@ -11,8 +11,10 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "pages"
-  cancel-in-progress: true
+  # Scope concurrency to branch so multiple branches don't cancel each other
+  group: pages-${{ github.ref }}
+  # Do not cancel an in-progress deployment when a new push arrives
+  cancel-in-progress: false
 
 jobs:
   deploy:
