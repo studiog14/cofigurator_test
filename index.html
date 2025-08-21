@@ -7082,6 +7082,40 @@ updateSummary();
         return btn;
       }
 
+      // DOM Overlay for AR (WebXR) — custom UI inside AR view (Android only)
+      function ensureArDomOverlay(){
+        let root = document.getElementById('__ar_dom_overlay');
+        if (!root) {
+          root = document.createElement('div');
+          root.id = '__ar_dom_overlay';
+          // Fullscreen overlay; let only our controls accept input
+          root.style.cssText = 'position:fixed;inset:0;z-index:2147483647;display:none;pointer-events:none;'
+            + 'font-family:Poppins,system-ui,Segoe UI,Roboto,Arial,sans-serif;';
+          // Bottom-left UI group
+          const bl = document.createElement('div');
+          bl.id = '__ar_ui_bottom_left';
+          bl.style.cssText = 'position:absolute;left:12px;bottom:12px;display:flex;gap:10px;align-items:center;pointer-events:auto;';
+          // Back tile button
+          const back = document.createElement('button');
+          back.id = '__ar_ui_back';
+          back.type = 'button';
+          back.textContent = 'Powrót do konfiguratora';
+          back.style.cssText = 'background:#F5C842;color:#333;border:none;border-radius:14px;padding:10px 14px;'
+            + 'font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,.25);letter-spacing:.2px;';
+          bl.appendChild(back);
+          // Optional: placeholder tile (expand later)
+          const info = document.createElement('div');
+          info.id = '__ar_ui_hint';
+          info.textContent = '';
+          info.style.cssText = 'color:white;text-shadow:0 1px 2px rgba(0,0,0,.6);font-size:12px;font-weight:600;opacity:.9;';
+          // Add groups
+          root.appendChild(bl);
+          root.appendChild(info);
+          document.body.appendChild(root);
+        }
+        return root;
+      }
+
   async function openArWebXRMobile() {
         try { showModelLoader('Ładowanie trybu AR...'); } catch(_) {}
         const curChair = (typeof selectedChair !== 'undefined' && selectedChair && selectedChair.Nazwa) ? selectedChair : window.selectedChair;
@@ -7137,13 +7171,75 @@ updateSummary();
           return;
         }
 
-        // Android: use Google Scene Viewer with a return link CTA (cannot remove native close/share)
+        // Android: try WebXR with DOM Overlay (custom UI). Fallback to Scene Viewer if unavailable.
         if (typeof isAndroid === 'function' && isAndroid()) {
           if (!glb) { hideModelLoader(); alert(`Brak pliku GLB dla AR dla modelu: ${curChair?.Nazwa || ''}`); return; }
+          await preloadModelViewerScriptForAndroid();
+          const overlay = ensureArDomOverlay();
+          const backBtnFloating = ensureArBackButton(); // for safety outside session
           try {
-            window.location.href = buildSceneViewerUrl(glb);
-          } finally {
-            setTimeout(() => hideModelLoader(), 1000);
+            let mv = document.getElementById('__mv_ar');
+            if (!mv) {
+              mv = document.createElement('model-viewer');
+              mv.id = '__mv_ar';
+              mv.setAttribute('ar', '');
+              mv.setAttribute('ar-modes', 'webxr');
+              mv.setAttribute('reveal', 'manual');
+              mv.setAttribute('disable-zoom', '');
+              mv.setAttribute('disable-pan', '');
+              mv.setAttribute('style', 'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;');
+              // Enable WebXR DOM overlay
+              const xrInit = {
+                requiredFeatures: ['hit-test'],
+                optionalFeatures: ['dom-overlay','unbounded','local-floor','bounded-floor'],
+                domOverlay: { root: '#__ar_dom_overlay' }
+              };
+              mv.setAttribute('xr-session-init', JSON.stringify(xrInit));
+              document.body.appendChild(mv);
+            }
+            mv.setAttribute('src', toAbsUrl(glb));
+            // Wire overlay controls
+            const backTile = document.getElementById('__ar_ui_back');
+            if (backTile) {
+              backTile.onclick = (e) => {
+                e.preventDefault(); e.stopPropagation();
+                try { typeof mv.exitAR === 'function' && mv.exitAR(); } catch(_) {}
+              };
+            }
+            const onProgress = (ev) => {
+              const p = ev?.detail?.totalProgress;
+              if (typeof p === 'number' && p >= 0 && p <= 1) updateModelLoaderProgress(6 + Math.round(p * 88));
+            };
+            const onArStatus = (ev) => {
+              const s = ev?.detail?.status || '';
+              if (s === 'session-started') {
+                overlay.style.display = 'block';
+                if (backBtnFloating) backBtnFloating.style.display = 'none';
+                hideModelLoader();
+              }
+              if (s === 'failed' || s === 'not-presenting') {
+                overlay.style.display = 'none';
+                if (backBtnFloating) backBtnFloating.style.display = 'none';
+                hideModelLoader();
+                mv.removeEventListener('progress', onProgress);
+                mv.removeEventListener('ar-status', onArStatus);
+              }
+            };
+            try { mv.removeEventListener('progress', onProgress); } catch(_) {}
+            try { mv.removeEventListener('ar-status', onArStatus); } catch(_) {}
+            mv.addEventListener('progress', onProgress);
+            mv.addEventListener('ar-status', onArStatus);
+            if (typeof mv.activateAR === 'function') {
+              mv.activateAR();
+            } else {
+              // Fallback to Scene Viewer with back link CTA
+              window.location.href = buildSceneViewerUrl(glb);
+              setTimeout(() => hideModelLoader(), 1000);
+            }
+          } catch (e) {
+            console.warn('WebXR AR error, falling back to Scene Viewer:', e);
+            // Fallback: open Scene Viewer
+            try { window.location.href = buildSceneViewerUrl(glb); } finally { setTimeout(() => hideModelLoader(), 1000); }
           }
           return;
         }
