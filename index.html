@@ -3281,9 +3281,10 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
             try {
               const isDesk = (typeof isDesktop === 'function') ? isDesktop() : !(typeof isIOS==='function'&&isIOS()) && !(typeof isAndroid==='function'&&isAndroid());
               if (isDesk) {
-                // Desktop unchanged – show QR to AR landing page
+                // Desktop unchanged – show QR to AR landing page (auto-open AR on mobile)
                 const url = (typeof buildArHtmlUrl === 'function') ? buildArHtmlUrl() : 'ar_viewer.html';
-                if (typeof showQrWithUrl === 'function') showQrWithUrl(url);
+                const qrUrl = url + (url.includes('?') ? '&' : '?') + 'open_ar=1';
+                if (typeof showQrWithUrl === 'function') showQrWithUrl(qrUrl);
                 return;
               }
 
@@ -6968,9 +6969,22 @@ updateSummary();
               link.setAttribute('href', buildQuickLookUrl(usdz));
               // Optional poster; leave unset to avoid white flash
               document.body.appendChild(link);
+              // iOS can sometimes ignore programmatic clicks; add a safety fallback
+              let navigated = false;
+              const mark = () => { navigated = true; };
+              window.addEventListener('pagehide', mark, { once: true });
+              document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState !== 'visible') navigated = true;
+              }, { once: true });
               link.click();
-              // Clean up quickly
-              setTimeout(() => { try { link.remove(); } catch(_){} }, 0);
+              // Fallback to AR landing if Quick Look didn’t engage
+              setTimeout(() => {
+                try { link.remove(); } catch(_){}
+                if (!navigated) {
+                  const url = (typeof buildArHtmlUrl === 'function') ? buildArHtmlUrl() : 'ar.html';
+                  window.location.href = url;
+                }
+              }, 900);
               return;
             }
           }
