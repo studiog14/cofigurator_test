@@ -7033,7 +7033,7 @@ updateSummary();
         try { return new URL(pathOrUrl, window.location.href).toString(); } catch { return pathOrUrl; }
       }
 
-      async function openArWebXRMobile() {
+  async function openArWebXRMobile() {
         const curChair = (typeof selectedChair !== 'undefined' && selectedChair && selectedChair.Nazwa) ? selectedChair : window.selectedChair;
         if (!curChair || !curChair.Nazwa) {
           alert('Najpierw wybierz krzesło z konfiguratora');
@@ -7041,12 +7041,22 @@ updateSummary();
         }
 
         const assets = (typeof getCurrentArAssets === 'function') ? getCurrentArAssets() : null;
-        const glb = assets?.glb || (Array.isArray(assets?.glbCandidates) ? assets.glbCandidates[0] : null);
-        const usdz = Array.isArray(assets?.usdzCandidates) ? assets.usdzCandidates[0] : null;
+  const glb = assets?.glb || (Array.isArray(assets?.glbCandidates) ? assets.glbCandidates[0] : null);
+  let usdz = Array.isArray(assets?.usdzCandidates) ? assets.usdzCandidates[0] : null;
 
         // iOS: Quick Look USDZ
         if (typeof isIOS === 'function' && isIOS()) {
-          if (!usdz) { alert('Brak pliku USDZ dla iOS.'); return; }
+          // Pick a real USDZ to avoid Quick Look hanging on a 404
+          const pickUsdz = async () => {
+            const list = Array.isArray(assets?.usdzCandidates) ? assets.usdzCandidates : (usdz ? [usdz] : []);
+            const headOk = async (p) => {
+              try { const r = await fetch(toAbsUrl(p), { method: 'HEAD' }); return r.ok; } catch { return false; }
+            };
+            for (const c of list) { if (await headOk(c)) return c; }
+            return null;
+          };
+          usdz = await pickUsdz();
+          if (!usdz) { alert('Brak dostępnego pliku USDZ dla iOS.'); return; }
           const link = document.createElement('a');
           link.setAttribute('rel', 'ar');
           link.setAttribute('href', toAbsUrl(usdz));
