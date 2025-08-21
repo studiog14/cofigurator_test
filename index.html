@@ -6938,7 +6938,21 @@ updateSummary();
         return `https://arvr.google.com/scene-viewer/1.0?file=${file}&mode=ar_only&title=${title}`;
       }
       function buildQuickLookUrl(usdzUrl) {
-        return new URL(usdzUrl, window.location.href).toString();
+        // Build iOS Quick Look URL with custom CTA back to configurator
+        const abs = new URL(usdzUrl, window.location.href);
+        // Preserve existing hash params and append/override Quick Look ones
+        const hashParams = new URLSearchParams(abs.hash ? abs.hash.slice(1) : '');
+        const returnUrl = (() => {
+          try {
+            const u = new URL(window.location.href);
+            u.searchParams.delete('open_ar');
+            return u.toString();
+          } catch { return window.location.href; }
+        })();
+        hashParams.set('callToAction', 'Powrót do konfiguratora');
+        hashParams.set('link', returnUrl);
+        abs.hash = hashParams.toString();
+        return abs.toString();
       }
       function buildArLandingUrl() {
         // Desktop QR should point to dedicated ar.html with model param
@@ -7126,9 +7140,11 @@ updateSummary();
               mv = document.createElement('model-viewer');
               mv.id = '__mv_ar';
               mv.setAttribute('ar', '');
-              // Prefer WebXR; allow Scene Viewer only as code fallback if activateAR is unavailable
+              // Prefer WebXR; do not expose default UI; Scene Viewer only via code fallback if needed
               mv.setAttribute('ar-modes', 'webxr');
               mv.setAttribute('reveal', 'manual');
+              mv.setAttribute('disable-zoom', '');
+              mv.setAttribute('disable-pan', '');
               // Do not expose camera controls/UI in-page; we trigger AR programmatically
               mv.setAttribute('style', 'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;');
               document.body.appendChild(mv);
