@@ -7108,12 +7108,45 @@ updateSummary();
           info.id = '__ar_ui_hint';
           info.textContent = '';
           info.style.cssText = 'color:white;text-shadow:0 1px 2px rgba(0,0,0,.6);font-size:12px;font-weight:600;opacity:.9;';
+          // Preview-close (visible only in preview mode)
+          const closePrev = document.createElement('button');
+          closePrev.id = '__ar_ui_preview_close';
+          closePrev.type = 'button';
+          closePrev.textContent = 'Zamknij podgląd';
+          closePrev.style.cssText = 'position:absolute;top:12px;right:12px;background:#111;color:#fff;opacity:.9;'
+            + 'border:none;border-radius:12px;padding:8px 12px;font-weight:700;pointer-events:auto;display:none;';
+          closePrev.addEventListener('click', (e)=>{
+            e.preventDefault(); e.stopPropagation();
+            hideArOverlayPreview();
+          });
           // Add groups
           root.appendChild(bl);
           root.appendChild(info);
+          root.appendChild(closePrev);
           document.body.appendChild(root);
         }
         return root;
+      }
+
+      // ===== Overlay preview (for iOS 15+ without WebXR) =====
+      function showArOverlayPreview() {
+        const overlay = ensureArDomOverlay();
+        overlay.style.display = 'block';
+        overlay.dataset.preview = '1';
+        const hint = document.getElementById('__ar_ui_hint');
+        if (hint) hint.textContent = 'Podgląd UI AR (bez AR)';
+        const prevClose = document.getElementById('__ar_ui_preview_close');
+        if (prevClose) prevClose.style.display = 'inline-block';
+      }
+      function hideArOverlayPreview() {
+        const overlay = document.getElementById('__ar_dom_overlay');
+        if (!overlay) return;
+        delete overlay.dataset.preview;
+        overlay.style.display = 'none';
+        const hint = document.getElementById('__ar_ui_hint');
+        if (hint) hint.textContent = '';
+        const prevClose = document.getElementById('__ar_ui_preview_close');
+        if (prevClose) prevClose.style.display = 'none';
       }
 
   async function openArWebXRMobile() {
@@ -7275,6 +7308,16 @@ updateSummary();
           if (vb) { bindView(vb); mo.disconnect(); }
         });
         mo.observe(document.body, { childList: true, subtree: true });
+      })();
+
+      // Enable overlay preview via URL param (?ar_ui_preview=1)
+      (function maybeEnableArUiPreview(){
+        try {
+          const u = new URL(window.location.href);
+          if (u.searchParams.get('ar_ui_preview') === '1') {
+            showArOverlayPreview();
+          }
+        } catch(_) {}
       })();
 
       // Preload script early on Android
