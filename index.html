@@ -7109,6 +7109,53 @@ updateSummary();
         try { return new URL(pathOrUrl, window.location.href).toString(); } catch { return pathOrUrl; }
       }
 
+      // ===== Fullscreen AR loading overlay (matches app styling) =====
+      (function injectArLoadingOverlay(){
+        if (document.getElementById('ar-loading-overlay')) return;
+        const style = document.createElement('style');
+        style.textContent = `@keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}`;
+        document.head.appendChild(style);
+        const overlay = document.createElement('div');
+        overlay.id = 'ar-loading-overlay';
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:999999;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.4);backdrop-filter:blur(6px);';
+        overlay.innerHTML = `
+          <div style="background:white;width:90%;max-width:380px;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.25);padding:24px;text-align:center;border:1px solid rgba(0,0,0,0.08);">
+            <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:14px;">
+              <img src="icons/FK_logo.png" alt="FK" style="height:36px;width:auto;object-fit:contain;"/>
+              <strong style="font-family:Poppins,sans-serif;color:#333;font-size:16px;">Fajne Krzesła</strong>
+            </div>
+            <div style="margin:6px auto 14px;width:42px;height:42px;border:4px solid #f3f3f3;border-top:4px solid #F5C842;border-radius:50%;animation:spin 1s linear infinite;"></div>
+            <div id="ar-loading-text" style="margin:8px 0 10px;font-size:14px;color:#555;">Ładowanie trybu AR...</div>
+            <div style="height:8px;background:#f0f0f0;border-radius:6px;overflow:hidden;">
+              <div id="ar-loading-bar" style="height:100%;width:0%;background:#F5C842;transition:width .2s ease;"></div>
+            </div>
+          </div>`;
+        document.body.appendChild(overlay);
+      })();
+
+      function showArLoading(text){
+        const o = document.getElementById('ar-loading-overlay');
+        if (!o) return; const t = o.querySelector('#ar-loading-text'); if (t && text) t.textContent = text; o.style.display = 'flex';
+      }
+      function updateArLoadingProgress(percent){
+        const o = document.getElementById('ar-loading-overlay'); if (!o) return; const b = o.querySelector('#ar-loading-bar');
+        const clamped = Math.max(0, Math.min(100, percent||0)); if (b) b.style.width = clamped + '%';
+      }
+      function hideArLoading(){ const o = document.getElementById('ar-loading-overlay'); if (!o) return; o.style.display='none'; const b=o.querySelector('#ar-loading-bar'); if (b) b.style.width='0%'; }
+
+      // Custom AR back button (Android WebXR)
+      function ensureArBackButton(){
+        let btn = document.getElementById('ar-back-button');
+        if (!btn) {
+          btn = document.createElement('button');
+          btn.id = 'ar-back-button';
+          btn.textContent = 'Powrót do konfiguratora';
+          btn.style.cssText = 'position:fixed;top:14px;left:14px;z-index:999999;display:none;background:#F5C842;color:#333;border:none;border-radius:24px;padding:10px 16px;font-weight:600;font-family:Poppins,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,0.2);';
+          document.body.appendChild(btn);
+        }
+        return btn;
+      }
+
   async function openArWebXRMobile() {
         try { showArLoading('Ładowanie trybu AR...'); } catch(_) {}
         const curChair = (typeof selectedChair !== 'undefined' && selectedChair && selectedChair.Nazwa) ? selectedChair : window.selectedChair;
@@ -7174,21 +7221,38 @@ updateSummary();
               mv = document.createElement('model-viewer');
               mv.id = '__mv_ar';
               mv.setAttribute('ar', '');
-              mv.setAttribute('ar-modes', 'webxr scene-viewer');
+              // Prefer WebXR; allow Scene Viewer only as code fallback if activateAR is unavailable
+              mv.setAttribute('ar-modes', 'webxr');
               mv.setAttribute('reveal', 'manual');
-              mv.setAttribute('camera-controls', '');
+              // Do not expose camera controls/UI in-page; we trigger AR programmatically
               mv.setAttribute('style', 'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;');
               document.body.appendChild(mv);
             }
             mv.setAttribute('src', toAbsUrl(glb));
+            // Prepare custom AR back button
+            const backBtn = ensureArBackButton();
+            if (backBtn) {
+              backBtn.style.display = 'none';
+              backBtn.onclick = (e) => {
+                e.stopPropagation();
+                try { typeof mv.exitAR === 'function' && mv.exitAR(); } catch(_) {}
+                backBtn.style.display = 'none';
+              };
+            }
             const onProgress = (ev) => {
               const p = ev?.detail?.totalProgress;
               if (typeof p === 'number' && p >= 0 && p <= 1) updateArLoadingProgress(6 + Math.round(p * 88));
             };
             const onArStatus = (ev) => {
               const s = ev?.detail?.status || '';
-              if (s === 'session-started' || s === 'failed' || s === 'not-presenting') {
+              if (s === 'session-started') {
+                // Show custom back button while in AR
+                if (backBtn) backBtn.style.display = 'block';
+              }
+              if (s === 'failed' || s === 'not-presenting') {
+                // Hide loader and back button when AR ends or fails
                 hideArLoading();
+                if (backBtn) backBtn.style.display = 'none';
                 mv.removeEventListener('progress', onProgress);
                 mv.removeEventListener('ar-status', onArStatus);
               }
