@@ -3279,7 +3279,8 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
           viewBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
             try {
-              const url = (typeof buildArHtmlUrl === 'function') ? buildArHtmlUrl() : 'ar.html';
+              const asyncUrl = (typeof buildArHtmlUrlAsync === 'function') ? await buildArHtmlUrlAsync() : null;
+              const url = asyncUrl || ((typeof buildArHtmlUrl === 'function') ? buildArHtmlUrl() : 'ar.html');
               if (typeof isDesktop === 'function' && isDesktop()) {
                 if (typeof showQrWithUrl === 'function') showQrWithUrl(url);
               } else {
@@ -3884,6 +3885,22 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
           const btn = ev.target && ev.target.closest && ev.target.closest('.category-button');
           if (!btn) return;
           try { window.__userCategoryPicked = true; } catch(_){}
+          // Global: enforce active highlighting immediately on any category-button click
+          try {
+            document.querySelectorAll('.category-button').forEach(b => {
+              b.classList.remove('active');
+              b.style.background = 'white';
+              b.style.color = b.classList.contains('promotion') ? '#FF6B6B' : '#333';
+            });
+            btn.classList.add('active');
+            if (btn.classList.contains('promotion')) {
+              btn.style.background = '#FF6B6B';
+              btn.style.color = 'white';
+            } else {
+              btn.style.background = '#F5C842';
+              btn.style.color = '#333';
+            }
+          } catch(_){ }
         }, { passive: true });
       } catch(_){}
       
@@ -5673,10 +5690,10 @@ renderOptions('legs-thumbnails', legs, item => {
           console.log('🖥️📱 Responsive UI initialization');
           renderCategoryButtons();
           // Poczekaj chwilę aż przyciski zostaną dodane do DOM-u, a następnie aktywuj Promocje
-          setTimeout(() => {
-            renderPromotions();
-          }, 50);
+          setTimeout(() => { renderPromotions(); }, 50);
           showScreen('models');
+          // Mobile: zainicjuj prawy panel kategorii od razu (np. z Promocje)
+          try { if (window.innerWidth <= 820) { setTimeout(() => { try { renderMobileRightPanelList('Promocje'); } catch(e) { console.warn('renderMobileRightPanelList init:', e); } }, 120); } } catch(_){ }
           const hdrEntries = allData.filter(d => d.HDR && d.HDRIcon);
           renderHDROptions(hdrEntries);
 
@@ -6808,6 +6825,22 @@ updateSummary();
         } catch (e) {
           return 'ar.html';
         }
+      }
+
+      // Prefer resolving an actually existing asset (GLB preferred; else first existing USDZ)
+      async function buildArHtmlUrlAsync() {
+        try {
+          const url = new URL('ar.html', window.location.href);
+          const assets = (typeof getCurrentArAssets === 'function') ? getCurrentArAssets() : null;
+          const headOk = async (p) => { try { const r = await fetch(p, { method: 'HEAD' }); return r.ok; } catch { return false; } };
+          let chosen = null;
+          if (assets?.glb && await headOk(assets.glb)) chosen = assets.glb;
+          if (!chosen && Array.isArray(assets?.usdzCandidates)) {
+            for (const u of assets.usdzCandidates) { if (await headOk(u)) { chosen = u; break; } }
+          }
+          if (chosen) url.searchParams.set('model', chosen);
+          return url.toString();
+        } catch { return 'ar.html'; }
       }
 
       function buildSceneViewerUrl(glbUrl) {
