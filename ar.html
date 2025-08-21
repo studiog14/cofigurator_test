@@ -224,7 +224,7 @@
           );
         } else {
           gltfLoader.load(
-      src,
+            src,
             (gltf) => {
               const root = gltf.scene || gltf.scenes?.[0];
               if (!root) { reject(new Error('Brak sceny w GLB')); return; }
@@ -314,15 +314,23 @@
         let modelRoot = null;
         try {
           modelRoot = await loadModel(modelUrl);
-  } catch(e) {
-          console.error('Nie udało się załadować GLB dla WebXR:', e);
+        } catch(e) {
+          console.error('Nie udało się załadować modelu dla WebXR:', e);
+          // Jeśli próbujemy USDZ i padło – spróbuj automatycznie GLB o tej samej bazie nazwy
+          try {
+            const base = modelUrl.replace(/\.usdz$/i, '').replace(/\.(glb|gltf)$/i,'');
+            const alt = `${base}.glb`;
+            console.log('Próba alternatywy GLB:', alt);
+            modelRoot = await loadModel(alt);
+          } catch(e2) {
+            console.error('Alternatywa GLB też nie działa:', e2);
           // Spróbuj natywnego AR jako awaryjne rozwiązanie
           loading.style.display = 'none';
           unsupported.style.display = 'flex';
           if (nativeBtn) {
             if (isAndroid) {
               const title = encodeURIComponent(modelUrl.split('/').pop() || 'Model');
-      const fileAbs = encodeURIComponent(new URL(modelUrl.replace(/\.usdz$/i,'.glb'), window.location.href).toString());
+              const fileAbs = encodeURIComponent(new URL(modelUrl.replace(/\.usdz$/i,'.glb'), window.location.href).toString());
               const sceneViewerUrl = `https://arvr.google.com/scene-viewer/1.0?file=${fileAbs}&mode=ar_only&title=${title}`;
               nativeBtn.style.display = 'inline-block';
               nativeBtn.onclick = () => { window.location.href = sceneViewerUrl; };
@@ -340,6 +348,7 @@
             }
           }
           return;
+          }
         }
 
   // Utworzenie sesji AR WebXR
@@ -567,11 +576,10 @@
       const dirs=['chairs','models'];
       const glbs=[]; const usdz=[];
       for (const d of dirs) { for (const b of bases) { glbs.push(`${d}/${b}.glb`, `${d}/${b}-2.glb`); usdz.push(`${d}/${b}.usdz`, `${d}/${b}-2.usdz`); } }
-      let chosen=null;
-      if (isAndroid) { for (const g of glbs) { if (await headOk(g)) { chosen=g; break; } } if (!chosen) { for (const u of usdz) { if (await headOk(u)) { chosen=u; break; } } }
-      } else if (isIOS) { for (const u of usdz) { if (await headOk(u)) { chosen=u; break; } } if (!chosen) { for (const g of glbs) { if (await headOk(g)) { chosen=g; break; } } }
-      } else { for (const g of glbs) { if (await headOk(g)) { chosen=g; break; } } if (!chosen) { for (const u of usdz) { if (await headOk(u)) { chosen=u; break; } } }
-      }
+  let chosen=null;
+  // Stabilność: preferuj GLB dla WebXR; jeśli brak, dopiero USDZ
+  for (const g of glbs) { if (await headOk(g)) { chosen=g; break; } }
+  if (!chosen) { for (const u of usdz) { if (await headOk(u)) { chosen=u; break; } } }
       if (!chosen) { alert('Nie znaleziono plików dla: ' + name); return; }
       // Przeładuj stronę z nowym parametrem (najszybsze i najstabilniejsze w AR)
       const next = new URL(window.location.href); next.searchParams.set('model', chosen); window.location.href = next.toString();
