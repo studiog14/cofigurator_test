@@ -6907,7 +6907,10 @@ updateSummary();
             console.warn('No model found for chair:', window.selectedChair?.Nazwa);
           }
           return url.toString();
-        } catch { return 'ar.html'; }
+        } catch(e) { 
+          console.error('Error building AR URL:', e);
+          return 'ar.html'; 
+        }
       }
 
       function buildSceneViewerUrl(glbUrl) {
