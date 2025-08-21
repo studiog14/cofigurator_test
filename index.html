@@ -7394,7 +7394,8 @@ updateSummary();
           // MVP: Desktop -> pokaż QR z linkiem do AR; Mobile -> otwórz AR bezpośrednio
           if (isDesktop()) {
             const url = buildArLandingUrl();
-            showQrWithUrl(url);
+            const qrUrl = url + (url.includes('?') ? '&' : '?') + 'open_ar=1';
+            showQrWithUrl(qrUrl);
           } else {
             await openArFlow();
           }
