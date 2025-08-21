@@ -3275,12 +3275,13 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
             viewBtn.style.background = 'linear-gradient(135deg, #F5C842, #E5B432)';
           });
 
-          // Click -> Go to ar.html on mobile; desktop shows QR to ar.html
+      // Click -> Go to ar.html on mobile; desktop shows QR to ar.html
           viewBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
             try {
-              // Ensure we have a selected chair before proceeding
-              if (!window.selectedChair?.Nazwa) {
+        // Ensure we have a selected chair before proceeding (prefer live var, fallback to window)
+        const curChair = (typeof selectedChair !== 'undefined' && selectedChair && selectedChair.Nazwa) ? selectedChair : window.selectedChair;
+        if (!curChair?.Nazwa) {
                 alert('Najpierw wybierz krzesło z konfiguratora');
                 return;
               }
@@ -3305,8 +3306,10 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
         const viewBtn = document.getElementById('view-in-room-button');
         if (!configBtn || !viewBtn) return;
 
-        const isMobile = isMobileMode();
-  const hasChair = !!(window.selectedChair && window.selectedChair.Nazwa);
+  const isMobile = isMobileMode();
+  // Prefer live variable selectedChair; fallback to window.selectedChair
+  const curChair = (typeof selectedChair !== 'undefined' && selectedChair && selectedChair.Nazwa) ? selectedChair : window.selectedChair;
+  const hasChair = !!(curChair && curChair.Nazwa);
   // Toggle a body flag so CSS can instantly hide/show on mobile
   if (hasChair) document.body.classList.add('has-chair');
   else document.body.classList.remove('has-chair');
@@ -4216,7 +4219,9 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
       currentModelContainer = await loadModelWithFreshness(`chairs/${variant.Nazwa}.glb`, viewer, { autoCenter: true });
 
       console.log("Meshe w modelu:", currentModelContainer.children.map(obj => obj.name)); // <-- DODAJ TO TUTAJ
-      //selectedChair = variant; // <-- DODAJ TO!
+  // Keep selection in sync for AR helpers
+  selectedChair = variant;
+  try { window.selectedChair = variant; } catch(_) {}
 
       
       // Wyśrodkuj kamerę na modelu
@@ -4251,7 +4256,9 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
   document.getElementById('model-loader').style.display = 'flex';
 
   try {
+    // Update both local and global references so other modules (AR helpers) see the latest chair
     selectedChair = variant;
+    try { window.selectedChair = variant; } catch(_) {}
 
     // Przygotuj listę możliwych ścieżek do modelu (mobilne i desktop)
     function candidateModelPaths(name) {
@@ -6801,7 +6808,9 @@ updateSummary();
 
       // Return current model assets for AR, with rich candidate lists sorted by best name match
       function getCurrentArAssets() {
-        const raw = (window.selectedChair?.Nazwa || '').trim();
+        // Prefer live selectedChair var; fallback to window.selectedChair
+        const curChair = (typeof selectedChair !== 'undefined' && selectedChair && selectedChair.Nazwa) ? selectedChair : window.selectedChair;
+        const raw = (curChair?.Nazwa || '').trim();
         const strip = (s)=> (typeof stripBrackets==='function'? stripBrackets(s): s);
         const baseRaw = strip(raw);
         const norm = (s)=> s
@@ -6904,7 +6913,8 @@ updateSummary();
             url.searchParams.set('model', chosen);
             console.log('Selected model for AR:', chosen);
           } else {
-            console.warn('No model found for chair:', window.selectedChair?.Nazwa);
+            const curChair = (typeof selectedChair !== 'undefined' && selectedChair && selectedChair.Nazwa) ? selectedChair : window.selectedChair;
+            console.warn('No model found for chair:', curChair?.Nazwa);
           }
           return url.toString();
         } catch(e) { 
@@ -6914,7 +6924,8 @@ updateSummary();
       }
 
       function buildSceneViewerUrl(glbUrl) {
-        const title = encodeURIComponent(window.selectedChair?.Nazwa || 'Model');
+        const curChair = (typeof selectedChair !== 'undefined' && selectedChair && selectedChair.Nazwa) ? selectedChair : window.selectedChair;
+        const title = encodeURIComponent(curChair?.Nazwa || 'Model');
         const file = encodeURIComponent(new URL(glbUrl, window.location.href).toString());
         return `https://arvr.google.com/scene-viewer/1.0?file=${file}&mode=ar_only&title=${title}`;
       }
@@ -7179,12 +7190,13 @@ updateSummary();
           if (typeof currentLegModel.dispose === 'function') currentLegModel.dispose();
         }
         
-        // Reset zmiennych
-        currentModelContainer = null;
-        currentLegModel = null;
-        selectedLeg = null;
-        selectedMaterials = {};
-        selectedChair = null;
+  // Reset zmiennych (keep globals in sync)
+  currentModelContainer = null;
+  currentLegModel = null;
+  selectedLeg = null;
+  selectedMaterials = {};
+  selectedChair = null;
+  try { window.selectedChair = null; } catch(_) {}
         
         // Odśwież kategorie
         renderCategoryButtons();
