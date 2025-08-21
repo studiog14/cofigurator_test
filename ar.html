@@ -126,6 +126,11 @@
 
   <div id="ar-diagnostics" style="display:none"></div>
 
+  <!-- Hidden Quick Look launcher for iOS (auto-clicked to skip white poster UI) -->
+  <a id="ql-link" rel="ar" href="#" style="display:none">
+    <img id="ql-poster" src="icons/AR_icon.png" alt="poster" />
+  </a>
+
   <script type="module">
     import * as THREE from 'https://unpkg.com/three@0.157.0/build/three.module.js';
   import { GLTFLoader } from 'https://unpkg.com/three@0.157.0/examples/jsm/loaders/GLTFLoader.js';
@@ -141,6 +146,7 @@
   const ua = navigator.userAgent || '';
   const isAndroid = /Android/i.test(ua);
   const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isMobile = isAndroid || isIOS;
     
     try { 
       localStorage.setItem('ar:lastModel', modelUrl); 
@@ -256,7 +262,19 @@
         loading.style.display = 'flex';
   console.log('Uruchamianie AR z WebXR...');
 
-  // Sprawdź wsparcie WebXR
+  // iOS: prefer Quick Look (bez białego widoku i domyślnego UI)
+  if (isIOS) {
+    const usdz = await resolveUsdzCandidate(modelUrl);
+    if (usdz) {
+      await openQuickLook(usdz, await resolvePosterForModel());
+      loading.style.display = 'none';
+      // Zostajemy na stronie — po zamknięciu AR użytkownik wraca tutaj, ma nasze UI
+      return;
+    }
+    // Brak USDZ → próbuj dalej WebXR z GLB
+  }
+
+  // Sprawdź wsparcie WebXR (Android i fallback dla iOS bez USDZ)
   const supported = !!(navigator.xr && await navigator.xr.isSessionSupported?.('immersive-ar'));
         
         if (!supported) {
@@ -562,6 +580,54 @@
 
     async function headOk(p) { try { const r= await fetch(p,{method:'HEAD'}); return r.ok; } catch { return false; } }
 
+    async function resolveUsdzCandidate(fromUrl) {
+      // Szukaj USDZ odpowiadającego bazie nazwy
+      try {
+        const base = fromUrl.replace(/\.(glb|gltf|usdz)$/i,'');
+        const tries = [ `${base}.usdz`, `${base}-2.usdz`, `${base.replace(/\s+/g,'_')}.usdz` ];
+        for (const t of tries) { if (await headOk(t)) return t; }
+      } catch {}
+      return null;
+    }
+
+    async function resolvePosterForModel() {
+      // Spróbuj obrazka z arkusza dla aktualnego modelu, jeśli jest dostępny; w przeciwnym razie użyj ikony AR
+      const cur = (new URL(window.location.href)).searchParams.get('model') || '';
+      const name = (cur.split('/').pop() || '').replace(/\.(glb|gltf|usdz)$/i,'');
+      const hit = sheetData.find(it => (it.Typ||'').toLowerCase()==='model' && (it.Nazwa||'').toLowerCase()===name.toLowerCase());
+      return hit?.Obrazek || 'icons/AR_icon.png';
+    }
+
+    async function openQuickLook(usdzUrl, posterUrl) {
+      try {
+        const link = document.getElementById('ql-link');
+        const img = document.getElementById('ql-poster');
+        const abs = new URL(usdzUrl, window.location.href).toString();
+        // Opcje Quick Look przez fragment (część jest wspierana w nowszych iOS)
+        const opts = `#allowsContentScaling=1&canonicalWebPageURL=${encodeURIComponent(window.location.href)}`;
+        link.setAttribute('href', abs + opts);
+        if (img && posterUrl) img.src = posterUrl;
+
+        // Szybkie kliknięcie, aby ominąć biały ekran i domyślne przyciski
+        setTimeout(() => {
+          try { link.click(); } catch {}
+        }, 50);
+
+        // Diagnostyka: obserwuj widoczność, aby wiedzieć, kiedy AR się otwiera/zamyka
+        document.addEventListener('visibilitychange', () => {
+          if (document.hidden) {
+            // AR Quick Look otwarty
+            setDiagnostics('Quick Look otwarty');
+          } else {
+            // Quick Look zamknięty
+            setDiagnostics('Quick Look zamknięty');
+          }
+        }, { once: true });
+      } catch(e) {
+        console.warn('Nie udało się otworzyć Quick Look:', e);
+      }
+    }
+
     async function chooseModel(name) {
       // Zbuduj listę kandydatów jak w index.html, zależnie od platformy
       const norm = (s)=> s.normalize?.('NFD').replace(/\p{Diacritic}/gu,'').replace(/[^\w\s-]/g,'').trim();
@@ -576,13 +642,20 @@
       const dirs=['chairs','models'];
       const glbs=[]; const usdz=[];
       for (const d of dirs) { for (const b of bases) { glbs.push(`${d}/${b}.glb`, `${d}/${b}-2.glb`); usdz.push(`${d}/${b}.usdz`, `${d}/${b}-2.usdz`); } }
-  let chosen=null;
-  // Stabilność: preferuj GLB dla WebXR; jeśli brak, dopiero USDZ
-  for (const g of glbs) { if (await headOk(g)) { chosen=g; break; } }
-  if (!chosen) { for (const u of usdz) { if (await headOk(u)) { chosen=u; break; } } }
-      if (!chosen) { alert('Nie znaleziono plików dla: ' + name); return; }
-      // Przeładuj stronę z nowym parametrem (najszybsze i najstabilniejsze w AR)
-      const next = new URL(window.location.href); next.searchParams.set('model', chosen); window.location.href = next.toString();
+      if (isIOS) {
+        // iOS: od razu Quick Look, bez białego UI
+        for (const u of usdz) { if (await headOk(u)) { await openQuickLook(u, await resolvePosterForModel()); return; } }
+        // Brak USDZ → przeładuj z GLB (WebXR fallback)
+        for (const g of glbs) { if (await headOk(g)) { const next = new URL(window.location.href); next.searchParams.set('model', g); window.location.href = next.toString(); return; } }
+        alert('Nie znaleziono plików dla: ' + name);
+        return;
+      } else {
+        // Android/pozostali → GLB (WebXR)
+        for (const g of glbs) { if (await headOk(g)) { const next = new URL(window.location.href); next.searchParams.set('model', g); window.location.href = next.toString(); return; } }
+        // Rezerwowo spróbuj USDZ (mało prawdopodobne)
+        for (const u of usdz) { if (await headOk(u)) { const next = new URL(window.location.href); next.searchParams.set('model', u); window.location.href = next.toString(); return; } }
+        alert('Nie znaleziono plików dla: ' + name);
+      }
     }
   </script>
 </body>
