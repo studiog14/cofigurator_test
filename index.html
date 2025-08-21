@@ -3206,28 +3206,28 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
     /* Make both buttons smaller and consistent on mobile */
     body.mobile-mode #config-overview-button,
     body.mobile-mode #view-in-room-button {
-      padding: 6px 10px !important;
-      font-size: 11px !important;
-      border-radius: 16px !important;
-      box-shadow: 0 3px 10px rgba(245, 200, 66, 0.35) !important;
+      padding: 4px 8px !important;
+      font-size: 10px !important;
+      border-radius: 14px !important;
+      box-shadow: 0 2px 8px rgba(245, 200, 66, 0.3) !important;
       display: inline-flex !important;
       align-items: center !important;
-      gap: 6px !important;
+      gap: 4px !important;
       line-height: 1 !important;
-      height: 32px !important;
+      height: 26px !important;
     }
     @media (max-width: 820px) {
       #config-overview-button,
       #view-in-room-button {
-        padding: 6px 10px !important;
-        font-size: 11px !important;
-        border-radius: 16px !important;
-        box-shadow: 0 3px 10px rgba(245, 200, 66, 0.35) !important;
+        padding: 4px 8px !important;
+        font-size: 10px !important;
+        border-radius: 14px !important;
+        box-shadow: 0 2px 8px rgba(245, 200, 66, 0.3) !important;
         display: inline-flex !important;
         align-items: center !important;
-        gap: 6px !important;
+        gap: 4px !important;
         line-height: 1 !important;
-        height: 32px !important;
+        height: 26px !important;
       }
     }
   </style>
@@ -3247,7 +3247,7 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
           viewBtn = document.createElement('div');
           viewBtn.id = 'view-in-room-button';
           // Prefer SVG, fallback to PNG to keep transparency
-          viewBtn.innerHTML = '<img alt="AR" style="width:16px;height:16px;object-fit:contain;filter:none;" src="icons/AR_icon.svg" onerror="this.onerror=null;this.src=\'icons/AR_icon.png\';" /> <span>Zobacz w pomieszczeniu</span>';
+          viewBtn.innerHTML = '<img alt="AR" style="width:14px;height:14px;object-fit:contain;filter:none;" src="icons/AR_icon.svg" onerror="this.onerror=null;this.src=\'icons/AR_icon.png\';" /> <span>Zobacz w pomieszczeniu</span>';
           // Copy base style from config button (looks identical)
           try { viewBtn.style.cssText = configBtn.getAttribute('style') || ''; } catch(_) {}
           // Keep same z-index, padding, colors; position will be computed
@@ -3291,17 +3291,26 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
         if (!configBtn || !viewBtn) return;
 
         const isMobile = isMobileMode();
+        const hasChair = !!(window.selectedChair && window.selectedChair.Nazwa);
         const configVisible = window.getComputedStyle(configBtn).display !== 'none';
-        // Show only on mobile and when the config button is visible
-        viewBtn.style.display = (isMobile && configVisible) ? window.getComputedStyle(configBtn).display : 'none';
+        // On mobile: show both only after a chair is selected
+        if (isMobile) {
+          configBtn.style.display = hasChair ? (configVisible ? window.getComputedStyle(configBtn).display : 'inline-flex') : 'none';
+          viewBtn.style.display = hasChair && (window.getComputedStyle(configBtn).display !== 'none') ? 'inline-flex' : 'none';
+        } else {
+          // On desktop don’t interfere with config button visibility; hide our mobile-only view button
+          viewBtn.style.display = 'none';
+        }
 
         // Position to the right side of the config button with 8px gap
         const rect = configBtn.getBoundingClientRect();
         // If config button is positioned fixed at bottom/left, compute left in px
-  const leftPx = Math.max(0, rect.left + rect.width + 8);
+        const leftPx = Math.max(0, rect.left + rect.width + 8);
         viewBtn.style.left = leftPx + 'px';
-        // Keep bottom aligned
-        viewBtn.style.bottom = (configBtn.style.bottom || '20px');
+        // Keep perfect vertical alignment by matching computed bottom in pixels
+        const bottomPx = Math.max(0, Math.round(window.innerHeight - rect.bottom));
+        viewBtn.style.top = 'auto';
+        viewBtn.style.bottom = bottomPx + 'px';
       }
 
       function initViewButtonEnhancement(){
