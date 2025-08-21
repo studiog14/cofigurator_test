@@ -9,6 +9,14 @@
   <title>AR — Konfigurator</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="icons/favicon.png" />
+  <link rel="icon" href="icons/favicon.png" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.157.0/build/three.module.js"
+      }
+    }
+  </script>
   <style>
     html, body { height:100%; margin:0; background:#000; font-family: Arial, sans-serif; }
     #xr-loading { 
@@ -132,9 +140,9 @@
   </a>
 
   <script type="module">
-    import * as THREE from 'https://unpkg.com/three@0.157.0/build/three.module.js';
-  import { GLTFLoader } from 'https://unpkg.com/three@0.157.0/examples/jsm/loaders/GLTFLoader.js';
-  import { USDZLoader } from 'https://unpkg.com/three@0.157.0/examples/jsm/loaders/USDZLoader.js';
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.157.0/examples/jsm/loaders/GLTFLoader.js';
+    import { USDZLoader } from 'https://cdn.jsdelivr.net/npm/three@0.157.0/examples/jsm/loaders/USDZLoader.js';
 
   console.log('AR.html z WebXR uruchamia się...');
 
@@ -268,8 +276,20 @@
         if (!supported) {
           console.log('WebXR AR nie jest wspierany, pokazuję fallback');
           loading.style.display = 'none';
-          unsupported.style.display = 'flex';
           
+          // iOS: jeśli brak WebXR (często przez brak HTTPS/secure context), spróbuj Quick Look automatycznie
+          if (isIOS) {
+            if (!window.isSecureContext) {
+              console.warn('Brak secure context — iOS WebXR wymaga HTTPS. Uruchamiam Quick Look.');
+            }
+            const usdz = await resolveUsdzCandidate(modelUrl);
+            if (usdz) {
+              await openQuickLook(usdz, await resolvePosterForModel());
+              return;
+            }
+          }
+
+          unsupported.style.display = 'flex';
           // Setup natywny AR fallback (ostatnia deska ratunku)
           if (nativeBtn) {
             if (isAndroid) {
@@ -283,7 +303,7 @@
                 window.location.href = sceneViewerUrl; 
               };
             } else if (isIOS) {
-              // iOS: Quick Look fallback, jeśli istnieje USDZ
+              // iOS: Quick Look fallback, jeśli istnieje USDZ (gdy auto nie zadziałało)
               const usdz = await resolveUsdzCandidate(modelUrl);
               if (usdz) {
                 nativeBtn.style.display = 'inline-block';
@@ -308,30 +328,26 @@
             modelRoot = await loadModel(alt);
           } catch(e2) {
             console.error('Alternatywa GLB też nie działa:', e2);
-          // Spróbuj natywnego AR jako awaryjne rozwiązanie
-          loading.style.display = 'none';
-          unsupported.style.display = 'flex';
-          if (nativeBtn) {
-            if (isAndroid) {
+            // iOS: Auto Quick Look, jeśli mamy USDZ
+            if (isIOS) {
+              const usdz = await resolveUsdzCandidate(modelUrl);
+              if (usdz) {
+                loading.style.display = 'none';
+                await openQuickLook(usdz, await resolvePosterForModel());
+                return;
+              }
+            }
+            // Android fallback UI
+            loading.style.display = 'none';
+            unsupported.style.display = 'flex';
+            if (nativeBtn && isAndroid) {
               const title = encodeURIComponent(modelUrl.split('/').pop() || 'Model');
               const fileAbs = encodeURIComponent(new URL(modelUrl.replace(/\.usdz$/i,'.glb'), window.location.href).toString());
               const sceneViewerUrl = `https://arvr.google.com/scene-viewer/1.0?file=${fileAbs}&mode=ar_only&title=${title}`;
               nativeBtn.style.display = 'inline-block';
               nativeBtn.onclick = () => { window.location.href = sceneViewerUrl; };
-            } else if (isIOS) {
-              const base = modelUrl.replace(/\.glb$/i, '');
-              const candidates = [ `${base}.usdz`, `${base}-2.usdz`, `${base.replace(/\s+/g,'_')}.usdz`, `chairs/Tulla-2.usdz` ];
-              let chosen = null;
-              for (const candidate of candidates) {
-                try { const res = await fetch(candidate, { method: 'HEAD' }); if (res.ok) { chosen = candidate; break; } } catch(_) {}
-              }
-              if (chosen) {
-                nativeBtn.style.display = 'inline-block';
-                nativeBtn.onclick = () => { window.location.href = new URL(chosen, window.location.href).toString(); };
-              }
             }
-          }
-          return;
+            return;
           }
         }
 
