@@ -3195,18 +3195,46 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
     });
   </script>
 
-  <!-- Mobile-only: hide AR button in bottom toolbar and add 'Zobacz w pomieszczeniu' next to 'Twoja konfiguracja' -->
+  <!-- Mobile-only: hide AR button and style/position config + view-in-room buttons -->
   <style>
     /* Hide AR button only on mobile */
     body.mobile-mode #bottom-toolbar #ar-button { display: none !important; }
     @media (max-width: 820px) {
       #bottom-toolbar #ar-button { display: none !important; }
     }
+
+    /* Make both buttons smaller and consistent on mobile */
+    body.mobile-mode #config-overview-button,
+    body.mobile-mode #view-in-room-button {
+      padding: 6px 10px !important;
+      font-size: 11px !important;
+      border-radius: 16px !important;
+      box-shadow: 0 3px 10px rgba(245, 200, 66, 0.35) !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 6px !important;
+      line-height: 1 !important;
+      height: 32px !important;
+    }
+    @media (max-width: 820px) {
+      #config-overview-button,
+      #view-in-room-button {
+        padding: 6px 10px !important;
+        font-size: 11px !important;
+        border-radius: 16px !important;
+        box-shadow: 0 3px 10px rgba(245, 200, 66, 0.35) !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        line-height: 1 !important;
+        height: 32px !important;
+      }
+    }
   </style>
 
   <script>
     (function(){
-      function isMobileMode(){
+  function isMobileMode(){
         return document.body.classList.contains('mobile-mode') || window.innerWidth <= 820;
       }
 
@@ -3218,7 +3246,8 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
         if (!viewBtn) {
           viewBtn = document.createElement('div');
           viewBtn.id = 'view-in-room-button';
-          viewBtn.innerHTML = '<span>👀</span> <span>Zobacz w pomieszczeniu</span>';
+          // Prefer SVG, fallback to PNG to keep transparency
+          viewBtn.innerHTML = '<img alt="AR" style="width:16px;height:16px;object-fit:contain;filter:none;" src="icons/AR_icon.svg" onerror="this.onerror=null;this.src=\'icons/AR_icon.png\';" /> <span>Zobacz w pomieszczeniu</span>';
           // Copy base style from config button (looks identical)
           try { viewBtn.style.cssText = configBtn.getAttribute('style') || ''; } catch(_) {}
           // Keep same z-index, padding, colors; position will be computed
@@ -3238,18 +3267,15 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
             viewBtn.style.background = 'linear-gradient(135deg, #F5C842, #E5B432)';
           });
 
-          // Click -> AR flow (same as AR button behavior)
+          // Click -> Go to ar.html on mobile; desktop shows QR to ar.html
           viewBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
             try {
+              const url = (typeof buildArHtmlUrl === 'function') ? buildArHtmlUrl() : 'ar.html';
               if (typeof isDesktop === 'function' && isDesktop()) {
-                const url = (typeof buildArLandingUrl === 'function') ? buildArLandingUrl() : location.href;
                 if (typeof showQrWithUrl === 'function') showQrWithUrl(url);
-              } else if (typeof openArFlow === 'function') {
-                await openArFlow();
               } else {
-                const popup = document.getElementById('ar-popup');
-                if (popup) popup.style.display = 'block';
+                window.location.href = url;
               }
             } catch(err){ console.warn('AR open error:', err); }
           });
@@ -3272,7 +3298,7 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
         // Position to the right side of the config button with 8px gap
         const rect = configBtn.getBoundingClientRect();
         // If config button is positioned fixed at bottom/left, compute left in px
-        const leftPx = Math.max(0, rect.left + rect.width + 8);
+  const leftPx = Math.max(0, rect.left + rect.width + 8);
         viewBtn.style.left = leftPx + 'px';
         // Keep bottom aligned
         viewBtn.style.bottom = (configBtn.style.bottom || '20px');
@@ -3285,7 +3311,7 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
       }
 
       // Initialize after load to ensure base scripts/styles ran
-      window.addEventListener('load', () => {
+  window.addEventListener('load', () => {
         initViewButtonEnhancement();
         // Recompute on resize/orientation
         window.addEventListener('resize', updateViewButtonLayout);
@@ -3299,7 +3325,7 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
         }
 
         // Periodic safety check (DOM manipulations elsewhere)
-        setInterval(updateViewButtonLayout, 800);
+  setInterval(updateViewButtonLayout, 800);
       });
     })();
   </script>
@@ -6731,6 +6757,21 @@ updateSummary();
         return { glb, usdzCandidates };
       }
 
+      // Build an ar.html URL with current model encoded as ?model=
+      function buildArHtmlUrl() {
+        try {
+          const url = new URL('ar.html', window.location.href);
+          if (typeof getCurrentArAssets === 'function') {
+            const a = getCurrentArAssets();
+            const model = (a && (a.glb || a.glbPath || a.gltf || a.usdzPath)) || null;
+            if (model) url.searchParams.set('model', model);
+          }
+          return url.toString();
+        } catch (e) {
+          return 'ar.html';
+        }
+      }
+
       function buildSceneViewerUrl(glbUrl) {
         const title = encodeURIComponent(window.selectedChair?.Nazwa || 'Model');
         const file = encodeURIComponent(new URL(glbUrl, window.location.href).toString());
@@ -6740,10 +6781,8 @@ updateSummary();
         return new URL(usdzUrl, window.location.href).toString();
       }
       function buildArLandingUrl() {
-        // Desktop shows a QR that encodes this page with ?open_ar=1 so mobile auto-opens AR
-        const current = new URL(window.location.href);
-        current.searchParams.set('open_ar', '1');
-        return current.toString();
+        // Desktop QR should point to dedicated ar.html with model param
+        return buildArHtmlUrl();
       }
       function showQrWithUrl(url) {
         const qrPopup = document.getElementById('qr-popup');
