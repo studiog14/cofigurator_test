@@ -7050,46 +7050,22 @@ updateSummary();
           { label: 'Szerokość', value: dimensionsParsed.x },
           { label: 'Głębokość', value: dimensionsParsed.y },
           { label: 'Wysokość', value: dimensionsParsed.z }
-              // Wire bottom toolbar AR button: desktop -> QR; mobile -> native AR
-              const arButton = document.getElementById('ar-button');
-              if (arButton) {
-                arButton.addEventListener('click', async (e) => {
-                  e.stopPropagation();
-                  try {
-                    if (typeof isDesktop === 'function' ? isDesktop() : (window.innerWidth > 820)) {
-                      const url = (typeof buildArHtmlUrl === 'function') ? buildArHtmlUrl() : 'ar.html';
-                      if (typeof showQrWithUrl === 'function') showQrWithUrl(url);
-                      return;
-                    }
-                    if (typeof openArFlow === 'function') await openArFlow();
-                  } catch(err){ console.warn('AR button error:', err); }
-                });
-              }
+        ];
 
-              // Safety net: delegate clicks on dynamically created view-in-room button
-              document.addEventListener('click', async (evt) => {
-                const target = evt.target && (evt.target.closest ? evt.target.closest('#view-in-room-button') : null);
-                if (!target) return;
-                evt.stopPropagation();
-                try {
-                  if (typeof isDesktop === 'function' ? isDesktop() : (window.innerWidth > 820)) {
-                    const url = (typeof buildArHtmlUrl === 'function') ? buildArHtmlUrl() : 'ar.html';
-                    if (typeof showQrWithUrl === 'function') showQrWithUrl(url);
-                    return;
-                  }
-                  if (typeof openArFlow === 'function') await openArFlow();
-                } catch(err){ console.warn('View-in-room click error:', err); }
-              });
+        // Dodaj wymiary do kontenera
+        dimensions.forEach(dim => {
+          if (dim.value !== undefined) {
+            const dimensionItem = document.createElement('div');
             dimensionItem.className = 'dimension-item';
-            
+
             const label = document.createElement('div');
             label.className = 'dimension-label';
             label.textContent = dim.label;
-            
+
             const value = document.createElement('div');
             value.className = 'dimension-value';
             value.textContent = `${dim.value} cm`;
-            
+
             dimensionItem.appendChild(label);
             dimensionItem.appendChild(value);
             dimensionsContainer.appendChild(dimensionItem);
