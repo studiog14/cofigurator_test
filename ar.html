@@ -317,6 +317,7 @@
     // Wstępnie załaduj model (.glb lub .usdz) — WebXR uruchamiamy na obu platformach
         let modelRoot = null;
         try {
+          console.log('Loading model:', modelUrl);
           modelRoot = await loadModel(modelUrl);
         } catch(e) {
           console.error('Nie udało się załadować modelu dla WebXR:', e);
@@ -381,6 +382,15 @@
           space: viewerSpace 
         });
 
+        // Add model to scene immediately (no need to wait for hit test)
+        if (modelRoot) {
+          xrState.model = modelRoot;
+          scene.add(modelRoot);
+          modelRoot.position.set(0, 0, -1.5); // Place 1.5m in front
+          modelRoot.scale.setScalar(0.5); // Start with reasonable scale
+          console.log('Model added to WebXR scene');
+        }
+
         // Event listenery
         session.addEventListener('end', () => { endAR(); });
         session.addEventListener('select', () => { 
@@ -410,7 +420,7 @@
           }
         };
 
-  // Pętla renderowania z hit-test
+        // Pętla renderowania z hit-test
         renderer.setAnimationLoop((timestamp, frame) => {
           if (!frame) return;
           
@@ -418,34 +428,24 @@
           if (!pose) return;
           
           // Hit testing - wykrywanie powierzchni
-          if (xrState.hitTestSource) {
+          if (xrState.hitTestSource && xrState.placed) {
             const results = frame.getHitTestResults(xrState.hitTestSource);
             if (results && results.length > 0) {
               const hit = results[0];
               const hitPose = hit.getPose(refSpace);
               
-              if (hitPose && xrState.placed) {
-                // Umie/zaktualizuj model na pozycji hit
-                if (!xrState.model && modelRoot) {
-                  xrState.model = modelRoot;
-                  scene.add(modelRoot);
-                  console.log('Model dodany do sceny');
-                }
-                
-                if (xrState.model) {
-                  const matrix = new THREE.Matrix4().fromArray(hitPose.transform.matrix);
-                  xrState.model.matrixAutoUpdate = false;
-                  xrState.model.matrix.copy(matrix);
-                  xrState.model.updateMatrixWorld(true);
-                }
+              if (hitPose && xrState.model) {
+                // Umieść model na pozycji hit
+                const matrix = new THREE.Matrix4().fromArray(hitPose.transform.matrix);
+                xrState.model.matrixAutoUpdate = false;
+                xrState.model.matrix.copy(matrix);
+                xrState.model.updateMatrixWorld(true);
               }
             }
           }
           
           renderer.render(scene, camera);
-        });
-
-        loading.style.display = 'none';
+        });        loading.style.display = 'none';
   console.log('WebXR AR sesja uruchomiona pomyślnie!');
         
       } catch(error) {
@@ -631,17 +631,43 @@
       const glbs=[]; const usdz=[];
       for (const d of dirs) { for (const b of bases) { glbs.push(`${d}/${b}.glb`, `${d}/${b}-2.glb`); usdz.push(`${d}/${b}.usdz`, `${d}/${b}-2.usdz`); } }
       if (isIOS) {
-        // iOS: od razu Quick Look, bez białego UI
-        for (const u of usdz) { if (await headOk(u)) { await openQuickLook(u, await resolvePosterForModel()); return; } }
-        // Brak USDZ → przeładuj z GLB (WebXR fallback)
-        for (const g of glbs) { if (await headOk(g)) { const next = new URL(window.location.href); next.searchParams.set('model', g); window.location.href = next.toString(); return; } }
+        // iOS: prefer USDZ for WebXR, fallback to GLB
+        for (const u of usdz) { 
+          if (await headOk(u)) { 
+            const next = new URL(window.location.href); 
+            next.searchParams.set('model', u); 
+            window.location.href = next.toString(); 
+            return; 
+          } 
+        }
+        for (const g of glbs) { 
+          if (await headOk(g)) { 
+            const next = new URL(window.location.href); 
+            next.searchParams.set('model', g); 
+            window.location.href = next.toString(); 
+            return; 
+          } 
+        }
         alert('Nie znaleziono plików dla: ' + name);
         return;
       } else {
-        // Android/pozostali → GLB (WebXR)
-        for (const g of glbs) { if (await headOk(g)) { const next = new URL(window.location.href); next.searchParams.set('model', g); window.location.href = next.toString(); return; } }
-        // Rezerwowo spróbuj USDZ (mało prawdopodobne)
-        for (const u of usdz) { if (await headOk(u)) { const next = new URL(window.location.href); next.searchParams.set('model', u); window.location.href = next.toString(); return; } }
+        // Android: prefer GLB for WebXR, fallback to USDZ
+        for (const g of glbs) { 
+          if (await headOk(g)) { 
+            const next = new URL(window.location.href); 
+            next.searchParams.set('model', g); 
+            window.location.href = next.toString(); 
+            return; 
+          } 
+        }
+        for (const u of usdz) { 
+          if (await headOk(u)) { 
+            const next = new URL(window.location.href); 
+            next.searchParams.set('model', u); 
+            window.location.href = next.toString(); 
+            return; 
+          } 
+        }
         alert('Nie znaleziono plików dla: ' + name);
       }
     }

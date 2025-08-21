@@ -3279,8 +3279,14 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
           viewBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
             try {
+              // Ensure we have a selected chair before proceeding
+              if (!window.selectedChair?.Nazwa) {
+                alert('Najpierw wybierz krzesło z konfiguratora');
+                return;
+              }
               const asyncUrl = (typeof buildArHtmlUrlAsync === 'function') ? await buildArHtmlUrlAsync() : null;
               const url = asyncUrl || ((typeof buildArHtmlUrl === 'function') ? buildArHtmlUrl() : 'ar.html');
+              console.log('Opening AR with URL:', url);
               if (typeof isDesktop === 'function' && isDesktop()) {
                 if (typeof showQrWithUrl === 'function') showQrWithUrl(url);
               } else {
@@ -6863,13 +6869,35 @@ updateSummary();
             } catch { return false; }
           };
           let chosen = null;
-          // Stabilne WebXR: zawsze preferuj GLB, niezależnie od platformy; jeśli brak GLB, spróbuj USDZ
-          const glbList = Array.isArray(assets?.glbCandidates) ? assets.glbCandidates : (assets?.glb ? [assets.glb] : []);
-          for (const g of glbList) { if (await headOk(g)) { chosen = g; break; } }
-          if (!chosen && Array.isArray(assets?.usdzCandidates)) {
-            for (const u of assets.usdzCandidates) { if (await headOk(u)) { chosen = u; break; } }
+
+          // Platform-specific model selection for WebXR
+          const preferUSDZ = (typeof isIOS === 'function') ? isIOS() : false;
+          const preferGLB = (typeof isAndroid === 'function') ? isAndroid() : !preferUSDZ;
+
+          if (preferGLB) {
+            // Android: prefer GLB first
+            const glbList = Array.isArray(assets?.glbCandidates) ? assets.glbCandidates : (assets?.glb ? [assets.glb] : []);
+            for (const g of glbList) { if (await headOk(g)) { chosen = g; break; } }
+            if (!chosen && Array.isArray(assets?.usdzCandidates)) {
+              for (const u of assets.usdzCandidates) { if (await headOk(u)) { chosen = u; break; } }
+            }
+          } else if (preferUSDZ) {
+            // iOS: prefer USDZ first for WebXR
+            if (Array.isArray(assets?.usdzCandidates)) {
+              for (const u of assets.usdzCandidates) { if (await headOk(u)) { chosen = u; break; } }
+            }
+            if (!chosen) {
+              const glbList = Array.isArray(assets?.glbCandidates) ? assets.glbCandidates : (assets?.glb ? [assets.glb] : []);
+              for (const g of glbList) { if (await headOk(g)) { chosen = g; break; } }
+            }
           }
-          if (chosen) url.searchParams.set('model', chosen);
+          
+          if (chosen) {
+            url.searchParams.set('model', chosen);
+            console.log('Selected model for AR:', chosen);
+          } else {
+            console.warn('No model found for chair:', window.selectedChair?.Nazwa);
+          }
           return url.toString();
         } catch { return 'ar.html'; }
       }
