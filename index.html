@@ -3275,7 +3275,7 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
             viewBtn.style.background = 'linear-gradient(135deg, #F5C842, #E5B432)';
           });
 
-      // Click -> Mobile: open native AR; Desktop: show QR to AR landing (no desktop behavior change)
+  // Click -> Mobile: go to ar.html (auto AR); Desktop: show QR to AR landing
           viewBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
             try {
@@ -3287,11 +3287,9 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
                 if (typeof showQrWithUrl === 'function') showQrWithUrl(qrUrl);
                 return;
               }
-
-              // Mobile – open native AR flow
-              if (typeof openArFlow === 'function') {
-                await openArFlow();
-              }
+      // Mobile – navigate to ar.html which will auto-open AR
+      const murl = (typeof buildArHtmlUrl === 'function') ? buildArHtmlUrl() : 'ar.html';
+      window.location.href = murl + (murl.includes('?') ? '&' : '?') + 'open_ar=1';
             } catch(err){ console.warn('AR open error:', err); }
           });
 
@@ -7405,13 +7403,13 @@ updateSummary();
       if (arButton) {
         arButton.addEventListener('click', async (e) => {
           e.stopPropagation();
-          // MVP: Desktop -> pokaż QR z linkiem do AR; Mobile -> otwórz AR bezpośrednio
-          if (isDesktop()) {
-            const url = buildArLandingUrl();
+          if (typeof isDesktop === 'function' && isDesktop()) {
+            const url = (typeof buildArLandingUrl === 'function') ? buildArLandingUrl() : 'ar.html';
             const qrUrl = url + (url.includes('?') ? '&' : '?') + 'open_ar=1';
-            showQrWithUrl(qrUrl);
+            if (typeof showQrWithUrl === 'function') showQrWithUrl(qrUrl); else window.location.href = url;
           } else {
-            await openArFlow();
+            const url = (typeof buildArHtmlUrl === 'function') ? buildArHtmlUrl() : 'ar.html';
+            window.location.href = url + (url.includes('?') ? '&' : '?') + 'open_ar=1';
           }
         });
       }

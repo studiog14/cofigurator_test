@@ -58,11 +58,52 @@
     mv.src = glb;
     mv.setAttribute('ios-src', usdz);
 
-    // AR open button
+    // AR open button (manual)
     document.getElementById('open-ar').addEventListener('click', () => {
-      // model-viewer handles correct native AR based on platform
       mv.activateAR();
     });
+
+    // Auto-open AR when coming from desktop QR or mobile button
+    const shouldAuto = url.searchParams.get('open_ar') === '1';
+    async function autoOpenAR() {
+      try {
+        if (!shouldAuto) return;
+        // Give model-viewer a moment to attach
+        await new Promise(r => setTimeout(r, 50));
+
+        if (isAndroid) {
+          mv.activateAR();
+          return;
+        }
+        if (isIOS) {
+          // Prefer Quick Look direct open via a rel="ar" anchor
+          const absUsdz = new URL(usdz, window.location.href).toString();
+          const a = document.createElement('a');
+          a.setAttribute('rel', 'ar');
+          a.setAttribute('href', absUsdz);
+          document.body.appendChild(a);
+          let engaged = false;
+          const mark = () => { engaged = true; };
+          window.addEventListener('pagehide', mark, { once: true });
+          document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState !== 'visible') engaged = true;
+          }, { once: true });
+          a.click();
+          setTimeout(() => { try { a.remove(); } catch(_){} }, 0);
+          // If not engaged, leave the overlay and allow manual open
+          setTimeout(() => {
+            if (!engaged) {
+              // Fallback: try model-viewer activateAR once
+              try { mv.activateAR(); } catch(_) {}
+            }
+          }, 800);
+          return;
+        }
+      } catch(e) {
+        console.warn('Auto-open AR failed:', e);
+      }
+    }
+    autoOpenAR();
 
     // Basic AR status logging
     mv.addEventListener('ar-status', (ev) => {
