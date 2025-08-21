@@ -7178,7 +7178,17 @@ updateSummary();
           const cancel = el.querySelector('#ar-pre-cancel');
           const go = el.querySelector('#ar-pre-go');
           cancel?.addEventListener('click', ()=> hideArPreOverlay());
-          go?.addEventListener('click', ()=> { hideArPreOverlay(); openArWebXRMobile(); });
+          go?.addEventListener('click', ()=> {
+            hideArPreOverlay();
+            try {
+              if (typeof isIOS === 'function' && isIOS()) {
+                const u = (typeof buildArHtmlUrl === 'function') ? buildArHtmlUrl() : 'ar.html';
+                window.location.href = u;
+              } else {
+                openArWebXRMobile();
+              }
+            } catch(_) { openArWebXRMobile(); }
+          });
         }
         return el;
       }
@@ -7345,11 +7355,9 @@ updateSummary();
         if (arBtn && !arBtn._arBound) {
           arBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            const u = new URL(window.location.href);
-            const usePre = u.searchParams.get('ar_pre') === '1';
-            if (usePre) {
+            if (typeof isIOS === 'function' && isIOS()) {
               showArPreOverlay();
-            } else if (typeof isIOS === 'function' && isIOS() || (typeof isAndroid === 'function' && isAndroid())) {
+            } else if (typeof isAndroid === 'function' && isAndroid()) {
               openArWebXRMobile();
             } else if (typeof showQrWithUrl === 'function' && typeof buildArLandingUrl === 'function') {
               const u = new URL(buildArLandingUrl(), window.location.href);
@@ -7366,15 +7374,16 @@ updateSummary();
         };
         const viewBtn = document.getElementById('view-in-room-button');
         if (viewBtn) {
-          const u = new URL(window.location.href);
-          const usePre = u.searchParams.get('ar_pre') === '1';
-          if (usePre) {
-            if (!viewBtn._arBound) {
-              viewBtn.addEventListener('click', (e)=>{ e.stopPropagation(); showArPreOverlay(); });
-              viewBtn._arBound = true;
-            }
-          } else {
-            bindView(viewBtn);
+          if (!viewBtn._arBound) {
+            viewBtn.addEventListener('click', (e)=>{
+              e.stopPropagation();
+              if (typeof isIOS === 'function' && isIOS()) {
+                showArPreOverlay();
+              } else {
+                openArWebXRMobile();
+              }
+            });
+            viewBtn._arBound = true;
           }
         }
         // If it's injected later, observe and bind once
