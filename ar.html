@@ -6,7 +6,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <title>AR � Konfigurator</title>
+  <title>AR � Konfigurator</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="icons/favicon.png" />
   <style>
@@ -65,29 +65,29 @@
   <div id="xr-loading">
     <div class="inner">
       <div class="spinner"></div>
-      <p>Uruchamianie AR�</p>
+      <p>Uruchamianie AR…</p>
     </div>
   </div>
   
   <div id="xr-reticle-2d"></div>
-  <button id="xr-exit-btn">Zakocz AR</button>
+  <button id="xr-exit-btn">Zakończ AR</button>
   
   <div id="ar-unsupported">
     <div>
       <h3>AR nie jest dostpne</h3>
       <p>Ta przegldarka nie wspiera WebXR AR.</p>
-      <p>Na iOS wcz WebXR w Safari � Advanced � Experimental Features.</p>
+      <p>Na iOS wcz WebXR w Safari � Advanced � Experimental Features.</p>
       <p>
         <button id="open-native-ar" style="display:none; background:#1e88e5;color:#fff;border:0;border-radius:10px;padding:10px 14px;">
-          Otw�rz w trybie natywnym
+          Otw�rz w trybie natywnym
         </button>
       </p>
-      <p><a href="index.html">Wr� do konfiguratora</a></p>
+      <p><a href="index.html">Wr� do konfiguratora</a></p>
     </div>
   </div>
   
   <div id="ar-ui" style="display:none">
-    <button id="btn-rotate">Obr� 15�</button>
+    <button id="btn-rotate">Obr� 15�</button>
     <button id="btn-scale-up">Skaluj +</button>
     <button id="btn-scale-down">Skaluj -</button>
   </div>
@@ -96,7 +96,7 @@
     import * as THREE from 'https://unpkg.com/three@0.157.0/build/three.module.js';
     import { GLTFLoader } from 'https://unpkg.com/three@0.157.0/examples/jsm/loaders/GLTFLoader.js';
 
-    console.log('?? AR.html z WebXR uruchamia si...');
+  console.log('AR.html z WebXR uruchamia się...');
 
     // Pobierz model z URL lub localStorage
     const url = new URL(window.location.href);
@@ -109,7 +109,7 @@
       console.warn('localStorage niedostpny'); 
     }
 
-    console.log('?? adowanie modelu:', modelUrl);
+  console.log('Ładowanie modelu:', modelUrl);
 
     // Setup Three.js z WebXR
     const renderer = new THREE.WebGLRenderer({ 
@@ -120,7 +120,7 @@
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(window.innerWidth, window.innerHeight);
     
-    // ?? KLUCZOWE: Wczenie WebXR
+  // Włączenie WebXR
     renderer.xr.enabled = true;
     
     document.body.appendChild(renderer.domElement);
@@ -159,7 +159,7 @@
     
     async function loadModel(uri) {
       return new Promise((resolve, reject) => {
-        console.log('?? adowanie GLTF:', uri);
+        console.log('Ładowanie GLTF:', uri);
         gltfLoader.load(
           uri,
           (gltf) => {
@@ -177,19 +177,19 @@
               }
             });
             
-            // Zapewnij rozsdn skal
+            // Zapewnij rozsądną skalę
             if (root.scale.length() < 0.001) {
               root.scale.setScalar(0.01);
             }
             
-            console.log('? Model zaadowany pomylnie');
+            console.log('Model załadowany pomyślnie');
             resolve(root);
           },
           (progress) => {
-            console.log('?? Postp adowania:', Math.round(progress.loaded / progress.total * 100) + '%');
+            console.log('Postęp ładowania:', Math.round(progress.loaded / progress.total * 100) + '%');
           },
           (error) => {
-            console.error('? Bd adowania GLTF:', error);
+            console.error('Błąd ładowania GLTF:', error);
             reject(error);
           }
         );
@@ -206,17 +206,17 @@
     }
     window.addEventListener('resize', onResize, { passive: true });
 
-    // ?? G�WNA FUNKCJA AR z WebXR
+  // Główna funkcja AR z WebXR
     async function startAR() {
       try {
         loading.style.display = 'flex';
-        console.log('?? Uruchamianie AR z WebXR...');
+  console.log('Uruchamianie AR z WebXR...');
 
-        // ?? Sprawd wsparcie WebXR
+  // Sprawdź wsparcie WebXR
         const supported = !!(navigator.xr && await navigator.xr.isSessionSupported?.('immersive-ar'));
         
         if (!supported) {
-          console.log('? WebXR AR nie jest wspierany, pokazuj fallback');
+          console.log('WebXR AR nie jest wspierany, pokazuję fallback');
           loading.style.display = 'none';
           unsupported.style.display = 'flex';
           
@@ -237,7 +237,7 @@
                 window.location.href = sceneViewerUrl; 
               };
             } else if (isIOS) {
-              // iOS Quick Look (pr�buj USDZ)
+              // iOS Quick Look (spróbuj USDZ)
               const base = modelUrl.replace(/\.glb$/i, '');
               const candidates = [
                 `${base}.usdz`, 
@@ -270,18 +270,18 @@
           return;
         }
 
-        // Wstpnie zaaduj model
+        // Wstępnie załaduj model
         let modelRoot = null;
         try {
           modelRoot = await loadModel(modelUrl);
         } catch(e) {
-          console.error('? Nie udao si zaadowa modelu:', e);
-          alert('Nie udao si zaadowa modelu: ' + modelUrl);
+          console.error('Nie udało się załadować modelu:', e);
+          alert('Nie udało się załadować modelu: ' + modelUrl);
           return;
         }
 
-        // ?? KLUCZOWE: danie sesji AR WebXR
-        console.log('?? danie sesji WebXR AR...');
+  // Utworzenie sesji AR WebXR
+  console.log('Tworzenie sesji WebXR AR...');
         const session = await navigator.xr.requestSession('immersive-ar', {
           requiredFeatures: ['hit-test', 'local-floor'],
           optionalFeatures: ['dom-overlay'],
@@ -291,7 +291,7 @@
         xrState.session = session;
         await renderer.xr.setSession(session);
 
-        console.log('? Sesja WebXR AR uruchomiona!');
+  console.log('Sesja WebXR AR uruchomiona!');
 
         // Poka UI AR
         exitBtn.style.display = 'block';
@@ -313,7 +313,7 @@
         // Event listenery
         session.addEventListener('end', () => { endAR(); });
         session.addEventListener('select', () => { 
-          console.log('?? Select event - umieszczanie modelu');
+          console.log('Select event - umieszczanie modelu');
           xrState.placed = true; 
         });
 
@@ -321,25 +321,25 @@
         btnRotate.onclick = () => {
           if (xrState.model) {
             xrState.model.rotateY(THREE.MathUtils.degToRad(15));
-            console.log('?? Obr�cono model o 15 stopni');
+            console.log('Obrócono model o 15 stopni');
           }
         };
         
         btnScaleUp.onclick = () => {
           if (xrState.model) {
             xrState.model.scale.multiplyScalar(1.1);
-            console.log('?? Powikszono model');
+            console.log('Powiększono model');
           }
         };
         
         btnScaleDown.onclick = () => {
           if (xrState.model) {
             xrState.model.scale.multiplyScalar(0.9);
-            console.log('?? Pomniejszono model');
+            console.log('Pomniejszono model');
           }
         };
 
-        // ?? KLUCZOWE: Ptla renderowania z hit-test
+  // Pętla renderowania z hit-test
         renderer.setAnimationLoop((timestamp, frame) => {
           if (!frame) return;
           
@@ -358,7 +358,7 @@
                 if (!xrState.model && modelRoot) {
                   xrState.model = modelRoot;
                   scene.add(modelRoot);
-                  console.log('??? Model dodany do sceny');
+                  console.log('Model dodany do sceny');
                 }
                 
                 if (xrState.model) {
@@ -375,18 +375,18 @@
         });
 
         loading.style.display = 'none';
-        console.log('?? WebXR AR sesja uruchomiona pomylnie!');
+  console.log('WebXR AR sesja uruchomiona pomyślnie!');
         
       } catch(error) {
-        console.error('? Bd uruchamiania AR:', error);
+  console.error('Błąd uruchamiania AR:', error);
         loading.style.display = 'none';
         alert('Nie udao si uruchomi AR: ' + error.message);
       }
     }
 
-    // Zakocz sesj AR
+    // Zakończ sesję AR
     async function endAR() {
-      console.log('?? Koczenie sesji AR...');
+      console.log('Kończenie sesji AR...');
       
       try {
         loading.style.display = 'none';

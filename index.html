@@ -6783,7 +6783,10 @@ updateSummary();
           const url = new URL('ar.html', window.location.href);
           if (typeof getCurrentArAssets === 'function') {
             const a = getCurrentArAssets();
-            const model = (a && (a.glb || a.glbPath || a.gltf || a.usdzPath)) || null;
+            let model = (a && (a.glb || a.glbPath || a.gltf || a.usdzPath)) || null;
+            if (!model && a && Array.isArray(a.usdzCandidates) && a.usdzCandidates.length) {
+              model = a.usdzCandidates[0];
+            }
             if (model) url.searchParams.set('model', model);
           }
           return url.toString();
