@@ -262,19 +262,7 @@
         loading.style.display = 'flex';
   console.log('Uruchamianie AR z WebXR...');
 
-  // iOS: prefer Quick Look (bez białego widoku i domyślnego UI)
-  if (isIOS) {
-    const usdz = await resolveUsdzCandidate(modelUrl);
-    if (usdz) {
-      await openQuickLook(usdz, await resolvePosterForModel());
-      loading.style.display = 'none';
-      // Zostajemy na stronie — po zamknięciu AR użytkownik wraca tutaj, ma nasze UI
-      return;
-    }
-    // Brak USDZ → próbuj dalej WebXR z GLB
-  }
-
-  // Sprawdź wsparcie WebXR (Android i fallback dla iOS bez USDZ)
+  // Sprawdź wsparcie WebXR (iOS i Android)
   const supported = !!(navigator.xr && await navigator.xr.isSessionSupported?.('immersive-ar'));
         
         if (!supported) {
@@ -295,33 +283,11 @@
                 window.location.href = sceneViewerUrl; 
               };
             } else if (isIOS) {
-              // iOS Quick Look (spróbuj USDZ)
-              const base = modelUrl.replace(/\.glb$/i, '');
-              const candidates = [
-                `${base}.usdz`, 
-                `${base}-2.usdz`, 
-                `${base.replace(/\s+/g,'_')}.usdz`, 
-                `chairs/Tulla-2.usdz`
-              ];
-              
-              let chosen = null;
-              for (const candidate of candidates) {
-                try {
-                  const res = await fetch(candidate, { method: 'HEAD' });
-                  if (res.ok) {
-                    chosen = candidate;
-                    break;
-                  }
-                } catch(e) {
-                  console.log('USDZ nie znaleziony:', candidate);
-                }
-              }
-              
-              if (chosen) {
+              // iOS: Quick Look fallback, jeśli istnieje USDZ
+              const usdz = await resolveUsdzCandidate(modelUrl);
+              if (usdz) {
                 nativeBtn.style.display = 'inline-block';
-                nativeBtn.onclick = () => { 
-                  window.location.href = new URL(chosen, window.location.href).toString(); 
-                };
+                nativeBtn.onclick = () => { window.location.href = new URL(usdz, window.location.href).toString(); };
               }
             }
           }
@@ -372,8 +338,8 @@
   // Utworzenie sesji AR WebXR
   console.log('Tworzenie sesji WebXR AR...');
         const session = await navigator.xr.requestSession('immersive-ar', {
-          requiredFeatures: ['hit-test', 'local-floor'],
-          optionalFeatures: ['dom-overlay'],
+          requiredFeatures: ['hit-test', 'local'],
+          optionalFeatures: ['local-floor', 'dom-overlay'],
           domOverlay: { root: document.body }
         });
         
@@ -578,7 +544,13 @@
     cfgSearch?.addEventListener('input', e => renderList(e.target.value));
     loadSheet();
 
-    async function headOk(p) { try { const r= await fetch(p,{method:'HEAD'}); return r.ok; } catch { return false; } }
+    async function headOk(p) {
+      try {
+        const abs = new URL(p, window.location.href).toString();
+        const r= await fetch(abs,{method:'HEAD'});
+        return r.ok;
+      } catch { return false; }
+    }
 
     async function resolveUsdzCandidate(fromUrl) {
       // Szukaj USDZ odpowiadającego bazie nazwy

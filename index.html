@@ -6855,7 +6855,13 @@ updateSummary();
         try {
           const url = new URL('ar.html', window.location.href);
           const assets = (typeof getCurrentArAssets === 'function') ? getCurrentArAssets() : null;
-          const headOk = async (p) => { try { const r = await fetch(p, { method: 'HEAD' }); return r.ok; } catch { return false; } };
+          const headOk = async (p) => {
+            try {
+              const abs = new URL(p, window.location.href).toString();
+              const r = await fetch(abs, { method: 'HEAD' });
+              return r.ok;
+            } catch { return false; }
+          };
           let chosen = null;
           // Stabilne WebXR: zawsze preferuj GLB, niezależnie od platformy; jeśli brak GLB, spróbuj USDZ
           const glbList = Array.isArray(assets?.glbCandidates) ? assets.glbCandidates : (assets?.glb ? [assets.glb] : []);
