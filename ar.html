@@ -102,20 +102,44 @@
     const url = new URL(window.location.href);
     const paramModel = url.searchParams.get('model');
     let modelUrl = paramModel || localStorage.getItem('ar:lastModel') || 'chairs/Tulla-2.glb';
-    // Jeśli podano USDZ, spróbuj dopasować odpowiadający GLB (WebXR wymaga GLB)
-    if (/\.usdz$/i.test(modelUrl)) {
-      const base = modelUrl.replace(/\.usdz$/i, '');
-      const candidates = [
-        `${base}.glb`,
-        `${base.replace(/-?2$/,'')}.glb`,
-        `${base.replace(/_/g,' ') }.glb`,
-      ];
-      for (const c of candidates) {
-        try {
-          const res = await fetch(c, { method: 'HEAD' });
-          if (res.ok) { modelUrl = c; break; }
-        } catch(_) {}
+    // Detekcja platformy
+    const ua = navigator.userAgent || '';
+    const isAndroid = /Android/i.test(ua);
+    const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+    // iOS: preferuj USDZ (Quick Look) i przekieruj bez uruchamiania WebXR
+    if (isIOS) {
+      const toAbs = (p)=> new URL(p, window.location.href).toString();
+      const tryHead = async (p)=> { try { const r = await fetch(p, { method:'HEAD' }); return r.ok; } catch { return false; } };
+      // Zestaw kandydatów dla wybranej nazwy (na podstawie ?model lub lastModel)
+      const raw = (paramModel || modelUrl || '').replace(/^.*\/(?!$)/,'').replace(/\.(glb|usdz)$/i,'');
+      const bases = Array.from(new Set([
+        raw,
+        raw.replace(/_/g,' '),
+        raw.replace(/\s+/g,'_'),
+        raw.replace(/\s+/g,'-'),
+        raw.replace(/\s+/g,'')
+      ].filter(Boolean)));
+      const dirs = ['chairs','models'];
+      const usdzCandidates = [];
+      for (const d of dirs) { for (const b of bases) { usdzCandidates.push(`${d}/${b}.usdz`, `${d}/${b}-2.usdz`); } }
+      if (!usdzCandidates.includes('chairs/Tulla-2.usdz')) usdzCandidates.push('chairs/Tulla-2.usdz');
+
+      let chosenUsdZ = null;
+      for (const u of usdzCandidates) { if (await tryHead(u)) { chosenUsdZ = u; break; } }
+      if (chosenUsdZ) {
+        console.log('iOS Quick Look redirect to:', chosenUsdZ);
+        window.location.replace(toAbs(chosenUsdZ));
+        // Zatrzymaj dalszą inicjalizację WebXR
       }
+      // Jeśli brak USDZ — spróbuj GLB z WebXR poniżej (best-effort)
+    }
+
+    // Jeśli podano USDZ i nie jesteśmy na iOS, spróbuj dopasować odpowiadający GLB (WebXR wymaga GLB)
+    if (/\.usdz$/i.test(modelUrl) && !isIOS) {
+      const base = modelUrl.replace(/\.usdz$/i, '');
+      const candidates = [ `${base}.glb`, `${base.replace(/-?2$/,'')}.glb`, `${base.replace(/_/g,' ') }.glb` ];
+      for (const c of candidates) { try { const res = await fetch(c, { method: 'HEAD' }); if (res.ok) { modelUrl = c; break; } } catch(_) {} }
     }
     
     try { 
@@ -236,9 +260,6 @@
           unsupported.style.display = 'flex';
           
           // Setup natywny AR fallback
-          const ua = navigator.userAgent || '';
-          const isAndroid = /Android/i.test(ua);
-          const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
           
           if (nativeBtn) {
             if (isAndroid) {
@@ -289,12 +310,9 @@
         let modelRoot = null;
         try {
           modelRoot = await loadModel(modelUrl);
-        } catch(e) {
+  } catch(e) {
           console.error('Nie udało się załadować GLB dla WebXR:', e);
           // Spróbuj natywnego AR jako awaryjne rozwiązanie
-          const ua = navigator.userAgent || '';
-          const isAndroid = /Android/i.test(ua);
-          const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
           loading.style.display = 'none';
           unsupported.style.display = 'flex';
           if (nativeBtn) {

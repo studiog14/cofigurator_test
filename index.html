@@ -6793,29 +6793,52 @@ updateSummary();
       function isAndroid() { return /Android/.test(navigator.userAgent); }
       function isDesktop() { return !(isIOS() || isAndroid()); }
 
-      // Return current model names for AR files (best-effort)
+      // Return current model assets for AR, with rich candidate lists sorted by best name match
       function getCurrentArAssets() {
-        // Try to use selected chair name
-        const name = (window.selectedChair?.Nazwa || '').trim();
-        const baseName = name || '';
-        const glb = baseName ? `chairs/${baseName}.glb` : null;
-        // Heuristic: USDZ has same base if exists; you already have 'Tulla-2.usdz' as example
-        const usdzCandidates = [
-          `chairs/${baseName}.usdz`,
-          `chairs/${baseName}-2.usdz`,
-          `chairs/${baseName.replace(/\s+/g,'_')}.usdz`,
-          `chairs/Tulla-2.usdz` // fallback demo
-        ];
-        return { glb, usdzCandidates };
+        const raw = (window.selectedChair?.Nazwa || '').trim();
+        const strip = (s)=> (typeof stripBrackets==='function'? stripBrackets(s): s);
+        const baseRaw = strip(raw);
+        const norm = (s)=> s
+          .normalize?.('NFD').replace(/\p{Diacritic}/gu,'')
+          .replace(/[^\w\s-]/g,'').trim();
+        const bases = Array.from(new Set([
+          baseRaw,
+          norm(baseRaw),
+          norm(baseRaw).replace(/\s+/g,' '),
+          norm(baseRaw).replace(/\s+/g,''),
+          norm(baseRaw).replace(/\s+/g,'-'),
+          norm(baseRaw).replace(/\s+/g,'_')
+        ].filter(Boolean)));
+
+        // Generate candidate paths preserving order of best match first
+        const glbCandidates = [];
+        const usdzCandidates = [];
+        const dirs = ['chairs','models'];
+        for (const dir of dirs) {
+          for (const b of bases) {
+            glbCandidates.push(`${dir}/${b}.glb`);
+            // common duplicate naming like "-2"
+            glbCandidates.push(`${dir}/${b}-2.glb`);
+            usdzCandidates.push(`${dir}/${b}.usdz`);
+            usdzCandidates.push(`${dir}/${b}-2.usdz`);
+          }
+        }
+        // Last-resort demo fallback to keep flow working in dev
+        if (!usdzCandidates.includes('chairs/Tulla-2.usdz')) usdzCandidates.push('chairs/Tulla-2.usdz');
+        return {
+          glb: glbCandidates[0] || null,
+          glbCandidates,
+          usdzCandidates
+        };
       }
 
-      // Build an ar.html URL with current model encoded as ?model=
-      function buildArHtmlUrl() {
+  // Build an ar.html URL with current model encoded as ?model=
+  function buildArHtmlUrl() {
         try {
           const url = new URL('ar.html', window.location.href);
           if (typeof getCurrentArAssets === 'function') {
             const a = getCurrentArAssets();
-            let model = (a && (a.glb || a.glbPath || a.gltf || a.usdzPath)) || null;
+    let model = (a && (a.glb || a.glbPath || a.gltf || a.usdzPath)) || null;
             if (!model && a && Array.isArray(a.usdzCandidates) && a.usdzCandidates.length) {
               model = a.usdzCandidates[0];
             }
@@ -6827,16 +6850,32 @@ updateSummary();
         }
       }
 
-      // Prefer resolving an actually existing asset (GLB preferred; else first existing USDZ)
+      // Prefer resolving an actually existing asset (Android: GLB; iOS: USDZ; else GLB->USDZ)
       async function buildArHtmlUrlAsync() {
         try {
           const url = new URL('ar.html', window.location.href);
           const assets = (typeof getCurrentArAssets === 'function') ? getCurrentArAssets() : null;
           const headOk = async (p) => { try { const r = await fetch(p, { method: 'HEAD' }); return r.ok; } catch { return false; } };
           let chosen = null;
-          if (assets?.glb && await headOk(assets.glb)) chosen = assets.glb;
-          if (!chosen && Array.isArray(assets?.usdzCandidates)) {
-            for (const u of assets.usdzCandidates) { if (await headOk(u)) { chosen = u; break; } }
+
+          const preferUSDZ = (typeof isIOS==='function') ? isIOS() : false;
+          const preferGLB = (typeof isAndroid==='function') ? isAndroid() : !preferUSDZ;
+
+          // Resolve by platform preference
+          if (preferGLB) {
+            const glbList = Array.isArray(assets?.glbCandidates) ? assets.glbCandidates : (assets?.glb ? [assets.glb] : []);
+            for (const g of glbList) { if (await headOk(g)) { chosen = g; break; } }
+            if (!chosen && Array.isArray(assets?.usdzCandidates)) {
+              for (const u of assets.usdzCandidates) { if (await headOk(u)) { chosen = u; break; } }
+            }
+          } else if (preferUSDZ) {
+            if (Array.isArray(assets?.usdzCandidates)) {
+              for (const u of assets.usdzCandidates) { if (await headOk(u)) { chosen = u; break; } }
+            }
+            if (!chosen) {
+              const glbList = Array.isArray(assets?.glbCandidates) ? assets.glbCandidates : (assets?.glb ? [assets.glb] : []);
+              for (const g of glbList) { if (await headOk(g)) { chosen = g; break; } }
+            }
           }
           if (chosen) url.searchParams.set('model', chosen);
           return url.toString();
