@@ -3203,6 +3203,14 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
       #bottom-toolbar #ar-button { display: none !important; }
     }
 
+    /* On mobile, hide both buttons until a chair is selected */
+    body.mobile-mode:not(.has-chair) #config-overview-button,
+    body.mobile-mode:not(.has-chair) #view-in-room-button { display: none !important; }
+    @media (max-width: 820px) {
+      body:not(.has-chair) #config-overview-button,
+      body:not(.has-chair) #view-in-room-button { display: none !important; }
+    }
+
     /* Make both buttons smaller and consistent on mobile */
     body.mobile-mode #config-overview-button,
     body.mobile-mode #view-in-room-button {
@@ -3291,7 +3299,10 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
         if (!configBtn || !viewBtn) return;
 
         const isMobile = isMobileMode();
-        const hasChair = !!(window.selectedChair && window.selectedChair.Nazwa);
+  const hasChair = !!(window.selectedChair && window.selectedChair.Nazwa);
+  // Toggle a body flag so CSS can instantly hide/show on mobile
+  if (hasChair) document.body.classList.add('has-chair');
+  else document.body.classList.remove('has-chair');
         const configVisible = window.getComputedStyle(configBtn).display !== 'none';
         // On mobile: show both only after a chair is selected
         if (isMobile) {
