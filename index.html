@@ -6850,7 +6850,7 @@ updateSummary();
   // Build an ar.html URL with current model encoded as ?model=
   function buildArHtmlUrl() {
         try {
-          const url = new URL('ar.html', window.location.href);
+          const url = new URL('ar_viewer.html', window.location.href);
           if (typeof getCurrentArAssets === 'function') {
             const a = getCurrentArAssets();
     let model = (a && (a.glb || a.glbPath || a.gltf || a.usdzPath)) || null;
@@ -6861,14 +6861,14 @@ updateSummary();
           }
           return url.toString();
         } catch (e) {
-          return 'ar.html';
+          return 'ar_viewer.html';
         }
       }
 
       // Prefer resolving an actually existing asset (Android: GLB; iOS: USDZ; else GLB->USDZ)
       async function buildArHtmlUrlAsync() {
         try {
-          const url = new URL('ar.html', window.location.href);
+          const url = new URL('ar_viewer.html', window.location.href);
           const assets = (typeof getCurrentArAssets === 'function') ? getCurrentArAssets() : null;
           const headOk = async (p) => {
             try {
@@ -6919,7 +6919,7 @@ updateSummary();
           return url.toString();
         } catch(e) { 
           console.error('Error building AR URL:', e);
-          return 'ar.html'; 
+          return 'ar_viewer.html'; 
         }
       }
 
