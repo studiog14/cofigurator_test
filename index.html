@@ -6935,7 +6935,14 @@ updateSummary();
         const curChair = (typeof selectedChair !== 'undefined' && selectedChair && selectedChair.Nazwa) ? selectedChair : window.selectedChair;
         const title = encodeURIComponent(curChair?.Nazwa || 'Model');
         const file = encodeURIComponent(new URL(glbUrl, window.location.href).toString());
-        return `https://arvr.google.com/scene-viewer/1.0?file=${file}&mode=ar_only&title=${title}`;
+        let backLink = '';
+        try {
+          const u = new URL(window.location.href);
+          u.searchParams.delete('open_ar');
+          backLink = encodeURIComponent(u.toString());
+        } catch { backLink = encodeURIComponent(window.location.href); }
+        // Add link param so Scene Viewer shows a bottom-left CTA chip to return
+        return `https://arvr.google.com/scene-viewer/1.0?file=${file}&mode=ar_only&title=${title}&link=${backLink}`;
       }
       function buildQuickLookUrl(usdzUrl) {
         // Build iOS Quick Look URL with custom CTA back to configurator
@@ -7130,68 +7137,13 @@ updateSummary();
           return;
         }
 
-        // Android: WebXR via model-viewer with fallback to Scene Viewer
+        // Android: use Google Scene Viewer with a return link CTA (cannot remove native close/share)
         if (typeof isAndroid === 'function' && isAndroid()) {
           if (!glb) { hideModelLoader(); alert(`Brak pliku GLB dla AR dla modelu: ${curChair?.Nazwa || ''}`); return; }
-          await preloadModelViewerScriptForAndroid();
           try {
-            let mv = document.getElementById('__mv_ar');
-            if (!mv) {
-              mv = document.createElement('model-viewer');
-              mv.id = '__mv_ar';
-              mv.setAttribute('ar', '');
-              // Prefer WebXR; do not expose default UI; Scene Viewer only via code fallback if needed
-              mv.setAttribute('ar-modes', 'webxr');
-              mv.setAttribute('reveal', 'manual');
-              mv.setAttribute('disable-zoom', '');
-              mv.setAttribute('disable-pan', '');
-              // Do not expose camera controls/UI in-page; we trigger AR programmatically
-              mv.setAttribute('style', 'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;');
-              document.body.appendChild(mv);
-            }
-            mv.setAttribute('src', toAbsUrl(glb));
-            // Prepare custom AR back button
-            const backBtn = ensureArBackButton();
-            if (backBtn) {
-              backBtn.style.display = 'none';
-              backBtn.onclick = (e) => {
-                e.stopPropagation();
-                try { typeof mv.exitAR === 'function' && mv.exitAR(); } catch(_) {}
-                backBtn.style.display = 'none';
-              };
-            }
-            const onProgress = (ev) => {
-              const p = ev?.detail?.totalProgress;
-              if (typeof p === 'number' && p >= 0 && p <= 1) updateModelLoaderProgress(6 + Math.round(p * 88));
-            };
-            const onArStatus = (ev) => {
-              const s = ev?.detail?.status || '';
-              if (s === 'session-started') {
-                if (backBtn) backBtn.style.display = 'block';
-                hideModelLoader();
-              }
-              if (s === 'failed' || s === 'not-presenting') {
-                hideModelLoader();
-                if (backBtn) backBtn.style.display = 'none';
-                mv.removeEventListener('progress', onProgress);
-                mv.removeEventListener('ar-status', onArStatus);
-              }
-            };
-            try { mv.removeEventListener('progress', onProgress); } catch(_) {}
-            try { mv.removeEventListener('ar-status', onArStatus); } catch(_) {}
-            mv.addEventListener('progress', onProgress);
-            mv.addEventListener('ar-status', onArStatus);
-            if (typeof mv.activateAR === 'function') {
-              mv.activateAR();
-            } else {
-              const title = encodeURIComponent(curChair?.Nazwa || 'Model');
-              const file = encodeURIComponent(toAbsUrl(glb));
-              window.location.href = `https://arvr.google.com/scene-viewer/1.0?file=${file}&mode=ar_only&title=${title}`;
-              setTimeout(() => hideModelLoader(), 1000);
-            }
-          } catch (e) {
-            console.warn('model-viewer AR error:', e);
-            hideModelLoader();
+            window.location.href = buildSceneViewerUrl(glb);
+          } finally {
+            setTimeout(() => hideModelLoader(), 1000);
           }
           return;
         }
