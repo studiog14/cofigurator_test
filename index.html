@@ -137,86 +137,8 @@
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
       transition: all 0.3s ease;
       transform: translateY(-5px);
-    }
-
-    #search-toggle:hover {
-      background: #E5B432;
-      transform: scale(1.05);
-    }
-
-    #search-toggle svg {
-      width: 20px;
-      height: 20px;
-      fill: #333;
-    }
-
-    #search-panel {
-      position: absolute !important;
-      top: 0 !important;
-      right: 54px !important;
-      width: 0 !important;
-      max-width: 0 !important;
-      background: rgba(255, 255, 255, 0.98) !important;
-      backdrop-filter: blur(15px) !important;
-      border-radius: 12px !important;
-      padding: 0 !important;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2) !important;
-      opacity: 0 !important;
-      visibility: hidden !important;
-      transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
-      z-index: 1400 !important;
-      transform: translateX(0) translateY(-5px) !important;
-      overflow: hidden !important;
-    }
-
-    #search-panel.active {
-      width: 320px !important;
-      max-width: 320px !important;
-      padding: 16px !important;
-      opacity: 1 !important;
-      visibility: visible !important;
-      transform: translateX(0) translateY(-5px) !important;
-    }
-
-    #search-input {
-      width: 100%;
-      border: 2px solid #F5C842;
-      border-radius: 8px;
-      padding: 12px 16px;
-      font-size: 16px;
-      outline: none;
-      background: white;
-      box-sizing: border-box;
-    }
-
-    #search-input::placeholder {
-      color: #888;
-    }
-
-    #search-input:focus {
-      border-color: #E5B432;
-      box-shadow: 0 0 0 3px rgba(245, 200, 66, 0.2);
-    }
-
-    #search-results {
-      margin-top: 8px;
-      max-height: 300px;
-      overflow-y: auto;
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-      gap: 8px;
-    }
-
-    .search-result-item {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 8px;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      border: 2px solid transparent;
-      background: rgba(255, 255, 255, 0.9);
+          // No custom UI content required per request; keep overlay root for potential future use
+          document.body.appendChild(root);
       text-align: center;
     }
 
@@ -7156,18 +7078,7 @@ updateSummary();
             if (s === 'session-started' || s === 'failed') {
               try { hideModelLoader(); } catch(_) {}
             }
-            // Toggle our DOM overlay when using WebXR
-            try {
-              const overlay = document.getElementById('__ar_dom_overlay') || ensureArDomOverlay();
-              if (s === 'session-started') {
-                // Show our overlay inside the XR session, with full side panel visible
-                overlay.style.display = 'block';
-              }
-              // Hide when the session ends or fails
-              if (s === 'session-ended' || s === 'failed' || s === 'not-presenting') {
-                overlay.style.display = 'none';
-              }
-            } catch(_) {}
+            // No custom AR overlay UI (per requirement)
           };
           mv.addEventListener('progress', onProgress);
           mv.addEventListener('ar-status', onArStatus);
@@ -7316,26 +7227,42 @@ updateSummary();
   // Remember current chair so we can restore it if the browser/page reloads after AR
   try { sessionStorage.setItem('__ar_resume', JSON.stringify({ chairName: curChair.Nazwa, ts: Date.now() })); } catch(_) {}
         const assets = (typeof getCurrentArAssets === 'function') ? getCurrentArAssets() : null;
-        const glb = assets?.glb || (Array.isArray(assets?.glbCandidates) ? assets.glbCandidates[0] : null);
+        const fallbackGlb = assets?.glb || (Array.isArray(assets?.glbCandidates) ? assets.glbCandidates[0] : null);
   const usdzList = [];
         await ensureModelViewerScript();
-        // If user prefers custom UI but WebXR is not supported, prompt and fallback path
-        const preferUI = getPreferWebXR();
-        if (preferUI) {
-          const supported = await isWebXRSupported();
-          if (!supported) {
-            hideModelLoader();
-            const ok = confirm('To ustawienie wymaga WebXR i nie jest wspierane na tym urządzeniu. Otworzyć natywny AR bez własnego UI?');
-            if (ok) { return openArFlow(); }
-            return;
-          }
-        }
+        const supported = await isWebXRSupported().catch(()=>false);
         const mv = ensureUnifiedArModelViewer();
-        const absGlb = glb ? toAbsUrl(glb) : '';
-        if (!absGlb) { hideModelLoader(); alert('Brak pliku GLB dla AR.'); return; }
+        // Try exporting the current configured model as a GLB (local blob) when WebXR is supported
+        let targetUrl = '';
+        if (supported && typeof viewer !== 'undefined' && viewer && viewer.scene) {
+          try {
+            const { GLTFExporter } = await import('https://unpkg.com/three@0.157.0/examples/jsm/exporters/GLTFExporter.js');
+            const exporter = new GLTFExporter();
+            const result = await new Promise((resolve, reject) => {
+              exporter.parse(viewer.scene, (bin) => resolve(bin), (e) => reject(e), {
+                binary: true,
+                onlyVisible: true,
+                includeCustomExtensions: true,
+                truncateDrawRange: true,
+                maxTextureSize: 2048
+              });
+            });
+            const blob = new Blob([result], { type: 'model/gltf-binary' });
+            targetUrl = URL.createObjectURL(blob);
+            // Cleanup later after AR attempt
+            setTimeout(() => { try { URL.revokeObjectURL(targetUrl); } catch(_) {} }, 60000);
+          } catch (e) {
+            // Fallback to predefined GLB
+            targetUrl = fallbackGlb ? toAbsUrl(fallbackGlb) : '';
+          }
+        } else {
+          // Non-WebXR devices cannot load blob URLs in native AR. Use fallback GLB.
+          targetUrl = fallbackGlb ? toAbsUrl(fallbackGlb) : '';
+        }
+        if (!targetUrl) { hideModelLoader(); alert('Brak pliku GLB dla AR.'); return; }
         const prevSrc = mv.getAttribute('src') || '';
-        const srcChanged = prevSrc !== absGlb;
-        if (srcChanged) mv.setAttribute('src', absGlb);
+        const srcChanged = prevSrc !== targetUrl;
+        if (srcChanged) mv.setAttribute('src', targetUrl);
   // iOS GLB-only: do not set ios-src to avoid Quick Look path and remove delay
   const prevIos = mv.getAttribute('ios-src') || '';
   const iosChanged = !!prevIos; // ensure no Quick Look source
@@ -7362,7 +7289,7 @@ updateSummary();
                   document.body.appendChild(link);
                   link.click();
                 } else {
-                  alert('AR na iOS wymaga Quick Look (USDZ) lub WebXR. Dla tego modelu brak USDZ.');
+                  alert('AR na iOS wymaga Quick Look (USDZ) lub WebXR. Dla skonfigurowanego modelu (materiały) wymagany jest WebXR.');
                 }
               }
             } catch(_) {}
@@ -7377,7 +7304,7 @@ updateSummary();
           }
         } else {
           // Fallback to Scene Viewer
-          try { window.location.href = buildSceneViewerUrl(glb); } finally { setTimeout(() => hideModelLoader(), 800); }
+          try { window.location.href = buildSceneViewerUrl(fallbackGlb); } finally { setTimeout(() => hideModelLoader(), 800); }
         }
       }
 
