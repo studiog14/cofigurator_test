@@ -1095,6 +1095,9 @@
       background: #e0e0e0;
     }
 
+  /* Small badge for active WebXR preference */
+  #ar-ui-prefer-webxr.active { background: #fdf3c4; border: 1px solid #F5C842; }
+
     #dimension-overlay {
       position: fixed;
       top: 50%;
@@ -2983,6 +2986,11 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
 
     <button id="ar-button" title="AR">
       <img src="icons/AR_icon.png" alt="AR" style="width: 30px; height: 30px;">
+    </button>
+
+    <!-- Prefer custom AR UI (WebXR) toggle -->
+    <button id="ar-ui-prefer-webxr" title="Preferuj własne AR UI (WebXR)" style="position: relative;">
+      <span style="font-weight:700;">UI</span>
     </button>
 
     <button id="dimensions-show" title="Wymiary modelu">
@@ -6815,6 +6823,19 @@ updateSummary();
       function isAndroid() { return /Android/.test(navigator.userAgent); }
       function isDesktop() { return !(isIOS() || isAndroid()); }
 
+      // WebXR UI preference helpers
+      function getPreferWebXR() {
+        try { return localStorage.getItem('__prefer_webxr_ui') === '1'; } catch(_) { return false; }
+      }
+      function setPreferWebXR(v) {
+        try { localStorage.setItem('__prefer_webxr_ui', v ? '1' : '0'); } catch(_) {}
+        const btn = document.getElementById('ar-ui-prefer-webxr');
+        if (btn) btn.classList.toggle('active', !!v);
+      }
+      async function isWebXRSupported() {
+        try { return !!(navigator.xr && await navigator.xr.isSessionSupported('immersive-ar')); } catch(_) { return false; }
+      }
+
       // Return current model assets for AR, with rich candidate lists sorted by best name match
       function getCurrentArAssets() {
         // Prefer live selectedChair var; fallback to window.selectedChair
@@ -7084,13 +7105,14 @@ updateSummary();
           mv = document.createElement('model-viewer');
           mv.id = '__mv_ar_unified';
           mv.setAttribute('ar', '');
-          // Prefer WebXR; allow URL flags to force WebXR-only for testing UI
+          // Prefer WebXR; allow URL flags to force WebXR-only for testing UI or global preference
           let modes = 'webxr scene-viewer quick-look';
           try {
             const url = new URL(window.location.href);
             const forceIOSWebXR = url.searchParams.get('ios_webxr') === '1';
             const forceWebXR = url.searchParams.get('force_webxr') === '1';
-            if ((forceIOSWebXR && typeof isIOS === 'function' && isIOS()) || forceWebXR) {
+            const prefer = getPreferWebXR();
+            if ((forceIOSWebXR && typeof isIOS === 'function' && isIOS()) || forceWebXR || prefer) {
               modes = 'webxr';
             }
           } catch(_) {}
@@ -7294,6 +7316,17 @@ updateSummary();
         const glb = assets?.glb || (Array.isArray(assets?.glbCandidates) ? assets.glbCandidates[0] : null);
   const usdzList = [];
         await ensureModelViewerScript();
+        // If user prefers custom UI but WebXR is not supported, prompt and fallback path
+        const preferUI = getPreferWebXR();
+        if (preferUI) {
+          const supported = await isWebXRSupported();
+          if (!supported) {
+            hideModelLoader();
+            const ok = confirm('To ustawienie wymaga WebXR i nie jest wspierane na tym urządzeniu. Otworzyć natywny AR bez własnego UI?');
+            if (ok) { return openArFlow(); }
+            return;
+          }
+        }
         const mv = ensureUnifiedArModelViewer();
         const absGlb = glb ? toAbsUrl(glb) : '';
         if (!absGlb) { hideModelLoader(); alert('Brak pliku GLB dla AR.'); return; }
@@ -7425,6 +7458,24 @@ updateSummary();
 
   // Preload model-viewer script early
   window.addEventListener('DOMContentLoaded', () => { ensureModelViewerScript(); });
+
+      // WebXR UI preference toggle wiring
+      (function wirePreferWebXR(){
+        const btn = document.getElementById('ar-ui-prefer-webxr');
+        if (!btn) return;
+        // Initialize visual state
+        try { if (getPreferWebXR()) btn.classList.add('active'); } catch(_) {}
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const next = !getPreferWebXR();
+          setPreferWebXR(next);
+          // Optional: hint when enabling but unsupported
+          if (next) {
+            const supported = await isWebXRSupported();
+            if (!supported) alert('WebXR nie jest wspierane na tym urządzeniu. Natywny podgląd AR nie pokaże własnego UI.');
+          }
+        });
+      })();
 
       // Przycisk powrotu do kategorii
       document.getElementById('back-to-categories')?.addEventListener('click', (e) => {
