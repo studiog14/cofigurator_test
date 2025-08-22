@@ -4605,8 +4605,8 @@ function hidePreloader() {
 function showModelLoader(text = 'Ładowanie modelu...') {
   const el = document.getElementById('model-loader');
   if (el) {
-  const textEl = el.querySelector('p');
-  if (textEl) textEl.textContent = text;
+    const textEl = el.querySelector('p');
+    if (textEl) textEl.textContent = text;
     el.style.display = 'flex';
   }
 }
@@ -4635,24 +4635,6 @@ function updateModelLoaderProgress(percent) {
   bar.style.animation = 'none';
   const clamped = Math.max(0, Math.min(100, Number(percent) || 0));
   bar.style.width = clamped + '%';
-}
-
-// Dodatkowa linia z procentem w nawiasie pod tekstem
-function updateModelLoaderPercent(percent){
-  const el = document.getElementById('model-loader');
-  if (!el) return;
-  const p = Math.max(0, Math.min(100, Number(percent) || 0));
-  const textEl = el.querySelector('p');
-  if (!textEl) return;
-  // Jeśli tekst nie zawiera już nawiasów, dodaj osobną linię z procentem
-  let extra = el.querySelector('.loader-percent');
-  if (!extra) {
-    extra = document.createElement('div');
-    extra.className = 'loader-percent';
-    extra.style.cssText = 'margin-top:6px;color:#666;font-weight:600;';
-    textEl.insertAdjacentElement('afterend', extra);
-  }
-  extra.textContent = `(${p}%)`;
 }
 
 // Funkcje loadera materiałów
@@ -7063,7 +7045,7 @@ updateSummary();
             // remove the param to avoid loops on back
             url.searchParams.delete('open_ar');
             window.history.replaceState({}, '', url.toString());
-            try { showModelLoader('Ładowanie trybu AR...'); } catch(_) {}
+            try { showModelLoader('Uruchamianie trybu AR...'); } catch(_) {}
             // Use the same mobile AR routine
             if (typeof openArWebXRMobile === 'function') openArWebXRMobile(); else openArFlow();
           }
@@ -7100,7 +7082,7 @@ updateSummary();
           mv = document.createElement('model-viewer');
           mv.id = '__mv_ar_unified';
           mv.setAttribute('ar', '');
-          mv.setAttribute('ar-modes', 'webxr scene-viewer quick-look');
+          mv.setAttribute('ar-modes', 'scene-viewer webxr quick-look');
           mv.setAttribute('ar-placement', 'floor');
           mv.setAttribute('reveal', 'manual');
           mv.setAttribute('shadow-intensity', '0.8');
@@ -7109,12 +7091,7 @@ updateSummary();
           const onProgress = (ev) => {
             const p = ev?.detail?.totalProgress;
             if (typeof p === 'number' && p >= 0 && p <= 1) {
-              const percent = Math.max(0, Math.min(100, 5 + Math.round(p * 95)));
-              try {
-                updateModelLoaderProgress(percent);
-                showModelLoader('Uruchamianie trybu AR...');
-                updateModelLoaderPercent(percent);
-              } catch(_) {}
+              try { updateModelLoaderProgress(6 + Math.round(p * 88)); } catch(_) {}
             }
           };
           const onArStatus = (ev) => {
@@ -7198,23 +7175,36 @@ updateSummary();
   // Pre-/Post-AR overlays removed per UX requirement
 
   async function openArWebXRMobile() {
-  try { showModelLoader('Uruchamianie trybu AR...'); updateModelLoaderProgress(0); updateModelLoaderPercent(0); } catch(_) {}
+  try {
+    showModelLoader('Uruchamianie trybu AR...');
+    updateModelLoaderProgress(0);
+  } catch(_) {}
         const curChair = (typeof selectedChair !== 'undefined' && selectedChair && selectedChair.Nazwa) ? selectedChair : window.selectedChair;
         if (!curChair || !curChair.Nazwa) { hideModelLoader(); alert('Najpierw wybierz krzesło z konfiguratora'); return; }
         const assets = (typeof getCurrentArAssets === 'function') ? getCurrentArAssets() : null;
-  const glb = assets?.glb || (Array.isArray(assets?.glbCandidates) ? assets.glbCandidates[0] : null);
+        const glb = assets?.glb || (Array.isArray(assets?.glbCandidates) ? assets.glbCandidates[0] : null);
+        const usdzList = Array.isArray(assets?.usdzCandidates) ? assets.usdzCandidates : [];
         await ensureModelViewerScript();
         const mv = ensureUnifiedArModelViewer();
         if (glb) mv.setAttribute('src', toAbsUrl(glb)); else { hideModelLoader(); alert('Brak pliku GLB dla AR.'); return; }
-  // Nie używamy USDZ na iOS – rely on GLB via model-viewer
-  try { mv.removeAttribute('ios-src'); } catch(_) {}
+        // Prefer a valid USDZ on iOS
+        let iosUsdz = '';
+        if (typeof isIOS === 'function' && isIOS() && usdzList.length) {
+          for (const u of usdzList) {
+            try { const r = await fetch(toAbsUrl(u), { method:'HEAD', cache:'no-store' }); if (r.ok) { iosUsdz = u; break; } } catch {}
+          }
+        }
+        if (iosUsdz) mv.setAttribute('ios-src', toAbsUrl(iosUsdz)); else mv.removeAttribute('ios-src');
         // Activate AR
         if (typeof mv.activateAR === 'function') {
           try {
-            const safety = setTimeout(() => { try { hideModelLoader(); } catch(_) {} }, 8000);
             await mv.activateAR();
-            clearTimeout(safety);
-          } catch(_) { try { hideModelLoader(); } catch(_) {} }
+          } catch(_) {
+            try { hideModelLoader(); } catch(_) {}
+          } finally {
+            // Safety: hide loader even if ar-status events are missed
+            try { hideModelLoader(); } catch(_) {}
+          }
         } else {
           // Fallback to Scene Viewer
           try { window.location.href = buildSceneViewerUrl(glb); } finally { setTimeout(() => hideModelLoader(), 800); }
