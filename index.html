@@ -7160,15 +7160,8 @@ updateSummary();
             try {
               const overlay = document.getElementById('__ar_dom_overlay') || ensureArDomOverlay();
               if (s === 'session-started') {
-                // Show our overlay inside the XR session
+                // Show our overlay inside the XR session, with full side panel visible
                 overlay.style.display = 'block';
-                // Show only the UI toggle by default; hide other controls until toggled
-                const back = overlay.querySelector('#__ar_ui_back');
-                const minus = overlay.querySelector('#__ar_ui_scale_minus');
-                const plus = overlay.querySelector('#__ar_ui_scale_plus');
-                if (back) back.style.display = 'none';
-                if (minus) minus.style.display = 'none';
-                if (plus) plus.style.display = 'none';
               }
               // Hide when the session ends or fails
               if (s === 'session-ended' || s === 'failed' || s === 'not-presenting') {
@@ -7227,18 +7220,11 @@ updateSummary();
           // Fullscreen overlay; let only our controls accept input
           root.style.cssText = 'position:fixed;inset:0;z-index:2147483647;display:none;pointer-events:auto;'
             + 'font-family:Poppins,system-ui,Segoe UI,Roboto,Arial,sans-serif;';
-          // Bottom-left UI group
+          // Right-side vertical panel with subtle background to improve contrast
           const bl = document.createElement('div');
-          bl.id = '__ar_ui_bottom_left';
-          bl.style.cssText = 'position:absolute;left:12px;bottom:12px;display:flex;gap:10px;align-items:center;pointer-events:auto;';
-          // UI toggle (show/hide our overlay controls)
-          const uiToggle = document.createElement('button');
-          uiToggle.id = '__ar_ui_toggle';
-          uiToggle.type = 'button';
-          uiToggle.textContent = 'UI';
-          uiToggle.title = 'Pokaż/ukryj sterowanie';
-          uiToggle.style.cssText = 'background:#F5C842;color:#333;border:none;border-radius:14px;padding:10px 14px;font-weight:800;';
-          bl.appendChild(uiToggle);
+          bl.id = '__ar_ui_side';
+          bl.style.cssText = 'position:absolute;right:12px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:10px;pointer-events:auto;'
+            + 'background: linear-gradient(90deg, rgba(0,0,0,0) 0%, rgba(17,17,17,0.35) 20%, rgba(17,17,17,0.35) 100%); padding: 10px; border-radius: 14px;';
           // Back tile button
           const back = document.createElement('button');
           back.id = '__ar_ui_back';
@@ -7283,14 +7269,6 @@ updateSummary();
           root.appendChild(info);
           root.appendChild(closePrev);
           document.body.appendChild(root);
-
-          // UI toggle behavior: toggle visibility of controls (except itself)
-          uiToggle.addEventListener('click', (e) => {
-            e.preventDefault(); e.stopPropagation();
-            const controls = [back, scaleMinus, scalePlus];
-            const anyVisible = controls.some(el => el.style.display !== 'none');
-            controls.forEach(el => el.style.display = anyVisible ? 'none' : '');
-          });
 
           // Behavior: back exits WebXR session if active
           back.addEventListener('click', (e) => {
