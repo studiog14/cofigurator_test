@@ -7459,14 +7459,15 @@ updateSummary();
           e.stopPropagation();
           const next = !getPreferWebXR();
           setPreferWebXR(next);
-          // Optional: hint when enabling but unsupported
-          if (next) {
+          // Optional info on desktop where WebXR overlay may not apply
+          const isMobile = (typeof isMobileMode === 'function') ? isMobileMode() : ((typeof isIOS==='function'&&isIOS()) || (typeof isAndroid==='function'&&isAndroid()) || window.innerWidth <= 820);
+          if (!isMobile && next) {
             const supported = await isWebXRSupported();
             if (!supported) alert('WebXR nie jest wspierane na tym urządzeniu. Natywny podgląd AR nie pokaże własnego UI.');
           }
         });
       })();
-
+      // Mobile – cross-platform AR with configured chair (pseudo-AR for now)
       // Przycisk powrotu do kategorii
       document.getElementById('back-to-categories')?.addEventListener('click', (e) => {
         e.stopPropagation();
