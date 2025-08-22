@@ -7084,12 +7084,13 @@ updateSummary();
           mv = document.createElement('model-viewer');
           mv.id = '__mv_ar_unified';
           mv.setAttribute('ar', '');
-          // Prefer WebXR; allow a URL flag ?ios_webxr=1 to force WebXR-only on iOS for testing UI
+          // Prefer WebXR; allow URL flags to force WebXR-only for testing UI
           let modes = 'webxr scene-viewer quick-look';
           try {
             const url = new URL(window.location.href);
             const forceIOSWebXR = url.searchParams.get('ios_webxr') === '1';
-            if (forceIOSWebXR && typeof isIOS === 'function' && isIOS()) {
+            const forceWebXR = url.searchParams.get('force_webxr') === '1';
+            if ((forceIOSWebXR && typeof isIOS === 'function' && isIOS()) || forceWebXR) {
               modes = 'webxr';
             }
           } catch(_) {}
@@ -7097,9 +7098,22 @@ updateSummary();
           mv.setAttribute('ar-placement', 'floor');
           // Request DOM overlay and hit-test for WebXR sessions; bind overlay root
           try {
+            // If we explicitly force WebXR, require dom-overlay so our UI is guaranteed visible in-session
+            let required = ['hit-test'];
+            let optional = ['dom-overlay','unbounded'];
+            try {
+              const u = new URL(window.location.href);
+              const forceIOSWebXR = u.searchParams.get('ios_webxr') === '1';
+              const forceWebXR = u.searchParams.get('force_webxr') === '1';
+              if (forceWebXR || forceIOSWebXR) {
+                required = ['hit-test','dom-overlay'];
+                optional = ['unbounded'];
+              }
+            } catch(_) {}
             const xrInit = {
-              requiredFeatures: ['hit-test'],
-              optionalFeatures: ['dom-overlay','unbounded'],
+              requiredFeatures: required,
+              optionalFeatures: optional,
+              // Pass CSS selector so model-viewer resolves the DOM overlay element inside XR
               domOverlay: { root: '#' + (overlayRoot?.id || '__ar_dom_overlay') }
             };
             mv.setAttribute('xr-session-init', JSON.stringify(xrInit));
@@ -7125,9 +7139,11 @@ updateSummary();
             try {
               const overlay = document.getElementById('__ar_dom_overlay') || ensureArDomOverlay();
               if (s === 'session-started') {
+                // Show our overlay inside the XR session
                 overlay.style.display = 'block';
               }
-              if (s === 'not-presenting' || s === 'failed') {
+              // Hide only when the session truly ends or fails; ignore early 'not-presenting'
+              if (s === 'session-ended' || s === 'failed') {
                 overlay.style.display = 'none';
               }
             } catch(_) {}
@@ -7181,7 +7197,7 @@ updateSummary();
           root = document.createElement('div');
           root.id = '__ar_dom_overlay';
           // Fullscreen overlay; let only our controls accept input
-          root.style.cssText = 'position:fixed;inset:0;z-index:2147483647;display:none;pointer-events:none;'
+          root.style.cssText = 'position:fixed;inset:0;z-index:2147483647;display:none;pointer-events:auto;'
             + 'font-family:Poppins,system-ui,Segoe UI,Roboto,Arial,sans-serif;';
           // Bottom-left UI group
           const bl = document.createElement('div');
@@ -7298,8 +7314,7 @@ updateSummary();
     // Activate AR
         if (typeof mv.activateAR === 'function') {
           try {
-      // Show our overlay early; if native mode opens, visibilitychange handler will hide it
-      try { const ov = ensureArDomOverlay(); ov.style.display = 'block'; } catch(_) {}
+            // Do not show overlay yet; wait for 'session-started' to display it
             await mv.activateAR();
           } catch(_) {
             // If activation fails (e.g., iOS without WebXR), try Quick Look if available
@@ -7318,6 +7333,8 @@ updateSummary();
                 }
               }
             } catch(_) {}
+            // Ensure overlay stays hidden on failure
+            try { const ov = document.getElementById('__ar_dom_overlay'); if (ov) ov.style.display = 'none'; } catch(_) {}
             // Hide shortly after to avoid a stuck loader
             setTimeout(() => { try { hideModelLoader(); } catch(_) {} }, 1500);
           } finally {
