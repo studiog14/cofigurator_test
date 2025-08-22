@@ -7201,6 +7201,8 @@ updateSummary();
   } catch(_) {}
         const curChair = (typeof selectedChair !== 'undefined' && selectedChair && selectedChair.Nazwa) ? selectedChair : window.selectedChair;
         if (!curChair || !curChair.Nazwa) { hideModelLoader(); alert('Najpierw wybierz krzesło z konfiguratora'); return; }
+  // Remember current chair so we can restore it if the browser/page reloads after AR
+  try { sessionStorage.setItem('__ar_resume', JSON.stringify({ chairName: curChair.Nazwa, ts: Date.now() })); } catch(_) {}
         const assets = (typeof getCurrentArAssets === 'function') ? getCurrentArAssets() : null;
         const glb = assets?.glb || (Array.isArray(assets?.glbCandidates) ? assets.glbCandidates[0] : null);
   const usdzList = [];
@@ -7284,6 +7286,33 @@ updateSummary();
             try { window.history.replaceState({}, '', u.toString()); } catch {}
           }
         } catch(_) {}
+      })();
+
+      // Restore previously selected chair after returning from AR (even if the page reloaded)
+      (function restoreChairAfterAr(){
+        const tryRestore = () => {
+          let payload = null;
+          try { payload = JSON.parse(sessionStorage.getItem('__ar_resume') || 'null'); } catch(_) { payload = null; }
+          if (!payload || !payload.chairName) return;
+          // Use it only once
+          try { sessionStorage.removeItem('__ar_resume'); } catch(_) {}
+          const name = payload.chairName;
+          let attempts = 0;
+          const tick = async () => {
+            attempts++;
+            if (window.viewer && typeof silentLoadModel === 'function') {
+              try { await silentLoadModel({ Nazwa: name }); } catch(_) {}
+              return; // done, stop retrying
+            }
+            if (attempts < 40) {
+              setTimeout(tick, 250);
+            }
+          };
+          // Defer until viewer is initialized
+          setTimeout(tick, 0);
+        };
+        window.addEventListener('pageshow', () => { tryRestore(); });
+        document.addEventListener('DOMContentLoaded', () => { tryRestore(); });
       })();
 
   // Preload model-viewer script early
