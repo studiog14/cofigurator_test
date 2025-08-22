@@ -3302,6 +3302,49 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
           });
 
           document.body.appendChild(viewBtn);
+
+          // Create small UI toggle next to "Zobacz w pomieszczeniu"
+          let viewUi = document.getElementById('view-in-room-ui-toggle');
+          if (!viewUi) {
+            viewUi = document.createElement('div');
+            viewUi.id = 'view-in-room-ui-toggle';
+            viewUi.innerHTML = '<strong>UI</strong>';
+            // Base style similar but more compact
+            try { viewUi.style.cssText = configBtn.getAttribute('style') || ''; } catch(_) {}
+            viewUi.style.position = 'fixed';
+            viewUi.style.padding = '4px 8px';
+            viewUi.style.fontSize = '10px';
+            viewUi.style.borderRadius = '14px';
+            viewUi.style.display = 'none';
+            viewUi.style.userSelect = 'none';
+            viewUi.style.whiteSpace = 'nowrap';
+            viewUi.title = 'Preferuj własne AR UI (WebXR)';
+
+            const reflect = () => {
+              const active = (typeof getPreferWebXR === 'function') ? getPreferWebXR() : false;
+              if (active) {
+                viewUi.style.boxShadow = '0 0 0 2px #F5C842 inset, 0 2px 8px rgba(245,200,66,0.35)';
+                viewUi.style.background = '#fdf3c4';
+                viewUi.style.color = '#333';
+              } else {
+                viewUi.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+                viewUi.style.background = 'linear-gradient(135deg, #F5C842, #E5B432)';
+                viewUi.style.color = '#111';
+              }
+            };
+            viewUi.addEventListener('click', (e) => {
+              e.stopPropagation();
+              try {
+                const cur = (typeof getPreferWebXR === 'function') ? getPreferWebXR() : false;
+                if (typeof setPreferWebXR === 'function') setPreferWebXR(!cur);
+                reflect();
+              } catch(_) {}
+            });
+
+            document.body.appendChild(viewUi);
+            // Initial visual state
+            reflect();
+          }
         }
         return viewBtn;
       }
@@ -3309,6 +3352,7 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
       function updateViewButtonLayout(){
         const configBtn = document.getElementById('config-overview-button');
         const viewBtn = document.getElementById('view-in-room-button');
+        const viewUi = document.getElementById('view-in-room-ui-toggle');
         if (!configBtn || !viewBtn) return;
 
   const isMobile = isMobileMode();
@@ -3323,9 +3367,11 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
         if (isMobile) {
           configBtn.style.display = hasChair ? (configVisible ? window.getComputedStyle(configBtn).display : 'inline-flex') : 'none';
           viewBtn.style.display = hasChair && (window.getComputedStyle(configBtn).display !== 'none') ? 'inline-flex' : 'none';
+          if (viewUi) viewUi.style.display = viewBtn.style.display;
         } else {
           // On desktop don’t interfere with config button visibility; hide our mobile-only view button
           viewBtn.style.display = 'none';
+          if (viewUi) viewUi.style.display = 'none';
         }
 
         // Position to the right side of the config button with 8px gap
@@ -3337,6 +3383,17 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
         const bottomPx = Math.max(0, Math.round(window.innerHeight - rect.bottom));
         viewBtn.style.top = 'auto';
         viewBtn.style.bottom = bottomPx + 'px';
+
+        // Place UI toggle 8px to the right of viewBtn
+        if (viewUi) {
+          try {
+            const vrect = viewBtn.getBoundingClientRect();
+            const left2 = Math.max(0, vrect.left + vrect.width + 8);
+            viewUi.style.left = left2 + 'px';
+            viewUi.style.top = 'auto';
+            viewUi.style.bottom = bottomPx + 'px';
+          } catch(_) {}
+        }
       }
 
       function initViewButtonEnhancement(){
