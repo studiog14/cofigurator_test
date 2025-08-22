@@ -3204,20 +3204,19 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
           });
 
   // Click -> Mobile: go to ar.html (auto AR); Desktop: show QR to AR landing
-          viewBtn.addEventListener('click', async (e) => {
+      viewBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
             try {
-              const isDesk = (typeof isDesktop === 'function') ? isDesktop() : !(typeof isIOS==='function'&&isIOS()) && !(typeof isAndroid==='function'&&isAndroid());
-              if (isDesk) {
+        const isDesk = (typeof isDesktop === 'function') ? isDesktop() : !(typeof isIOS==='function'&&isIOS()) && !(typeof isAndroid==='function'&&isAndroid());
+        if (isDesk) {
                 // Desktop unchanged – show QR to AR landing page (auto-open AR on mobile)
                 const url = (typeof buildArHtmlUrl === 'function') ? buildArHtmlUrl() : 'ar_viewer.html';
                 const qrUrl = url + (url.includes('?') ? '&' : '?') + 'open_ar=1';
                 if (typeof showQrWithUrl === 'function') showQrWithUrl(qrUrl);
                 return;
               }
-      // Mobile – navigate to ar.html which will auto-open AR
-      const murl = (typeof buildArHtmlUrl === 'function') ? buildArHtmlUrl() : 'ar.html';
-      window.location.href = murl + (murl.includes('?') ? '&' : '?') + 'open_ar=1';
+    // Mobile – cross-platform AR with configured chair
+    if (typeof openConfiguredAR === 'function') openConfiguredAR(); else if (typeof openArWebXRMobile === 'function') openArWebXRMobile();
             } catch(err){ console.warn('AR open error:', err); }
           });
 
@@ -7107,6 +7106,56 @@ updateSummary();
         } catch(_) {}
       }
 
+      // Cross-platform AR opener: iOS -> Zappar inline WebAR; Android -> WebXR via model-viewer
+      async function openConfiguredAR(){
+        try { showModelLoader('Przygotowywanie modelu do AR...'); updateModelLoaderProgress(0); } catch(_) {}
+        const curChair = (typeof selectedChair !== 'undefined' && selectedChair && selectedChair.Nazwa) ? selectedChair : window.selectedChair;
+        if (!curChair || !curChair.Nazwa) { hideModelLoader(); alert('Najpierw wybierz krzesło.'); return; }
+
+        // Export configured scene to GLB (binary)
+        let blobUrl = '';
+        try {
+          if (typeof viewer !== 'undefined' && viewer && viewer.scene) {
+            const { GLTFExporter } = await import('https://unpkg.com/three@0.157.0/examples/jsm/exporters/GLTFExporter.js');
+            const exporter = new GLTFExporter();
+            const bin = await new Promise((resolve, reject) => {
+              exporter.parse(viewer.scene, (b)=>resolve(b), (e)=>reject(e), {
+                binary: true, onlyVisible: true, includeCustomExtensions: true, truncateDrawRange: true, maxTextureSize: 2048
+              });
+            });
+            const blob = new Blob([bin], { type: 'model/gltf-binary' });
+            blobUrl = URL.createObjectURL(blob);
+            setTimeout(() => { try { URL.revokeObjectURL(blobUrl); } catch(_) {} }, 120000);
+          }
+        } catch(_) {}
+
+        if (isIOS()) {
+          // iOS: open inline WebAR with Zappar (works in Safari) and pass our GLB URL
+          try {
+            const base = 'webar_zappar.html';
+            const url = base + '?model=' + encodeURIComponent(blobUrl || (getCurrentArAssets()?.glb || ''));
+            window.location.href = url;
+          } finally { setTimeout(()=>{ try{ hideModelLoader(); }catch(_){}} , 500); }
+          return;
+        }
+
+        // Android or other – reuse WebXR flow with our blob GLB
+        try {
+          await ensureModelViewerScript();
+          const mv = ensureUnifiedArModelViewer();
+          const target = blobUrl || (getCurrentArAssets()?.glb ? toAbsUrl(getCurrentArAssets().glb) : '');
+          if (!target) { hideModelLoader(); alert('Brak modelu AR.'); return; }
+          const prev = mv.getAttribute('src') || '';
+          if (prev !== target) mv.setAttribute('src', target);
+          const prevIos = mv.getAttribute('ios-src') || ''; if (prevIos) mv.removeAttribute('ios-src');
+          await __waitForArAnchorRefresh(mv);
+          await mv.activateAR();
+        } catch (e) {
+          console.warn('WebXR AR failed, fallback:', e);
+          try { const a = getCurrentArAssets(); if (a?.glb) window.location.href = buildSceneViewerUrl(a.glb); } finally { setTimeout(()=>hideModelLoader(), 500); }
+        }
+      }
+
       // Custom AR back button (Android WebXR)
       function ensureArBackButton(){
         let btn = document.getElementById('ar-back-button');
@@ -7874,6 +7923,16 @@ fetch(basePath, { method: 'HEAD' })
       rememberedIcon.classList.add('selected');
       renderMaterialsInPanel(rememberedMaterials, targetMesh);
     }
+  }
+
+  // Helper to open pseudo-AR with the currently selected model (GLB); does not change main AR flow
+  function openPseudoArPreview(){
+    try {
+      const a = (typeof getCurrentArAssets === 'function') ? getCurrentArAssets() : null;
+      const glb = a?.glb || (Array.isArray(a?.glbCandidates) ? a.glbCandidates[0] : '');
+      const url = 'pseudo_ar.html' + (glb ? ('?model=' + encodeURIComponent(glb)) : '');
+      window.open(url, '_blank');
+    } catch(e) { console.warn('Pseudo-AR open failed', e); }
   }
 }
 

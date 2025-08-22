@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Pseudo‑AR podgląd (kamera + 3D)</title>
+  <meta name="theme-color" content="#000000">
+  <style>
+    html, body { height: 100%; margin: 0; background: #000; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    #wrap { position: fixed; inset: 0; overflow: hidden; }
+    #cam { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); /* mirror for front cams, toggled later */ }
+    #stage { position: absolute; inset: 0; display: block; }
+
+    #uiTop { position: fixed; left: env(safe-area-inset-left,12px); right: env(safe-area-inset-right,12px); top: env(safe-area-inset-top,12px); display:flex; align-items:center; justify-content:space-between; gap:8px; z-index: 10; }
+    #uiBottom { position: fixed; left: env(safe-area-inset-left,12px); right: env(safe-area-inset-right,12px); bottom: env(safe-area-inset-bottom,12px); display:flex; align-items:center; justify-content:space-between; gap:8px; z-index: 10; }
+    .tile { pointer-events:auto; background:#111; color:#fff; border:1px solid rgba(255,255,255,.25); border-radius:14px; padding:10px 14px; font-weight:700; box-shadow:0 8px 24px rgba(0,0,0,.35); }
+    .accent { background:#F5C842; color:#222; border:0; }
+    #hint { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom,12px) + 64px); color:#fff; text-shadow:0 1px 2px rgba(0,0,0,.6); font-weight:700; z-index:10; }
+
+    /* Simple crosshair */
+    #cross { position: fixed; left:50%; top:50%; transform: translate(-50%,-50%); width:28px; height:28px; border-radius:50%; box-shadow: 0 0 0 2px rgba(255,255,255,.75); z-index: 5; opacity:.6; }
+
+    /* Sliders */
+    .group { display:flex; align-items:center; gap:8px; }
+    .lbl { font-size:12px; color:#eee; font-weight:700; opacity:.9; }
+    input[type=range] { width: 160px; }
+  </style>
+  <script src="https://unpkg.com/three@0.157.0/build/three.min.js"></script>
+  <script src="https://unpkg.com/three@0.157.0/examples/js/loaders/GLTFLoader.js"></script>
+</head>
+<body>
+  <div id="wrap">
+    <video id="cam" playsinline autoplay muted></video>
+    <canvas id="stage"></canvas>
+  </div>
+  <div id="cross"></div>
+  <div id="uiTop">
+    <button id="back" class="tile">Powrót</button>
+    <div class="group">
+      <span class="lbl">Odległość</span>
+      <input id="dist" type="range" min="0.5" max="3.0" step="0.1" value="1.5"/>
+      <span class="lbl">Skala</span>
+      <input id="scale" type="range" min="0.3" max="3.0" step="0.05" value="1.0"/>
+    </div>
+    <button id="flip" class="tile">Kamera: tył</button>
+  </div>
+  <div id="uiBottom">
+    <div class="group">
+      <button id="place" class="tile accent">Umieść tutaj</button>
+      <button id="rotateL" class="tile">⟲</button>
+      <button id="rotateR" class="tile">⟳</button>
+      <button id="reset" class="tile">Reset</button>
+    </div>
+    <div class="group">
+      <input id="modelUrl" class="tile" style="width:260px; background:#fff; color:#111; border:0; font-weight:600;" placeholder="URL GLB (opcjonalnie)"/>
+      <button id="loadUrl" class="tile">Załaduj</button>
+    </div>
+  </div>
+  <div id="hint">To jest podglądowy tryb AR (bez śledzenia płaszczyzn)</div>
+
+  <script>
+  (function(){
+    const qs = new URLSearchParams(location.search);
+    const defaultModel = qs.get('model') || 'chairs/Default.glb';
+
+    let currentStream = null;
+    let usingBack = true;
+
+    const video = document.getElementById('cam');
+    const canvas = document.getElementById('stage');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    function resize(){ renderer.setSize(innerWidth, innerHeight, false); }
+    addEventListener('resize', resize); resize();
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.01, 100);
+    camera.position.set(0, 0, 0);
+
+    // Simple light
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.0));
+
+    // Anchor for chair (in front of camera on -Z)
+    const anchor = new THREE.Group();
+    scene.add(anchor);
+
+    let chair = null;
+    const loader = new THREE.GLTFLoader();
+    function loadModel(url){
+      try {
+        loader.load(url, (gltf)=>{
+          if (chair) anchor.remove(chair);
+          chair = gltf.scene;
+          chair.scale.set(1,1,1);
+          chair.rotation.set(0,0,0);
+          anchor.add(chair);
+        }, undefined, (err)=> console.warn('GLB load error:', err));
+      } catch(e){ console.warn(e); }
+    }
+
+    // Controls
+    const distEl = document.getElementById('dist');
+    const scaleEl = document.getElementById('scale');
+    function updateAnchor(){
+      const d = parseFloat(distEl.value || '1.5');
+      // place d meters in front of camera, slightly below center
+      anchor.position.set(0, -0.2, -d);
+      // Keep anchor in camera space
+      anchor.quaternion.copy(camera.quaternion);
+      if (chair){
+        const s = parseFloat(scaleEl.value || '1');
+        chair.scale.set(s,s,s);
+      }
+    }
+
+    document.getElementById('place').addEventListener('click', ()=>{ updateAnchor(); });
+    document.getElementById('rotateL').addEventListener('click', ()=>{ if(chair) chair.rotation.y -= Math.PI/12; });
+    document.getElementById('rotateR').addEventListener('click', ()=>{ if(chair) chair.rotation.y += Math.PI/12; });
+    document.getElementById('reset').addEventListener('click', ()=>{ if(chair){ scaleEl.value = '1.0'; distEl.value = '1.5'; chair.rotation.set(0,0,0); updateAnchor(); }});
+    distEl.addEventListener('input', updateAnchor);
+    scaleEl.addEventListener('input', updateAnchor);
+
+    document.getElementById('back').addEventListener('click', ()=>{ history.length ? history.back() : (location.href='index.html'); });
+
+    // Load by URL box
+    document.getElementById('loadUrl').addEventListener('click', ()=>{
+      const u = document.getElementById('modelUrl').value.trim();
+      if (u) loadModel(u);
+    });
+
+    // Gestures: pinch -> scale, rotate two-finger -> rotate, tap -> place
+    let activeTouches = [];
+    function getTouches(ev){ return Array.from(ev.touches).map(t=>({x:t.clientX,y:t.clientY,id:t.identifier})); }
+    function dist(a,b){ const dx=a.x-b.x, dy=a.y-b.y; return Math.hypot(dx,dy); }
+    let lastDist = null;
+    let lastAngle = null;
+    addEventListener('touchstart', (ev)=>{ activeTouches = getTouches(ev); if(activeTouches.length===1) updateAnchor(); });
+    addEventListener('touchmove', (ev)=>{
+      const t = getTouches(ev); if (t.length===2 && chair){
+        const dNow = dist(t[0], t[1]);
+        const aNow = Math.atan2(t[1].y - t[0].y, t[1].x - t[0].x);
+        if (lastDist!=null){
+          const deltaS = (dNow - lastDist) / 200; // normalize
+          const s = Math.min(3, Math.max(0.3, parseFloat(scaleEl.value) + deltaS));
+          scaleEl.value = String(s.toFixed(2));
+        }
+        if (lastAngle!=null){
+          const dA = aNow - lastAngle;
+          chair.rotation.y += dA;
+        }
+        lastDist = dNow; lastAngle = aNow; updateAnchor();
+      }
+    }, {passive:true});
+    addEventListener('touchend', ()=>{ activeTouches = []; lastDist = null; lastAngle = null; });
+
+    // Camera handling
+    async function startCamera(kind){
+      try {
+        if (currentStream){ currentStream.getTracks().forEach(t=>t.stop()); currentStream=null; }
+        const constraints = { audio:false, video:{ facingMode: kind, width:{ideal:1280}, height:{ideal:720} } };
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        currentStream = stream;
+        video.srcObject = stream;
+        await video.play().catch(()=>{});
+        // If using back camera, un-mirror; if front, mirror
+        const facing = (kind && kind.ideal) ? kind.ideal : kind;
+        const isBack = (facing === 'environment');
+        video.style.transform = isBack ? 'scaleX(1)' : 'scaleX(-1)';
+        document.getElementById('flip').textContent = 'Kamera: ' + (isBack ? 'tył' : 'przód');
+      } catch (e){
+        console.warn('Camera error', e);
+        document.getElementById('hint').textContent = 'Brak dostępu do kamery. Zezwól w przeglądarce.';
+      }
+    }
+
+    document.getElementById('flip').addEventListener('click', ()=>{
+      usingBack = !usingBack; startCamera({ ideal: usingBack ? 'environment' : 'user' });
+    });
+
+    // Animation loop
+    function animate(){
+      requestAnimationFrame(animate);
+      renderer.render(scene, camera);
+    }
+
+    // Init
+    startCamera({ ideal: 'environment' });
+    loadModel(defaultModel);
+    updateAnchor();
+    animate();
+  })();
+  </script>
+</body>
+</html>
