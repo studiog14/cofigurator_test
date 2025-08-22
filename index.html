@@ -7098,28 +7098,22 @@ updateSummary();
           mv.setAttribute('ar-placement', 'floor');
           // Request DOM overlay and hit-test for WebXR sessions; bind overlay root
           try {
-            // If we explicitly force WebXR, require dom-overlay so our UI is guaranteed visible in-session
-            let required = ['hit-test'];
-            let optional = ['dom-overlay','unbounded'];
-            try {
-              const u = new URL(window.location.href);
-              const forceIOSWebXR = u.searchParams.get('ios_webxr') === '1';
-              const forceWebXR = u.searchParams.get('force_webxr') === '1';
-              if (forceWebXR || forceIOSWebXR) {
-                required = ['hit-test','dom-overlay'];
-                optional = ['unbounded'];
-              }
-            } catch(_) {}
+            // Always require dom-overlay so our UI is available inside the WebXR session.
+            const required = ['hit-test','dom-overlay'];
+            const optional = ['unbounded'];
             const xrInit = {
               requiredFeatures: required,
               optionalFeatures: optional,
-              // Provide the actual element for domOverlay root via property
               domOverlay: { root: overlayRoot || document.getElementById('__ar_dom_overlay') }
             };
-            // Bind via property so model-viewer passes a real element to WebXR
-            mv.xrSessionInit = xrInit;
-            // Also set attribute for visibility/debugging
-            try { mv.setAttribute('xr-session-init', JSON.stringify({ requiredFeatures: required, optionalFeatures: optional, domOverlay: { root: '#' + (overlayRoot?.id || '__ar_dom_overlay') } })); } catch(_) {}
+            mv.xrSessionInit = xrInit; // property
+            try {
+              mv.setAttribute('xr-session-init', JSON.stringify({
+                requiredFeatures: required,
+                optionalFeatures: optional,
+                domOverlay: { root: '#' + (overlayRoot?.id || '__ar_dom_overlay') }
+              }));
+            } catch(_) {}
           } catch(_) {}
           mv.setAttribute('reveal', 'manual');
           mv.setAttribute('shadow-intensity', '0.8');
