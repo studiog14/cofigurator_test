@@ -119,9 +119,9 @@
       margin-top: -10px;
       z-index: 1300;
       display: flex;
-      align-items: center; /* desktop: środek pionowo */
+      align-items: flex-start;
       justify-content: flex-end;
-      gap: 8px;
+      gap: 10px;
     }
 
     #search-toggle {
@@ -136,6 +136,87 @@
       justify-content: center;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
       transition: all 0.3s ease;
+      transform: translateY(-5px);
+    }
+
+    #search-toggle:hover {
+      background: #E5B432;
+      transform: scale(1.05);
+    }
+
+    #search-toggle svg {
+      width: 20px;
+      height: 20px;
+      fill: #333;
+    }
+
+    #search-panel {
+      position: absolute !important;
+      top: 0 !important;
+      right: 54px !important;
+      width: 0 !important;
+      max-width: 0 !important;
+      background: rgba(255, 255, 255, 0.98) !important;
+      backdrop-filter: blur(15px) !important;
+      border-radius: 12px !important;
+      padding: 0 !important;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2) !important;
+      opacity: 0 !important;
+      visibility: hidden !important;
+      transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
+      z-index: 1400 !important;
+      transform: translateX(0) translateY(-5px) !important;
+      overflow: hidden !important;
+    }
+
+    #search-panel.active {
+      width: 320px !important;
+      max-width: 320px !important;
+      padding: 16px !important;
+      opacity: 1 !important;
+      visibility: visible !important;
+      transform: translateX(0) translateY(-5px) !important;
+    }
+
+    #search-input {
+      width: 100%;
+      border: 2px solid #F5C842;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 16px;
+      outline: none;
+      background: white;
+      box-sizing: border-box;
+    }
+
+    #search-input::placeholder {
+      color: #888;
+    }
+
+    #search-input:focus {
+      border-color: #E5B432;
+      box-shadow: 0 0 0 3px rgba(245, 200, 66, 0.2);
+    }
+
+    #search-results {
+      margin-top: 8px;
+      max-height: 300px;
+      overflow-y: auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+      gap: 8px;
+    }
+
+    .search-result-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 8px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: 2px solid transparent;
+      background: rgba(255, 255, 255, 0.9);
       text-align: center;
     }
 
@@ -1013,9 +1094,6 @@
     #bottom-toolbar button:hover {
       background: #e0e0e0;
     }
-
-  /* Small badge for active WebXR preference */
-  #ar-ui-prefer-webxr.active { background: #fdf3c4; border: 1px solid #F5C842; }
 
     #dimension-overlay {
       position: fixed;
@@ -2907,11 +2985,6 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
       <img src="icons/AR_icon.png" alt="AR" style="width: 30px; height: 30px;">
     </button>
 
-    <!-- Prefer custom AR UI (WebXR) toggle -->
-    <button id="ar-ui-prefer-webxr" title="Preferuj własne AR UI (WebXR)" style="position: relative;">
-      <span style="font-weight:700;">UI</span>
-    </button>
-
     <button id="dimensions-show" title="Wymiary modelu">
       <img src="icons/dimmension_icon.png" alt="Wymiary" style="width: 20px; height: 20px;">
     </button>
@@ -2946,7 +3019,7 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
   <link rel="manifest" href="manifest.json?v=2025080418&fix=welcome" />
   <link rel="apple-touch-icon" href="icons/favicon.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"">
   
   <!-- In-page WebXR AR controls -->
   <div id="xr-reticle"></div>
@@ -3202,22 +3275,32 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
             viewBtn.style.background = 'linear-gradient(135deg, #F5C842, #E5B432)';
           });
 
-  // Click -> Mobile: go to ar.html (auto AR); Desktop: show QR to AR landing
-      viewBtn.addEventListener('click', async (e) => {
+  // Click -> Mobile: open pseudo_ar.html with current GLB; Desktop: show QR to AR landing
+          viewBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
             try {
-        const isDesk = (typeof isDesktop === 'function') ? isDesktop() : !(typeof isIOS==='function'&&isIOS()) && !(typeof isAndroid==='function'&&isAndroid());
-        if (isDesk) {
+              const isDesk = (typeof isDesktop === 'function') ? isDesktop() : !(typeof isIOS==='function'&&isIOS()) && !(typeof isAndroid==='function'&&isAndroid());
+              if (isDesk) {
                 // Desktop unchanged – show QR to AR landing page (auto-open AR on mobile)
                 const url = (typeof buildArHtmlUrl === 'function') ? buildArHtmlUrl() : 'ar_viewer.html';
                 const qrUrl = url + (url.includes('?') ? '&' : '?') + 'open_ar=1';
                 if (typeof showQrWithUrl === 'function') showQrWithUrl(qrUrl);
                 return;
               }
-  // Mobile – TEMP: open pseudo AR preview (no changes to ar.html)
-  if (typeof openPseudoArPreview === 'function') openPseudoArPreview();
-  else if (typeof openConfiguredAR === 'function') openConfiguredAR();
-  else if (typeof openArWebXRMobile === 'function') openArWebXRMobile();
+      // Mobile – navigate to pseudo AR preview with current GLB; fallback to previous AR flow if no GLB
+      let glb = null;
+      try {
+        const assets = (typeof getCurrentArAssets === 'function') ? getCurrentArAssets() : null;
+        glb = assets?.glb || (Array.isArray(assets?.glbCandidates) ? assets.glbCandidates[0] : null);
+      } catch(_) {}
+      if (glb) {
+        const abs = new URL(glb, window.location.href).toString();
+        const purl = 'pseudo_ar.html?model=' + encodeURIComponent(abs);
+        window.location.href = purl;
+      } else {
+        const murl = (typeof buildArHtmlUrl === 'function') ? buildArHtmlUrl() : 'ar.html';
+        window.location.href = murl + (murl.includes('?') ? '&' : '?') + 'open_ar=1';
+      }
             } catch(err){ console.warn('AR open error:', err); }
           });
 
@@ -3228,7 +3311,7 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
 
       function updateViewButtonLayout(){
         const configBtn = document.getElementById('config-overview-button');
-  const viewBtn = document.getElementById('view-in-room-button');
+        const viewBtn = document.getElementById('view-in-room-button');
         if (!configBtn || !viewBtn) return;
 
   const isMobile = isMobileMode();
@@ -3257,8 +3340,6 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
         const bottomPx = Math.max(0, Math.round(window.innerHeight - rect.bottom));
         viewBtn.style.top = 'auto';
         viewBtn.style.bottom = bottomPx + 'px';
-
-  // No extra UI toggle in configurator – UI toggle is inside AR session overlay
       }
 
       function initViewButtonEnhancement(){
@@ -6745,19 +6826,6 @@ updateSummary();
       function isAndroid() { return /Android/.test(navigator.userAgent); }
       function isDesktop() { return !(isIOS() || isAndroid()); }
 
-      // WebXR UI preference helpers
-      function getPreferWebXR() {
-        try { return localStorage.getItem('__prefer_webxr_ui') === '1'; } catch(_) { return false; }
-      }
-      function setPreferWebXR(v) {
-        try { localStorage.setItem('__prefer_webxr_ui', v ? '1' : '0'); } catch(_) {}
-        const btn = document.getElementById('ar-ui-prefer-webxr');
-        if (btn) btn.classList.toggle('active', !!v);
-      }
-      async function isWebXRSupported() {
-        try { return !!(navigator.xr && await navigator.xr.isSessionSupported('immersive-ar')); } catch(_) { return false; }
-      }
-
       // Return current model assets for AR, with rich candidate lists sorted by best name match
       function getCurrentArAssets() {
         // Prefer live selectedChair var; fallback to window.selectedChair
@@ -6915,17 +6983,6 @@ updateSummary();
         // Desktop QR should point to dedicated ar.html with model param
         return buildArHtmlUrl();
       }
-      // Ensure a global pseudo-AR opener exists for mobile testing
-      if (!window.openPseudoArPreview) {
-        window.openPseudoArPreview = function openPseudoArPreview() {
-          try {
-            const a = (typeof getCurrentArAssets === 'function') ? getCurrentArAssets() : null;
-            const glb = a?.glb || (Array.isArray(a?.glbCandidates) ? a.glbCandidates[0] : '');
-            const url = 'pseudo_ar.html' + (glb ? ('?model=' + encodeURIComponent(glb)) : '');
-            window.open(url, '_blank');
-          } catch (e) { console.warn('Pseudo-AR open failed', e); }
-        };
-      }
       function showQrWithUrl(url) {
         const qrPopup = document.getElementById('qr-popup');
         const qrContainer = document.getElementById('qrcode');
@@ -6966,8 +7023,6 @@ updateSummary();
               document.addEventListener('visibilitychange', () => {
                 if (document.visibilityState !== 'visible') navigated = true;
               }, { once: true });
-              // Hide our overlay if it was shown
-              try { const ov = document.getElementById('__ar_dom_overlay'); if (ov) ov.style.display = 'none'; } catch(_) {}
               link.click();
               setTimeout(() => {
                 try { link.remove(); } catch(_){ }
@@ -7038,37 +7093,17 @@ updateSummary();
           mv = document.createElement('model-viewer');
           mv.id = '__mv_ar_unified';
           mv.setAttribute('ar', '');
-          // Prefer WebXR; allow URL flags to force WebXR-only for testing UI or global preference
-          let modes = 'webxr scene-viewer quick-look';
-          try {
-            const url = new URL(window.location.href);
-            const forceIOSWebXR = url.searchParams.get('ios_webxr') === '1';
-            const forceWebXR = url.searchParams.get('force_webxr') === '1';
-            const prefer = getPreferWebXR();
-            if ((forceIOSWebXR && typeof isIOS === 'function' && isIOS()) || forceWebXR || prefer) {
-              modes = 'webxr';
-            }
-          } catch(_) {}
-          mv.setAttribute('ar-modes', modes);
+          // Prefer WebXR but keep native fallbacks available (Scene Viewer/Quick Look)
+          mv.setAttribute('ar-modes', 'webxr scene-viewer quick-look');
           mv.setAttribute('ar-placement', 'floor');
           // Request DOM overlay and hit-test for WebXR sessions; bind overlay root
           try {
-            // Always require dom-overlay so our UI is available inside the WebXR session.
-            const required = ['hit-test','dom-overlay'];
-            const optional = ['unbounded'];
             const xrInit = {
-              requiredFeatures: required,
-              optionalFeatures: optional,
-              domOverlay: { root: overlayRoot || document.getElementById('__ar_dom_overlay') }
+              requiredFeatures: ['hit-test'],
+              optionalFeatures: ['dom-overlay','unbounded'],
+              domOverlay: { root: '#' + (overlayRoot?.id || '__ar_dom_overlay') }
             };
-            mv.xrSessionInit = xrInit; // property
-            try {
-              mv.setAttribute('xr-session-init', JSON.stringify({
-                requiredFeatures: required,
-                optionalFeatures: optional,
-                domOverlay: { root: '#' + (overlayRoot?.id || '__ar_dom_overlay') }
-              }));
-            } catch(_) {}
+            mv.setAttribute('xr-session-init', JSON.stringify(xrInit));
           } catch(_) {}
           mv.setAttribute('reveal', 'manual');
           mv.setAttribute('shadow-intensity', '0.8');
@@ -7087,7 +7122,16 @@ updateSummary();
             if (s === 'session-started' || s === 'failed') {
               try { hideModelLoader(); } catch(_) {}
             }
-            // No custom AR overlay UI (per requirement)
+            // Toggle our DOM overlay when using WebXR
+            try {
+              const overlay = document.getElementById('__ar_dom_overlay') || ensureArDomOverlay();
+              if (s === 'session-started') {
+                overlay.style.display = 'block';
+              }
+              if (s === 'not-presenting' || s === 'failed') {
+                overlay.style.display = 'none';
+              }
+            } catch(_) {}
           };
           mv.addEventListener('progress', onProgress);
           mv.addEventListener('ar-status', onArStatus);
@@ -7118,56 +7162,6 @@ updateSummary();
         } catch(_) {}
       }
 
-      // Cross-platform AR opener: iOS -> Zappar inline WebAR; Android -> WebXR via model-viewer
-      async function openConfiguredAR(){
-        try { showModelLoader('Przygotowywanie modelu do AR...'); updateModelLoaderProgress(0); } catch(_) {}
-        const curChair = (typeof selectedChair !== 'undefined' && selectedChair && selectedChair.Nazwa) ? selectedChair : window.selectedChair;
-        if (!curChair || !curChair.Nazwa) { hideModelLoader(); alert('Najpierw wybierz krzesło.'); return; }
-
-        // Export configured scene to GLB (binary)
-        let blobUrl = '';
-        try {
-          if (typeof viewer !== 'undefined' && viewer && viewer.scene) {
-            const { GLTFExporter } = await import('https://unpkg.com/three@0.157.0/examples/jsm/exporters/GLTFExporter.js');
-            const exporter = new GLTFExporter();
-            const bin = await new Promise((resolve, reject) => {
-              exporter.parse(viewer.scene, (b)=>resolve(b), (e)=>reject(e), {
-                binary: true, onlyVisible: true, includeCustomExtensions: true, truncateDrawRange: true, maxTextureSize: 2048
-              });
-            });
-            const blob = new Blob([bin], { type: 'model/gltf-binary' });
-            blobUrl = URL.createObjectURL(blob);
-            setTimeout(() => { try { URL.revokeObjectURL(blobUrl); } catch(_) {} }, 120000);
-          }
-        } catch(_) {}
-
-        if (isIOS()) {
-          // iOS: open inline WebAR with Zappar (works in Safari) and pass our GLB URL
-          try {
-            const base = 'webar_zappar.html';
-            const url = base + '?model=' + encodeURIComponent(blobUrl || (getCurrentArAssets()?.glb || ''));
-            window.location.href = url;
-          } finally { setTimeout(()=>{ try{ hideModelLoader(); }catch(_){}} , 500); }
-          return;
-        }
-
-        // Android or other – reuse WebXR flow with our blob GLB
-        try {
-          await ensureModelViewerScript();
-          const mv = ensureUnifiedArModelViewer();
-          const target = blobUrl || (getCurrentArAssets()?.glb ? toAbsUrl(getCurrentArAssets().glb) : '');
-          if (!target) { hideModelLoader(); alert('Brak modelu AR.'); return; }
-          const prev = mv.getAttribute('src') || '';
-          if (prev !== target) mv.setAttribute('src', target);
-          const prevIos = mv.getAttribute('ios-src') || ''; if (prevIos) mv.removeAttribute('ios-src');
-          await __waitForArAnchorRefresh(mv);
-          await mv.activateAR();
-        } catch (e) {
-          console.warn('WebXR AR failed, fallback:', e);
-          try { const a = getCurrentArAssets(); if (a?.glb) window.location.href = buildSceneViewerUrl(a.glb); } finally { setTimeout(()=>hideModelLoader(), 500); }
-        }
-      }
-
       // Custom AR back button (Android WebXR)
       function ensureArBackButton(){
         let btn = document.getElementById('ar-back-button');
@@ -7188,13 +7182,12 @@ updateSummary();
           root = document.createElement('div');
           root.id = '__ar_dom_overlay';
           // Fullscreen overlay; let only our controls accept input
-          root.style.cssText = 'position:fixed;inset:0;z-index:2147483647;display:none;pointer-events:auto;'
+          root.style.cssText = 'position:fixed;inset:0;z-index:2147483647;display:none;pointer-events:none;'
             + 'font-family:Poppins,system-ui,Segoe UI,Roboto,Arial,sans-serif;';
-          // Right-side vertical panel with subtle background to improve contrast
+          // Bottom-left UI group
           const bl = document.createElement('div');
-          bl.id = '__ar_ui_side';
-          bl.style.cssText = 'position:absolute;right:12px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:10px;pointer-events:auto;'
-            + 'background: linear-gradient(90deg, rgba(0,0,0,0) 0%, rgba(17,17,17,0.35) 20%, rgba(17,17,17,0.35) 100%); padding: 10px; border-radius: 14px;';
+          bl.id = '__ar_ui_bottom_left';
+          bl.style.cssText = 'position:absolute;left:12px;bottom:12px;display:flex;gap:10px;align-items:center;pointer-events:auto;';
           // Back tile button
           const back = document.createElement('button');
           back.id = '__ar_ui_back';
@@ -7203,21 +7196,6 @@ updateSummary();
           back.style.cssText = 'background:#F5C842;color:#333;border:none;border-radius:18px;padding:12px 16px;'
             + 'font-weight:800;box-shadow:0 10px 30px rgba(0,0,0,.35);letter-spacing:.2px;';
           bl.appendChild(back);
-          // Simple demo controls for WebXR: scale − / +
-          const scaleMinus = document.createElement('button');
-          scaleMinus.id = '__ar_ui_scale_minus';
-          scaleMinus.type = 'button';
-          scaleMinus.textContent = '−';
-          scaleMinus.title = 'Zmniejsz skalę';
-          scaleMinus.style.cssText = 'background:#111;color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:14px;padding:10px 14px;font-weight:900;';
-          const scalePlus = document.createElement('button');
-          scalePlus.id = '__ar_ui_scale_plus';
-          scalePlus.type = 'button';
-          scalePlus.textContent = '+';
-          scalePlus.title = 'Zwiększ skalę';
-          scalePlus.style.cssText = 'background:#111;color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:14px;padding:10px 14px;font-weight:900;';
-          bl.appendChild(scaleMinus);
-          bl.appendChild(scalePlus);
           // Optional: placeholder tile (expand later)
           const info = document.createElement('div');
           info.id = '__ar_ui_hint';
@@ -7256,18 +7234,6 @@ updateSummary();
               }
             } catch(_) {}
           });
-
-          // Behavior: scale controls adjust model-viewer scale in WebXR
-          const applyScale = (delta) => {
-            try {
-              const mv = document.getElementById('__mv_ar_unified');
-              const cur = mv.scale || { x: 1, y: 1, z: 1 };
-              const nx = Math.max(0.3, Math.min(3, (cur.x || 1) + delta));
-              mv.scale = `${nx} ${nx} ${nx}`;
-            } catch(_) {}
-          };
-          scaleMinus.addEventListener('click', (e)=>{ e.preventDefault(); e.stopPropagation(); applyScale(-0.05); });
-          scalePlus.addEventListener('click', (e)=>{ e.preventDefault(); e.stopPropagation(); applyScale(0.05); });
         }
         return root;
       }
@@ -7286,42 +7252,15 @@ updateSummary();
   // Remember current chair so we can restore it if the browser/page reloads after AR
   try { sessionStorage.setItem('__ar_resume', JSON.stringify({ chairName: curChair.Nazwa, ts: Date.now() })); } catch(_) {}
         const assets = (typeof getCurrentArAssets === 'function') ? getCurrentArAssets() : null;
-        const fallbackGlb = assets?.glb || (Array.isArray(assets?.glbCandidates) ? assets.glbCandidates[0] : null);
+        const glb = assets?.glb || (Array.isArray(assets?.glbCandidates) ? assets.glbCandidates[0] : null);
   const usdzList = [];
         await ensureModelViewerScript();
-        const supported = await isWebXRSupported().catch(()=>false);
         const mv = ensureUnifiedArModelViewer();
-        // Try exporting the current configured model as a GLB (local blob) when WebXR is supported
-        let targetUrl = '';
-        if (supported && typeof viewer !== 'undefined' && viewer && viewer.scene) {
-          try {
-            const { GLTFExporter } = await import('https://unpkg.com/three@0.157.0/examples/jsm/exporters/GLTFExporter.js');
-            const exporter = new GLTFExporter();
-            const result = await new Promise((resolve, reject) => {
-              exporter.parse(viewer.scene, (bin) => resolve(bin), (e) => reject(e), {
-                binary: true,
-                onlyVisible: true,
-                includeCustomExtensions: true,
-                truncateDrawRange: true,
-                maxTextureSize: 2048
-              });
-            });
-            const blob = new Blob([result], { type: 'model/gltf-binary' });
-            targetUrl = URL.createObjectURL(blob);
-            // Cleanup later after AR attempt
-            setTimeout(() => { try { URL.revokeObjectURL(targetUrl); } catch(_) {} }, 60000);
-          } catch (e) {
-            // Fallback to predefined GLB
-            targetUrl = fallbackGlb ? toAbsUrl(fallbackGlb) : '';
-          }
-        } else {
-          // Non-WebXR devices cannot load blob URLs in native AR. Use fallback GLB.
-          targetUrl = fallbackGlb ? toAbsUrl(fallbackGlb) : '';
-        }
-        if (!targetUrl) { hideModelLoader(); alert('Brak pliku GLB dla AR.'); return; }
+        const absGlb = glb ? toAbsUrl(glb) : '';
+        if (!absGlb) { hideModelLoader(); alert('Brak pliku GLB dla AR.'); return; }
         const prevSrc = mv.getAttribute('src') || '';
-        const srcChanged = prevSrc !== targetUrl;
-        if (srcChanged) mv.setAttribute('src', targetUrl);
+        const srcChanged = prevSrc !== absGlb;
+        if (srcChanged) mv.setAttribute('src', absGlb);
   // iOS GLB-only: do not set ios-src to avoid Quick Look path and remove delay
   const prevIos = mv.getAttribute('ios-src') || '';
   const iosChanged = !!prevIos; // ensure no Quick Look source
@@ -7330,10 +7269,9 @@ updateSummary();
         if (srcChanged || iosChanged) {
           await __waitForArAnchorRefresh(mv, { timeoutMs: 900 });
         }
-    // Activate AR
+        // Activate AR
         if (typeof mv.activateAR === 'function') {
           try {
-            // Do not show overlay yet; wait for 'session-started' to display it
             await mv.activateAR();
           } catch(_) {
             // If activation fails (e.g., iOS without WebXR), try Quick Look if available
@@ -7348,12 +7286,10 @@ updateSummary();
                   document.body.appendChild(link);
                   link.click();
                 } else {
-                  alert('AR na iOS wymaga Quick Look (USDZ) lub WebXR. Dla skonfigurowanego modelu (materiały) wymagany jest WebXR.');
+                  alert('AR na iOS wymaga Quick Look (USDZ) lub WebXR. Dla tego modelu brak USDZ.');
                 }
               }
             } catch(_) {}
-            // Ensure overlay stays hidden on failure
-            try { const ov = document.getElementById('__ar_dom_overlay'); if (ov) ov.style.display = 'none'; } catch(_) {}
             // Hide shortly after to avoid a stuck loader
             setTimeout(() => { try { hideModelLoader(); } catch(_) {} }, 1500);
           } finally {
@@ -7363,7 +7299,7 @@ updateSummary();
           }
         } else {
           // Fallback to Scene Viewer
-          try { window.location.href = buildSceneViewerUrl(fallbackGlb); } finally { setTimeout(() => hideModelLoader(), 800); }
+          try { window.location.href = buildSceneViewerUrl(glb); } finally { setTimeout(() => hideModelLoader(), 800); }
         }
       }
 
@@ -7448,25 +7384,6 @@ updateSummary();
   // Preload model-viewer script early
   window.addEventListener('DOMContentLoaded', () => { ensureModelViewerScript(); });
 
-      // WebXR UI preference toggle wiring
-      (function wirePreferWebXR(){
-        const btn = document.getElementById('ar-ui-prefer-webxr');
-        if (!btn) return;
-        // Initialize visual state
-        try { if (getPreferWebXR()) btn.classList.add('active'); } catch(_) {}
-        btn.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          const next = !getPreferWebXR();
-          setPreferWebXR(next);
-          // Optional info on desktop where WebXR overlay may not apply
-          const isMobile = (typeof isMobileMode === 'function') ? isMobileMode() : ((typeof isIOS==='function'&&isIOS()) || (typeof isAndroid==='function'&&isAndroid()) || window.innerWidth <= 820);
-          if (!isMobile && next) {
-            const supported = await isWebXRSupported();
-            if (!supported) alert('WebXR nie jest wspierane na tym urządzeniu. Natywny podgląd AR nie pokaże własnego UI.');
-          }
-        });
-      })();
-      // Mobile – cross-platform AR with configured chair (pseudo-AR for now)
       // Przycisk powrotu do kategorii
       document.getElementById('back-to-categories')?.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -7936,22 +7853,6 @@ fetch(basePath, { method: 'HEAD' })
       rememberedIcon.classList.add('selected');
       renderMaterialsInPanel(rememberedMaterials, targetMesh);
     }
-  }
-
-  // Helper to open pseudo-AR with the currently selected model (GLB); does not change main AR flow
-  // Expose globally so button handler can call it
-  window.openPseudoArPreview = function openPseudoArPreview(){
-    try {
-      const a = (typeof getCurrentArAssets === 'function') ? getCurrentArAssets() : null;
-      const glb = a?.glb || (Array.isArray(a?.glbCandidates) ? a.glbCandidates[0] : '');
-      const url = 'pseudo_ar.html' + (glb ? ('?model=' + encodeURIComponent(glb)) : '');
-      // On mobile: navigate in same tab to avoid popup blocking
-      if ((typeof isIOS==='function'&&isIOS()) || (typeof isAndroid==='function'&&isAndroid()) || window.innerWidth <= 820) {
-        window.location.href = url;
-      } else {
-        window.open(url, '_blank');
-      }
-    } catch(e) { console.warn('Pseudo-AR open failed', e); }
   }
 }
 
