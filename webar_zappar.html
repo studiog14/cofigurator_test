@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>WebAR (Zappar) – test</title>
+  <meta name="theme-color" content="#ffffff">
+  <!-- Jeśli Twoja licencja wymaga meta z kluczem, postępuj wg dokumentacji Zappar (opcjonalne) -->
+  <style>
+    html, body { height: 100%; margin: 0; background: #000; }
+    #stage { position: fixed; inset: env(safe-area-inset-top) 0 env(safe-area-inset-bottom) 0; }
+    #ui {
+      position: fixed; left: 12px; bottom: 12px; right: 12px; display: flex; gap: 10px;
+      justify-content: space-between; align-items: center; z-index: 10; pointer-events: none;
+    }
+    .tile { pointer-events: auto; background: #fff; color: #222; border: 0; border-radius: 14px; padding: 10px 14px;
+      font-weight: 800; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+    .accent { background: #F5C842; color: #333; }
+    #hint { position: fixed; left: 12px; top: 12px; z-index: 10; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.65); font-weight: 700; }
+  </style>
+  <!-- THREE.js and GLTFLoader (global THREE namespace) -->
+  <script src="https://unpkg.com/three@0.152.2/build/three.min.js"></script>
+  <script src="https://unpkg.com/three@0.152.2/examples/js/loaders/GLTFLoader.js"></script>
+  <!-- Zappar for ThreeJS (global ZapparThree namespace) -->
+  <script src="https://libs.zappar.com/zappar-threejs/2.1.1/zappar-threejs.min.js"></script>
+</head>
+<body>
+  <canvas id="stage"></canvas>
+  <div id="hint">Poruszaj telefonem i stuknij, aby umieścić krzesło</div>
+  <div id="ui">
+    <button id="back" class="tile">Powrót do konfiguratora</button>
+    <div style="display:flex; gap:10px;">
+      <button id="place" class="tile accent">Umieść tutaj</button>
+      <button id="rotate" class="tile">Obróć</button>
+      <button id="scaleUp" class="tile">+</button>
+      <button id="scaleDown" class="tile">-</button>
+    </div>
+  </div>
+
+  <script>
+  (async function(){
+    // 1) Uprawnienia kamery
+    const granted = await ZapparThree.permissionRequestUI();
+    if (!granted) { ZapparThree.permissionDeniedUI(); return; }
+    ZapparThree.permissionGranted();
+
+    // 2) Renderer i kamera Zappar
+    const canvas = document.getElementById('stage');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    const scene = new THREE.Scene();
+    const camera = new ZapparThree.Camera();
+    scene.add(camera);
+
+    // 3) Tracker podłogi (Instant World Tracking)
+    const tracker = new ZapparThree.InstantWorldTracker();
+    const anchor = new ZapparThree.InstantWorldAnchorGroup(camera, tracker);
+    scene.add(anchor);
+
+    // 4) Oświetlenie proste
+    const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0);
+    scene.add(light);
+
+    // 5) Wczytanie modelu krzesła (z parametrów ?model=... lub domyślne)
+    const params = new URLSearchParams(location.search);
+    const modelPath = params.get('model') || 'chairs/Tulla-2.glb';
+    const loader = new THREE.GLTFLoader();
+    let chair = null;
+    try {
+      loader.load(modelPath, (gltf)=>{
+        chair = gltf.scene;
+        chair.scale.set(1,1,1);
+        chair.rotation.y = 0;
+        anchor.add(chair);
+      }, undefined, (err)=> console.warn('GLB load error:', err));
+    } catch (e) { console.warn(e); }
+
+    // 6) Sterowanie: umieszczenie, rotacja, skala
+    function placeHere(){ tracker.setAnchorPoseFromCameraOffset(0, 0, -1.5); }
+    document.getElementById('place').addEventListener('click', placeHere);
+    document.getElementById('rotate').addEventListener('click', ()=>{ if (chair) chair.rotation.y += Math.PI/8; });
+    document.getElementById('scaleUp').addEventListener('click', ()=>{ if (chair) chair.scale.multiplyScalar(1.05); });
+    document.getElementById('scaleDown').addEventListener('click', ()=>{ if (chair) chair.scale.multiplyScalar(0.95); });
+    document.getElementById('back').addEventListener('click', ()=>{ history.length ? history.back() : (location.href = 'index.html'); });
+    // Tap anywhere to place
+    document.body.addEventListener('click', (e)=>{ if ((e.target||{}).id && ['place','rotate','scaleUp','scaleDown','back'].includes(e.target.id)) return; placeHere(); });
+
+    // 7) Pętla renderowania
+    function onResize(){ renderer.setSize(window.innerWidth, window.innerHeight); }
+    window.addEventListener('resize', onResize);
+    const clock = new THREE.Clock();
+    function animate(){
+      requestAnimationFrame(animate);
+      // Aktualizacja kamery z Zappar
+      camera.updateFrame(renderer);
+      renderer.render(scene, camera);
+    }
+    animate();
+  })();
+  </script>
+</body>
+</html>
