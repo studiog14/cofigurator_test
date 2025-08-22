@@ -7082,7 +7082,7 @@ updateSummary();
           mv = document.createElement('model-viewer');
           mv.id = '__mv_ar_unified';
           mv.setAttribute('ar', '');
-          mv.setAttribute('ar-modes', 'scene-viewer webxr quick-look');
+          mv.setAttribute('ar-modes', 'webxr scene-viewer');
           mv.setAttribute('ar-placement', 'floor');
           mv.setAttribute('reveal', 'manual');
           mv.setAttribute('shadow-intensity', '0.8');
@@ -7091,7 +7091,11 @@ updateSummary();
           const onProgress = (ev) => {
             const p = ev?.detail?.totalProgress;
             if (typeof p === 'number' && p >= 0 && p <= 1) {
-              try { updateModelLoaderProgress(6 + Math.round(p * 88)); } catch(_) {}
+              const percent = Math.max(0, Math.min(100, 6 + Math.round(p * 88)));
+              try {
+                updateModelLoaderProgress(percent);
+                showModelLoader(`Uruchamianie trybu AR... ${percent}%`);
+              } catch(_) {}
             }
           };
           const onArStatus = (ev) => {
@@ -7175,23 +7179,16 @@ updateSummary();
   // Pre-/Post-AR overlays removed per UX requirement
 
   async function openArWebXRMobile() {
-        try { showModelLoader('Ładowanie modelu...'); } catch(_) {}
+        try { showModelLoader('Uruchamianie trybu AR... 0%'); updateModelLoaderProgress(0); } catch(_) {}
         const curChair = (typeof selectedChair !== 'undefined' && selectedChair && selectedChair.Nazwa) ? selectedChair : window.selectedChair;
         if (!curChair || !curChair.Nazwa) { hideModelLoader(); alert('Najpierw wybierz krzesło z konfiguratora'); return; }
         const assets = (typeof getCurrentArAssets === 'function') ? getCurrentArAssets() : null;
-        const glb = assets?.glb || (Array.isArray(assets?.glbCandidates) ? assets.glbCandidates[0] : null);
-        const usdzList = Array.isArray(assets?.usdzCandidates) ? assets.usdzCandidates : [];
+  const glb = assets?.glb || (Array.isArray(assets?.glbCandidates) ? assets.glbCandidates[0] : null);
         await ensureModelViewerScript();
         const mv = ensureUnifiedArModelViewer();
         if (glb) mv.setAttribute('src', toAbsUrl(glb)); else { hideModelLoader(); alert('Brak pliku GLB dla AR.'); return; }
-        // Prefer a valid USDZ on iOS
-        let iosUsdz = '';
-        if (typeof isIOS === 'function' && isIOS() && usdzList.length) {
-          for (const u of usdzList) {
-            try { const r = await fetch(toAbsUrl(u), { method:'HEAD', cache:'no-store' }); if (r.ok) { iosUsdz = u; break; } } catch {}
-          }
-        }
-        if (iosUsdz) mv.setAttribute('ios-src', toAbsUrl(iosUsdz)); else mv.removeAttribute('ios-src');
+  // Nie używamy USDZ na iOS – rely on GLB via model-viewer
+  try { mv.removeAttribute('ios-src'); } catch(_) {}
         // Activate AR
         if (typeof mv.activateAR === 'function') {
           try { await mv.activateAR(); } catch(_) { try { hideModelLoader(); } catch(_) {} }
