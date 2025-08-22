@@ -7928,7 +7928,8 @@ fetch(basePath, { method: 'HEAD' })
   }
 
   // Helper to open pseudo-AR with the currently selected model (GLB); does not change main AR flow
-  function openPseudoArPreview(){
+  // Expose globally so button handler can call it
+  window.openPseudoArPreview = function openPseudoArPreview(){
     try {
       const a = (typeof getCurrentArAssets === 'function') ? getCurrentArAssets() : null;
       const glb = a?.glb || (Array.isArray(a?.glbCandidates) ? a.glbCandidates[0] : '');
