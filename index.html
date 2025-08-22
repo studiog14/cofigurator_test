@@ -6916,6 +6916,17 @@ updateSummary();
         // Desktop QR should point to dedicated ar.html with model param
         return buildArHtmlUrl();
       }
+      // Ensure a global pseudo-AR opener exists for mobile testing
+      if (!window.openPseudoArPreview) {
+        window.openPseudoArPreview = function openPseudoArPreview() {
+          try {
+            const a = (typeof getCurrentArAssets === 'function') ? getCurrentArAssets() : null;
+            const glb = a?.glb || (Array.isArray(a?.glbCandidates) ? a.glbCandidates[0] : '');
+            const url = 'pseudo_ar.html' + (glb ? ('?model=' + encodeURIComponent(glb)) : '');
+            window.open(url, '_blank');
+          } catch (e) { console.warn('Pseudo-AR open failed', e); }
+        };
+      }
       function showQrWithUrl(url) {
         const qrPopup = document.getElementById('qr-popup');
         const qrContainer = document.getElementById('qrcode');
