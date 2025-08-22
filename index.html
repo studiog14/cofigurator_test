@@ -7111,6 +7111,24 @@ updateSummary();
         return mv;
       }
 
+      // After changing src/ios-src, wait briefly so model-viewer refreshes its AR link (prevents using previous model)
+      async function __waitForArAnchorRefresh(mv, { timeoutMs = 900 } = {}) {
+        try {
+          // Prefer updateComplete when available (Lit)
+          const upd = mv?.updateComplete;
+          const waitUpdate = (upd && typeof upd.then === 'function')
+            ? upd.catch(()=>{})
+            : new Promise(res => requestAnimationFrame(() => requestAnimationFrame(res)));
+          const waitLoadOrTimeout = new Promise(res => {
+            let done = false;
+            const to = setTimeout(() => { if (!done) { done = true; res(); } }, timeoutMs);
+            const onLoad = () => { if (!done) { done = true; clearTimeout(to); res(); } };
+            mv?.addEventListener('load', onLoad, { once: true });
+          });
+          await Promise.race([waitUpdate, waitLoadOrTimeout]);
+        } catch(_) {}
+      }
+
       // Custom AR back button (Android WebXR)
       function ensureArBackButton(){
         let btn = document.getElementById('ar-back-button');
@@ -7186,7 +7204,11 @@ updateSummary();
         const usdzList = Array.isArray(assets?.usdzCandidates) ? assets.usdzCandidates : [];
         await ensureModelViewerScript();
         const mv = ensureUnifiedArModelViewer();
-        if (glb) mv.setAttribute('src', toAbsUrl(glb)); else { hideModelLoader(); alert('Brak pliku GLB dla AR.'); return; }
+        const absGlb = glb ? toAbsUrl(glb) : '';
+        if (!absGlb) { hideModelLoader(); alert('Brak pliku GLB dla AR.'); return; }
+        const prevSrc = mv.getAttribute('src') || '';
+        const srcChanged = prevSrc !== absGlb;
+        if (srcChanged) mv.setAttribute('src', absGlb);
         // Prefer a valid USDZ on iOS
         let iosUsdz = '';
         if (typeof isIOS === 'function' && isIOS() && usdzList.length) {
@@ -7194,7 +7216,14 @@ updateSummary();
             try { const r = await fetch(toAbsUrl(u), { method:'HEAD', cache:'no-store' }); if (r.ok) { iosUsdz = u; break; } } catch {}
           }
         }
-        if (iosUsdz) mv.setAttribute('ios-src', toAbsUrl(iosUsdz)); else mv.removeAttribute('ios-src');
+        const absUsdz = iosUsdz ? toAbsUrl(iosUsdz) : '';
+        const prevIos = mv.getAttribute('ios-src') || '';
+        const iosChanged = (!!absUsdz && prevIos !== absUsdz) || (!absUsdz && !!prevIos);
+        if (absUsdz) mv.setAttribute('ios-src', absUsdz); else mv.removeAttribute('ios-src');
+        // If we changed src or ios-src, wait a moment so AR intent/anchor points to the new model
+        if (srcChanged || iosChanged) {
+          await __waitForArAnchorRefresh(mv, { timeoutMs: 900 });
+        }
         // Activate AR
         if (typeof mv.activateAR === 'function') {
           try {
