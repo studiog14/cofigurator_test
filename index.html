@@ -6998,7 +6998,31 @@ updateSummary();
           if (typeof isAndroid === 'function' && isAndroid()) {
             if (glb) { window.location.href = buildSceneViewerUrl(glb); return; }
           }
-          // iOS Quick Look disabled; we rely on WebXR-only on iOS
+          if (typeof isIOS === 'function' && isIOS()) {
+            // Use a Quick Look anchor to ensure it executes in the user gesture context
+            if (usdz) {
+              const link = document.createElement('a');
+              link.setAttribute('rel', 'ar');
+              link.setAttribute('href', buildQuickLookUrl(usdz));
+              document.body.appendChild(link);
+              // iOS can sometimes ignore programmatic clicks; add a safety fallback
+              let navigated = false;
+              const mark = () => { navigated = true; };
+              window.addEventListener('pagehide', mark, { once: true });
+              document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState !== 'visible') navigated = true;
+              }, { once: true });
+              link.click();
+              setTimeout(() => {
+                try { link.remove(); } catch(_){ }
+                if (!navigated) {
+                  const url = (typeof buildArHtmlUrl === 'function') ? buildArHtmlUrl() : 'ar.html';
+                  window.location.href = url;
+                }
+              }, 900);
+              return;
+            }
+          }
 
           // Fallback: open landing page that routes to native AR
           const url = (typeof buildArHtmlUrl === 'function') ? buildArHtmlUrl() : 'ar_viewer.html';
@@ -7058,15 +7082,8 @@ updateSummary();
           mv = document.createElement('model-viewer');
           mv.id = '__mv_ar_unified';
           mv.setAttribute('ar', '');
-          // Prefer WebXR; on iOS force WebXR-only so native Quick Look UI is never used
-          try {
-            const modes = (typeof isIOS === 'function' && isIOS())
-              ? 'webxr'
-              : 'webxr scene-viewer quick-look';
-            mv.setAttribute('ar-modes', modes);
-          } catch(_) {
-            mv.setAttribute('ar-modes', 'webxr scene-viewer quick-look');
-          }
+          // Prefer WebXR but keep native fallbacks available (Scene Viewer/Quick Look)
+          mv.setAttribute('ar-modes', 'webxr scene-viewer quick-look');
           mv.setAttribute('ar-placement', 'floor');
           // Request DOM overlay and hit-test for WebXR sessions; bind overlay root
           try {
@@ -7246,7 +7263,23 @@ updateSummary();
           try {
             await mv.activateAR();
           } catch(_) {
-            // If activation throws, hide shortly after to avoid a stuck loader
+            // If activation fails (e.g., iOS without WebXR), try Quick Look if available
+            try {
+              if (typeof isIOS === 'function' && isIOS()) {
+                const assets2 = (typeof getCurrentArAssets === 'function') ? getCurrentArAssets() : null;
+                const usdz2 = Array.isArray(assets2?.usdzCandidates) ? assets2.usdzCandidates[0] : '';
+                if (usdz2) {
+                  const link = document.createElement('a');
+                  link.setAttribute('rel', 'ar');
+                  link.setAttribute('href', buildQuickLookUrl(usdz2));
+                  document.body.appendChild(link);
+                  link.click();
+                } else {
+                  alert('AR na iOS wymaga Quick Look (USDZ) lub WebXR. Dla tego modelu brak USDZ.');
+                }
+              }
+            } catch(_) {}
+            // Hide shortly after to avoid a stuck loader
             setTimeout(() => { try { hideModelLoader(); } catch(_) {} }, 1500);
           } finally {
             // Do NOT hide immediately; wait for page to background or session-started.
