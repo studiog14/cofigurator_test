@@ -7096,7 +7096,9 @@ updateSummary();
           };
           const onArStatus = (ev) => {
             const s = ev?.detail?.status || '';
-            if (s === 'session-started' || s === 'not-presenting' || s === 'failed') {
+            // Keep loader until AR session actually starts or fails.
+            // Do NOT hide on 'not-presenting' because on Android it can fire before Scene Viewer opens.
+            if (s === 'session-started' || s === 'failed') {
               try { hideModelLoader(); } catch(_) {}
             }
           };
@@ -7201,7 +7203,7 @@ updateSummary();
         if (!curChair || !curChair.Nazwa) { hideModelLoader(); alert('Najpierw wybierz krzesło z konfiguratora'); return; }
         const assets = (typeof getCurrentArAssets === 'function') ? getCurrentArAssets() : null;
         const glb = assets?.glb || (Array.isArray(assets?.glbCandidates) ? assets.glbCandidates[0] : null);
-        const usdzList = Array.isArray(assets?.usdzCandidates) ? assets.usdzCandidates : [];
+  const usdzList = [];
         await ensureModelViewerScript();
         const mv = ensureUnifiedArModelViewer();
         const absGlb = glb ? toAbsUrl(glb) : '';
@@ -7209,17 +7211,10 @@ updateSummary();
         const prevSrc = mv.getAttribute('src') || '';
         const srcChanged = prevSrc !== absGlb;
         if (srcChanged) mv.setAttribute('src', absGlb);
-        // Prefer a valid USDZ on iOS
-        let iosUsdz = '';
-        if (typeof isIOS === 'function' && isIOS() && usdzList.length) {
-          for (const u of usdzList) {
-            try { const r = await fetch(toAbsUrl(u), { method:'HEAD', cache:'no-store' }); if (r.ok) { iosUsdz = u; break; } } catch {}
-          }
-        }
-        const absUsdz = iosUsdz ? toAbsUrl(iosUsdz) : '';
-        const prevIos = mv.getAttribute('ios-src') || '';
-        const iosChanged = (!!absUsdz && prevIos !== absUsdz) || (!absUsdz && !!prevIos);
-        if (absUsdz) mv.setAttribute('ios-src', absUsdz); else mv.removeAttribute('ios-src');
+  // iOS GLB-only: do not set ios-src to avoid Quick Look path and remove delay
+  const prevIos = mv.getAttribute('ios-src') || '';
+  const iosChanged = !!prevIos; // we will remove ios-src if present
+  if (prevIos) mv.removeAttribute('ios-src');
         // If we changed src or ios-src, wait a moment so AR intent/anchor points to the new model
         if (srcChanged || iosChanged) {
           await __waitForArAnchorRefresh(mv, { timeoutMs: 900 });
