@@ -7012,6 +7012,8 @@ updateSummary();
               document.addEventListener('visibilitychange', () => {
                 if (document.visibilityState !== 'visible') navigated = true;
               }, { once: true });
+              // Hide our overlay if it was shown
+              try { const ov = document.getElementById('__ar_dom_overlay'); if (ov) ov.style.display = 'none'; } catch(_) {}
               link.click();
               setTimeout(() => {
                 try { link.remove(); } catch(_){ }
@@ -7082,8 +7084,16 @@ updateSummary();
           mv = document.createElement('model-viewer');
           mv.id = '__mv_ar_unified';
           mv.setAttribute('ar', '');
-          // Prefer WebXR but keep native fallbacks available (Scene Viewer/Quick Look)
-          mv.setAttribute('ar-modes', 'webxr scene-viewer quick-look');
+          // Prefer WebXR; allow a URL flag ?ios_webxr=1 to force WebXR-only on iOS for testing UI
+          let modes = 'webxr scene-viewer quick-look';
+          try {
+            const url = new URL(window.location.href);
+            const forceIOSWebXR = url.searchParams.get('ios_webxr') === '1';
+            if (forceIOSWebXR && typeof isIOS === 'function' && isIOS()) {
+              modes = 'webxr';
+            }
+          } catch(_) {}
+          mv.setAttribute('ar-modes', modes);
           mv.setAttribute('ar-placement', 'floor');
           // Request DOM overlay and hit-test for WebXR sessions; bind overlay root
           try {
@@ -7285,9 +7295,11 @@ updateSummary();
         if (srcChanged || iosChanged) {
           await __waitForArAnchorRefresh(mv, { timeoutMs: 900 });
         }
-        // Activate AR
+    // Activate AR
         if (typeof mv.activateAR === 'function') {
           try {
+      // Show our overlay early; if native mode opens, visibilitychange handler will hide it
+      try { const ov = ensureArDomOverlay(); ov.style.display = 'block'; } catch(_) {}
             await mv.activateAR();
           } catch(_) {
             // If activation fails (e.g., iOS without WebXR), try Quick Look if available
