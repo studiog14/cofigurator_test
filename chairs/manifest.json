@@ -1,0 +1,21 @@
+[
+  { "id": "amy-2", "name": "Amy-2", "glb": "chairs/Amy-2.glb" },
+  { "id": "ava", "name": "Ava", "glb": "chairs/Ava.glb" },
+  { "id": "carine", "name": "Carine", "glb": "chairs/Carine.glb" },
+  { "id": "daro", "name": "Daro", "glb": "chairs/Daro.glb" },
+  { "id": "default", "name": "Default", "glb": "chairs/Default.glb" },
+  { "id": "fargo", "name": "Fargo", "glb": "chairs/Fargo.glb" },
+  { "id": "helper", "name": "Helper", "glb": "chairs/Helper.glb" },
+  { "id": "jacob", "name": "Jacob", "glb": "chairs/Jacob.glb" },
+  { "id": "lucas", "name": "Lucas", "glb": "chairs/Lucas.glb" },
+  { "id": "marco", "name": "Marco", "glb": "chairs/Marco.glb" },
+  { "id": "mats", "name": "Mats", "glb": "chairs/Mats.glb" },
+  { "id": "molly", "name": "Molly", "glb": "chairs/Molly.glb" },
+  { "id": "olivia", "name": "Olivia", "glb": "chairs/Olivia.glb" },
+  { "id": "otto", "name": "Otto", "glb": "chairs/Otto.glb" },
+  { "id": "soren", "name": "Soren", "glb": "chairs/Soren.glb" },
+  { "id": "soul-plus", "name": "Soul Plus", "glb": "chairs/Soul Plus.glb" },
+  { "id": "soul", "name": "Soul", "glb": "chairs/Soul.glb" },
+  { "id": "tulla-2", "name": "Tulla-2", "glb": "chairs/Tulla-2.glb", "usdz": "chairs/Tulla-2.usdz" },
+  { "id": "tulla", "name": "Tulla", "glb": "chairs/Tulla.glb" }
+]
