@@ -119,9 +119,9 @@
       margin-top: -10px;
       z-index: 1300;
       display: flex;
-      align-items: flex-start;
+      align-items: center; /* desktop: środek pionowo */
       justify-content: flex-end;
-      gap: 10px;
+      gap: 8px;
     }
 
     #search-toggle {
@@ -136,7 +136,6 @@
       justify-content: center;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
       transition: all 0.3s ease;
-      transform: translateY(-5px);
       text-align: center;
     }
 
@@ -7946,7 +7945,12 @@ fetch(basePath, { method: 'HEAD' })
       const a = (typeof getCurrentArAssets === 'function') ? getCurrentArAssets() : null;
       const glb = a?.glb || (Array.isArray(a?.glbCandidates) ? a.glbCandidates[0] : '');
       const url = 'pseudo_ar.html' + (glb ? ('?model=' + encodeURIComponent(glb)) : '');
-      window.open(url, '_blank');
+      // On mobile: navigate in same tab to avoid popup blocking
+      if ((typeof isIOS==='function'&&isIOS()) || (typeof isAndroid==='function'&&isAndroid()) || window.innerWidth <= 820) {
+        window.location.href = url;
+      } else {
+        window.open(url, '_blank');
+      }
     } catch(e) { console.warn('Pseudo-AR open failed', e); }
   }
 }
