@@ -7113,10 +7113,13 @@ updateSummary();
             const xrInit = {
               requiredFeatures: required,
               optionalFeatures: optional,
-              // Pass CSS selector so model-viewer resolves the DOM overlay element inside XR
-              domOverlay: { root: '#' + (overlayRoot?.id || '__ar_dom_overlay') }
+              // Provide the actual element for domOverlay root via property
+              domOverlay: { root: overlayRoot || document.getElementById('__ar_dom_overlay') }
             };
-            mv.setAttribute('xr-session-init', JSON.stringify(xrInit));
+            // Bind via property so model-viewer passes a real element to WebXR
+            mv.xrSessionInit = xrInit;
+            // Also set attribute for visibility/debugging
+            try { mv.setAttribute('xr-session-init', JSON.stringify({ requiredFeatures: required, optionalFeatures: optional, domOverlay: { root: '#' + (overlayRoot?.id || '__ar_dom_overlay') } })); } catch(_) {}
           } catch(_) {}
           mv.setAttribute('reveal', 'manual');
           mv.setAttribute('shadow-intensity', '0.8');
@@ -7142,8 +7145,8 @@ updateSummary();
                 // Show our overlay inside the XR session
                 overlay.style.display = 'block';
               }
-              // Hide only when the session truly ends or fails; ignore early 'not-presenting'
-              if (s === 'session-ended' || s === 'failed') {
+              // Hide when the session ends or fails
+              if (s === 'session-ended' || s === 'failed' || s === 'not-presenting') {
                 overlay.style.display = 'none';
               }
             } catch(_) {}
