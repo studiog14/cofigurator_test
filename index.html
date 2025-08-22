@@ -7226,10 +7226,12 @@ updateSummary();
           try {
             await mv.activateAR();
           } catch(_) {
-            try { hideModelLoader(); } catch(_) {}
+            // If activation throws, hide shortly after to avoid a stuck loader
+            setTimeout(() => { try { hideModelLoader(); } catch(_) {} }, 1500);
           } finally {
-            // Safety: hide loader even if ar-status events are missed
-            try { hideModelLoader(); } catch(_) {}
+            // Do NOT hide immediately; wait for page to background or session-started.
+            // Add a long safety timeout to ensure we never get stuck.
+            setTimeout(() => { try { hideModelLoader(); } catch(_) {} }, 12000);
           }
         } else {
           // Fallback to Scene Viewer
