@@ -7082,7 +7082,8 @@ updateSummary();
           mv = document.createElement('model-viewer');
           mv.id = '__mv_ar_unified';
           mv.setAttribute('ar', '');
-          mv.setAttribute('ar-modes', 'scene-viewer webxr quick-look');
+          // Prefer WebXR first (Android) to allow a custom DOM overlay; fallback to native modes if unavailable
+          mv.setAttribute('ar-modes', 'webxr scene-viewer quick-look');
           mv.setAttribute('ar-placement', 'floor');
           mv.setAttribute('reveal', 'manual');
           mv.setAttribute('shadow-intensity', '0.8');
@@ -7101,6 +7102,16 @@ updateSummary();
             if (s === 'session-started' || s === 'failed') {
               try { hideModelLoader(); } catch(_) {}
             }
+            // Toggle our DOM overlay when using WebXR
+            try {
+              const overlay = document.getElementById('__ar_dom_overlay') || ensureArDomOverlay();
+              if (s === 'session-started') {
+                overlay.style.display = 'block';
+              }
+              if (s === 'not-presenting' || s === 'failed') {
+                overlay.style.display = 'none';
+              }
+            } catch(_) {}
           };
           mv.addEventListener('progress', onProgress);
           mv.addEventListener('ar-status', onArStatus);
@@ -7162,8 +7173,8 @@ updateSummary();
           back.id = '__ar_ui_back';
           back.type = 'button';
           back.textContent = 'Powrót do konfiguratora';
-          back.style.cssText = 'background:#F5C842;color:#333;border:none;border-radius:14px;padding:10px 14px;'
-            + 'font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,.25);letter-spacing:.2px;';
+          back.style.cssText = 'background:#F5C842;color:#333;border:none;border-radius:18px;padding:12px 16px;'
+            + 'font-weight:800;box-shadow:0 10px 30px rgba(0,0,0,.35);letter-spacing:.2px;';
           bl.appendChild(back);
           // Optional: placeholder tile (expand later)
           const info = document.createElement('div');
@@ -7186,6 +7197,17 @@ updateSummary();
           root.appendChild(info);
           root.appendChild(closePrev);
           document.body.appendChild(root);
+
+          // Behavior: back exits WebXR session if active
+          back.addEventListener('click', (e) => {
+            e.preventDefault(); e.stopPropagation();
+            try {
+              const mv = document.getElementById('__mv_ar_unified');
+              // model-viewer exposes no public exit, but WebXR sessions end on tapping outside; we can hide overlay and rely on system exit
+              // As a fallback, try to blur focus and hide overlay
+              root.style.display = 'none';
+            } catch(_) {}
+          });
         }
         return root;
       }
