@@ -3215,8 +3215,10 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
                 if (typeof showQrWithUrl === 'function') showQrWithUrl(qrUrl);
                 return;
               }
-    // Mobile – cross-platform AR with configured chair
-    if (typeof openConfiguredAR === 'function') openConfiguredAR(); else if (typeof openArWebXRMobile === 'function') openArWebXRMobile();
+  // Mobile – TEMP: open pseudo AR preview (no changes to ar.html)
+  if (typeof openPseudoArPreview === 'function') openPseudoArPreview();
+  else if (typeof openConfiguredAR === 'function') openConfiguredAR();
+  else if (typeof openArWebXRMobile === 'function') openArWebXRMobile();
             } catch(err){ console.warn('AR open error:', err); }
           });
 
