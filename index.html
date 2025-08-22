@@ -3302,57 +3302,13 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
           });
 
           document.body.appendChild(viewBtn);
-
-          // Create small UI toggle next to "Zobacz w pomieszczeniu"
-          let viewUi = document.getElementById('view-in-room-ui-toggle');
-          if (!viewUi) {
-            viewUi = document.createElement('div');
-            viewUi.id = 'view-in-room-ui-toggle';
-            viewUi.innerHTML = '<strong>UI</strong>';
-            // Base style similar but more compact
-            try { viewUi.style.cssText = configBtn.getAttribute('style') || ''; } catch(_) {}
-            viewUi.style.position = 'fixed';
-            viewUi.style.padding = '4px 8px';
-            viewUi.style.fontSize = '10px';
-            viewUi.style.borderRadius = '14px';
-            viewUi.style.display = 'none';
-            viewUi.style.userSelect = 'none';
-            viewUi.style.whiteSpace = 'nowrap';
-            viewUi.title = 'Preferuj własne AR UI (WebXR)';
-
-            const reflect = () => {
-              const active = (typeof getPreferWebXR === 'function') ? getPreferWebXR() : false;
-              if (active) {
-                viewUi.style.boxShadow = '0 0 0 2px #F5C842 inset, 0 2px 8px rgba(245,200,66,0.35)';
-                viewUi.style.background = '#fdf3c4';
-                viewUi.style.color = '#333';
-              } else {
-                viewUi.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
-                viewUi.style.background = 'linear-gradient(135deg, #F5C842, #E5B432)';
-                viewUi.style.color = '#111';
-              }
-            };
-            viewUi.addEventListener('click', (e) => {
-              e.stopPropagation();
-              try {
-                const cur = (typeof getPreferWebXR === 'function') ? getPreferWebXR() : false;
-                if (typeof setPreferWebXR === 'function') setPreferWebXR(!cur);
-                reflect();
-              } catch(_) {}
-            });
-
-            document.body.appendChild(viewUi);
-            // Initial visual state
-            reflect();
-          }
         }
         return viewBtn;
       }
 
       function updateViewButtonLayout(){
         const configBtn = document.getElementById('config-overview-button');
-        const viewBtn = document.getElementById('view-in-room-button');
-        const viewUi = document.getElementById('view-in-room-ui-toggle');
+  const viewBtn = document.getElementById('view-in-room-button');
         if (!configBtn || !viewBtn) return;
 
   const isMobile = isMobileMode();
@@ -3367,11 +3323,9 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
         if (isMobile) {
           configBtn.style.display = hasChair ? (configVisible ? window.getComputedStyle(configBtn).display : 'inline-flex') : 'none';
           viewBtn.style.display = hasChair && (window.getComputedStyle(configBtn).display !== 'none') ? 'inline-flex' : 'none';
-          if (viewUi) viewUi.style.display = viewBtn.style.display;
         } else {
           // On desktop don’t interfere with config button visibility; hide our mobile-only view button
           viewBtn.style.display = 'none';
-          if (viewUi) viewUi.style.display = 'none';
         }
 
         // Position to the right side of the config button with 8px gap
@@ -3384,16 +3338,7 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
         viewBtn.style.top = 'auto';
         viewBtn.style.bottom = bottomPx + 'px';
 
-        // Place UI toggle 8px to the right of viewBtn
-        if (viewUi) {
-          try {
-            const vrect = viewBtn.getBoundingClientRect();
-            const left2 = Math.max(0, vrect.left + vrect.width + 8);
-            viewUi.style.left = left2 + 'px';
-            viewUi.style.top = 'auto';
-            viewUi.style.bottom = bottomPx + 'px';
-          } catch(_) {}
-        }
+  // No extra UI toggle in configurator – UI toggle is inside AR session overlay
       }
 
       function initViewButtonEnhancement(){
@@ -7217,6 +7162,13 @@ updateSummary();
               if (s === 'session-started') {
                 // Show our overlay inside the XR session
                 overlay.style.display = 'block';
+                // Show only the UI toggle by default; hide other controls until toggled
+                const back = overlay.querySelector('#__ar_ui_back');
+                const minus = overlay.querySelector('#__ar_ui_scale_minus');
+                const plus = overlay.querySelector('#__ar_ui_scale_plus');
+                if (back) back.style.display = 'none';
+                if (minus) minus.style.display = 'none';
+                if (plus) plus.style.display = 'none';
               }
               // Hide when the session ends or fails
               if (s === 'session-ended' || s === 'failed' || s === 'not-presenting') {
@@ -7279,6 +7231,14 @@ updateSummary();
           const bl = document.createElement('div');
           bl.id = '__ar_ui_bottom_left';
           bl.style.cssText = 'position:absolute;left:12px;bottom:12px;display:flex;gap:10px;align-items:center;pointer-events:auto;';
+          // UI toggle (show/hide our overlay controls)
+          const uiToggle = document.createElement('button');
+          uiToggle.id = '__ar_ui_toggle';
+          uiToggle.type = 'button';
+          uiToggle.textContent = 'UI';
+          uiToggle.title = 'Pokaż/ukryj sterowanie';
+          uiToggle.style.cssText = 'background:#F5C842;color:#333;border:none;border-radius:14px;padding:10px 14px;font-weight:800;';
+          bl.appendChild(uiToggle);
           // Back tile button
           const back = document.createElement('button');
           back.id = '__ar_ui_back';
@@ -7323,6 +7283,14 @@ updateSummary();
           root.appendChild(info);
           root.appendChild(closePrev);
           document.body.appendChild(root);
+
+          // UI toggle behavior: toggle visibility of controls (except itself)
+          uiToggle.addEventListener('click', (e) => {
+            e.preventDefault(); e.stopPropagation();
+            const controls = [back, scaleMinus, scalePlus];
+            const anyVisible = controls.some(el => el.style.display !== 'none');
+            controls.forEach(el => el.style.display = anyVisible ? 'none' : '');
+          });
 
           // Behavior: back exits WebXR session if active
           back.addEventListener('click', (e) => {
