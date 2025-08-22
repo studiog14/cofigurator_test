@@ -7079,12 +7079,23 @@ updateSummary();
       function ensureUnifiedArModelViewer() {
         let mv = document.getElementById('__mv_ar_unified');
         if (!mv) {
+          // Ensure our DOM overlay exists first so we can reference it in xr-session-init
+          const overlayRoot = ensureArDomOverlay();
           mv = document.createElement('model-viewer');
           mv.id = '__mv_ar_unified';
           mv.setAttribute('ar', '');
           // Prefer WebXR first (Android) to allow a custom DOM overlay; fallback to native modes if unavailable
           mv.setAttribute('ar-modes', 'webxr scene-viewer quick-look');
           mv.setAttribute('ar-placement', 'floor');
+          // Request DOM overlay and hit-test for WebXR sessions; bind overlay root
+          try {
+            const xrInit = {
+              requiredFeatures: ['hit-test'],
+              optionalFeatures: ['dom-overlay','unbounded'],
+              domOverlay: { root: '#' + (overlayRoot?.id || '__ar_dom_overlay') }
+            };
+            mv.setAttribute('xr-session-init', JSON.stringify(xrInit));
+          } catch(_) {}
           mv.setAttribute('reveal', 'manual');
           mv.setAttribute('shadow-intensity', '0.8');
           mv.setAttribute('style', 'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;');
@@ -7203,9 +7214,15 @@ updateSummary();
             e.preventDefault(); e.stopPropagation();
             try {
               const mv = document.getElementById('__mv_ar_unified');
-              // model-viewer exposes no public exit, but WebXR sessions end on tapping outside; we can hide overlay and rely on system exit
-              // As a fallback, try to blur focus and hide overlay
-              root.style.display = 'none';
+              // Try ending XR session when available (non-public, best-effort)
+              const anyMv = mv;
+              const xrSession = anyMv && (anyMv.xrSession || anyMv[$$?.xrSession]);
+              if (xrSession && typeof xrSession.end === 'function') {
+                xrSession.end();
+              } else {
+                // Fallback: hide overlay; system/native UI may provide exit
+                root.style.display = 'none';
+              }
             } catch(_) {}
           });
         }
