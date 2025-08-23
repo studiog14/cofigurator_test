@@ -24,139 +24,178 @@
   <button id="configBtn" class="btn">Konfiguruj</button>
   </div>
 
-  <script type="module">
-    import * as THREE from 'https://unpkg.com/three@0.157.0/build/three.module.js';
-    import { OrbitControls } from 'https://unpkg.com/three@0.157.0/examples/jsm/controls/OrbitControls.js';
-    import { GLTFLoader } from 'https://unpkg.com/three@0.157.0/examples/jsm/loaders/GLTFLoader.js';
+  <!-- iOS/Safari: tap-to-enable camera overlay -->
+  <div id="tapOverlay" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.85);z-index:4;">
+    <button id="tapStart" class="btn" style="font-size:16px;padding:12px 18px;border-radius:14px;border:1px solid rgba(255,255,255,0.3);background:#111;">Dotknij, aby uruchomić kamerę</button>
+  </div>
+  <!-- Use non-module scripts for broader iOS compatibility -->
+  <script src="https://unpkg.com/three@0.157.0/build/three.min.js"></script>
+  <script src="https://unpkg.com/three@0.157.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://unpkg.com/three@0.157.0/examples/js/loaders/GLTFLoader.js"></script>
+  <script>
+    (function(){
+      const toast = (msg)=>{ const el = document.getElementById('toast'); el.textContent = msg; el.style.display = 'block'; clearTimeout(el._t); el._t = setTimeout(()=>{ el.style.display='none'; }, 2500); };
 
-    const toast = (msg)=>{ const el = document.getElementById('toast'); el.textContent = msg; el.style.display = 'block'; clearTimeout(el._t); el._t = setTimeout(()=>{ el.style.display='none'; }, 2500); };
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      const video = document.getElementById('videoBg');
+      const canvas = document.getElementById('canvas3d');
+      const backBtn = document.getElementById('backBtn');
+      const resetBtn = document.getElementById('resetBtn');
+      const configBtn = document.getElementById('configBtn');
+      const tapOverlay = document.getElementById('tapOverlay');
+      const tapStart = document.getElementById('tapStart');
 
-    async function main(){
-      try {
-        const video = document.getElementById('videoBg');
-        const canvas = document.getElementById('canvas3d');
-        const backBtn = document.getElementById('backBtn');
-        const resetBtn = document.getElementById('resetBtn');
-        const configBtn = document.getElementById('configBtn');
+      const urlParams = new URLSearchParams(location.search);
+      let modelUrl = urlParams.get('model');
+      const chairName = urlParams.get('name') || '';
+      const retUrl = (() => { try { return urlParams.get('ret') || ''; } catch(_) { return ''; } })();
 
-        const retUrl = (() => { try { return new URLSearchParams(location.search).get('ret') || ''; } catch(_) { return ''; } })();
-        backBtn.addEventListener('click', () => {
-          if (retUrl) { location.href = retUrl; return; }
-          history.length > 1 ? history.back() : (location.href = 'index.html');
-        });
-        configBtn.addEventListener('click', () => {
-          if (retUrl) { location.href = retUrl; return; }
-          location.href = 'index.html';
-        });
+      if (!modelUrl) {
+        // Fallback to default model
+        modelUrl = 'chairs/Default.glb';
+      }
 
-        const urlParams = new URLSearchParams(location.search);
-        const modelUrl = urlParams.get('model');
-        const chairName = urlParams.get('name') || '';
-        if (!modelUrl) { toast('Brak modelu – wróć i wybierz krzesło'); }
+      function goBack(){
+        if (retUrl) { location.href = retUrl; return; }
+        if (document.referrer) { location.href = document.referrer; return; }
+        if (history.length > 1) { history.back(); return; }
+        location.href = 'index.html';
+      }
 
-        // Camera background
+      backBtn.addEventListener('click', goBack);
+      configBtn.addEventListener('click', goBack);
+
+      // Three.js setup
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(innerWidth, innerHeight);
+
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.01, 100);
+      camera.position.set(0.6, 0.5, 1.2);
+
+      const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0);
+      scene.add(light);
+      const dir = new THREE.DirectionalLight(0xffffff, 0.6); dir.position.set(1,2,1); scene.add(dir);
+
+      const controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.target.set(0, 0.4, 0);
+
+      const root = new THREE.Group();
+      scene.add(root);
+
+      // Optional: simple ground shadow
+      const plane = new THREE.Mesh(
+        new THREE.CircleGeometry(0.8, 48),
+        new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.15 })
+      );
+      plane.rotation.x = -Math.PI/2;
+      plane.position.y = 0;
+      root.add(plane);
+
+      // Load model
+      (async function(){
         try {
+          const loader = new THREE.GLTFLoader();
+          const abs = new URL(modelUrl, location.href).toString();
+          const gltf = await new Promise((resolve, reject)=>{
+            loader.load(abs, resolve, undefined, reject);
+          });
+          const loaded = gltf.scene;
+          loaded.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; } });
+          // Normalize height to ~1m and drop to ground
+          const box = new THREE.Box3().setFromObject(loaded);
+          const size = new THREE.Vector3(); box.getSize(size);
+          const maxY = Math.max(0.001, size.y);
+          const s = 1.0 / maxY;
+          loaded.scale.setScalar(s);
+          const center = new THREE.Vector3(); box.getCenter(center);
+          loaded.position.add(new THREE.Vector3(-center.x, -box.min.y, -center.z).multiplyScalar(s));
+          root.add(loaded);
+        } catch (e) {
+          console.warn('Nie udało się wczytać modelu', e);
+          toast('Błąd wczytywania modelu');
+        }
+      })();
+
+      // Reset view
+      resetBtn.addEventListener('click', () => {
+        camera.position.set(0.6, 0.5, 1.2);
+        controls.target.set(0, 0.4, 0);
+        controls.update();
+      });
+
+      // Resize
+      window.addEventListener('resize', () => {
+        renderer.setSize(innerWidth, innerHeight);
+        camera.aspect = innerWidth/innerHeight;
+        camera.updateProjectionMatrix();
+      });
+
+      // Animate
+      const clock = new THREE.Clock();
+      function tick(){
+        clock.getDelta();
+        controls.update();
+        renderer.render(scene, camera);
+        requestAnimationFrame(tick);
+      }
+      tick();
+
+      // Camera start logic
+      async function startCamera(){
+        try {
+          const hasMedia = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+          if (!hasMedia) {
+            toast('Kamera niedostępna na tym urządzeniu');
+            return;
+          }
           const constraints = { video: { facingMode: { ideal: 'environment' } }, audio: false };
-          const stream = await navigator.mediaDevices.getUserMedia(constraints);
+          let stream;
+          try {
+            stream = await navigator.mediaDevices.getUserMedia(constraints);
+          } catch (e1) {
+            // Retry with generic camera
+            stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+          }
           video.srcObject = stream;
           try { await video.play(); } catch(_) {}
+          tapOverlay.style.display = 'none';
         } catch (e) {
           console.warn('Camera unavailable', e);
-          toast('Brak dostępu do kamery – sprawdź uprawnienia przeglądarki');
+          toast('Brak dostępu do kamery – sprawdź uprawnienia');
+          // Keep overlay visible to allow retry
+          tapOverlay.style.display = 'flex';
         }
-
-        // Three.js setup
-        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-        renderer.setSize(innerWidth, innerHeight);
-
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.01, 100);
-        camera.position.set(0.6, 0.5, 1.2);
-
-        const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0);
-        scene.add(light);
-        const dir = new THREE.DirectionalLight(0xffffff, 0.6); dir.position.set(1,2,1); scene.add(dir);
-
-        const controls = new OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.target.set(0, 0.4, 0);
-
-        const root = new THREE.Group();
-        scene.add(root);
-
-        // Optional: simple ground shadow
-        const plane = new THREE.Mesh(
-          new THREE.CircleGeometry(0.8, 48),
-          new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.15 })
-        );
-        plane.rotation.x = -Math.PI/2;
-        plane.position.y = 0;
-        root.add(plane);
-
-        // Load model
-        if (modelUrl) {
-          try {
-            const loader = new GLTFLoader();
-            const abs = new URL(modelUrl, location.href).toString();
-            const gltf = await loader.loadAsync(abs);
-            const loaded = gltf.scene;
-            loaded.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; } });
-            // Normalize approximate height to ~1m and drop to ground
-            const box = new THREE.Box3().setFromObject(loaded);
-            const size = new THREE.Vector3(); box.getSize(size);
-            const maxY = Math.max(0.001, size.y);
-            const s = 1.0 / maxY; // target ~1m
-            loaded.scale.setScalar(s);
-            const center = new THREE.Vector3(); box.getCenter(center);
-            loaded.position.add(new THREE.Vector3(-center.x, -box.min.y, -center.z).multiplyScalar(s));
-            root.add(loaded);
-          } catch (e) {
-            console.warn('Nie udało się wczytać modelu', e);
-            toast('Błąd wczytywania modelu');
-          }
-        }
-
-        // Reset view
-        resetBtn.addEventListener('click', () => {
-          camera.position.set(0.6, 0.5, 1.2);
-          controls.target.set(0, 0.4, 0);
-          controls.update();
-        });
-
-        // Resize
-        window.addEventListener('resize', () => {
-          renderer.setSize(innerWidth, innerHeight);
-          camera.aspect = innerWidth/innerHeight;
-          camera.updateProjectionMatrix();
-        });
-
-        // Animate
-        const clock = new THREE.Clock();
-        function tick(){
-          clock.getDelta();
-          controls.update();
-          renderer.render(scene, camera);
-          requestAnimationFrame(tick);
-        }
-        tick();
-
-        // Show a one-time hint if camera feed is black (e.g., permission denied)
-        setTimeout(() => {
-          try {
-            const w = video.videoWidth || 0;
-            const h = video.videoHeight || 0;
-            if (!w || !h) toast('Jeśli nie widzisz kamery, udziel dostępu w przeglądarce');
-          } catch(_){ }
-        }, 1500);
-      } catch (err) {
-        console.error('Pseudo AR fatal error:', err);
-        toast('Błąd inicjalizacji podglądu AR');
       }
-    }
 
-    // Run after module loads
-    main();
+      // Show overlay on iOS or if autoplay may fail
+      const autoShowOverlay = isIOS;
+      if (autoShowOverlay) {
+        tapOverlay.style.display = 'flex';
+      } else {
+        // Try to start immediately
+        startCamera().then(() => {
+          // If camera didn't start (no dimensions), show overlay
+          setTimeout(() => {
+            if (!video.videoWidth || !video.videoHeight) {
+              tapOverlay.style.display = 'flex';
+            }
+          }, 1200);
+        });
+      }
+      tapStart.addEventListener('click', startCamera);
+
+      // Hint if still black after a while
+      setTimeout(() => {
+        try {
+          const w = video.videoWidth || 0;
+          const h = video.videoHeight || 0;
+          if (!w || !h) toast('Jeśli nie widzisz kamery, udziel dostępu w przeglądarce');
+        } catch(_){ }
+      }, 2000);
+    })();
   </script>
 </body>
 </html>

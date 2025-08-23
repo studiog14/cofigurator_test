@@ -1,8 +1,9 @@
 // Zwiększ wersję przy każdej zmianie - BŁĘDY JS FIX
-const CACHE_NAME = 'v47-pseudo-ar-route';
+const CACHE_NAME = 'v48-pseudo-ar-route';
 const urlsToCache = [
   './',
   'index.html',
+  'pseudo_ar.html',
   'manifest.json',
   'mobile.html',
   'pwa-install.js',
