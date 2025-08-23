@@ -3309,6 +3309,11 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
         glb = assets?.glb || (Array.isArray(assets?.glbCandidates) ? assets.glbCandidates[0] : null);
         console.log('📦 Found GLB:', glb);
       } catch(_) {}
+      // If no GLB resolved, use a safe default to guarantee pseudo AR opens
+      if (!glb) {
+        glb = 'chairs/Default.glb';
+        console.log('⚠️ No GLB from selection, using fallback:', glb);
+      }
       if (glb) {
         const abs = new URL(glb, window.location.href).toString();
         // Compute repo base path robustly (works on GitHub Pages and local)
@@ -3328,9 +3333,7 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
         console.log('🎯 Opening pseudo AR:', dest);
         window.location.assign(dest);
       } else {
-        console.log('❌ No GLB found, using fallback AR');
-        const murl = (typeof buildArHtmlUrl === 'function') ? buildArHtmlUrl() : 'ar.html';
-        window.location.href = murl + (murl.includes('?') ? '&' : '?') + 'open_ar=1';
+        console.log('❌ No GLB and fallback missing');
       }
             } catch(err){ console.warn('AR open error:', err); }
           });
@@ -3384,7 +3387,9 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
             // This prevents any later-bound handlers from overriding our behavior.
             try {
               const captureHandler = async (e) => {
-                const target = e.target.closest ? e.target.closest('#view-in-room-button') : null;
+                // Normalize to an Element (Text nodes don't have closest)
+                const baseEl = (e.target && e.target.nodeType === 1) ? e.target : (e.target && e.target.parentElement);
+                const target = baseEl && baseEl.closest ? baseEl.closest('#view-in-room-button') : null;
                 if (!target) return;
                 // Don’t interfere on desktop
                 const ua = navigator.userAgent || '';
@@ -3400,8 +3405,9 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
                 e.stopImmediatePropagation?.();
                 try {
                   const assets = (typeof getCurrentArAssets === 'function') ? getCurrentArAssets() : null;
-                  const glb = assets?.glb || (Array.isArray(assets?.glbCandidates) ? assets.glbCandidates[0] : null);
-                  if (!glb) return; // let default flow happen if no model
+                  let glb = assets?.glb || (Array.isArray(assets?.glbCandidates) ? assets.glbCandidates[0] : null);
+                  if (!glb) glb = 'chairs/Default.glb';
+                  if (!glb) return; // safety
                   const abs = new URL(glb, window.location.href).toString();
                   // Compute repo base path robustly (works on GitHub Pages and local)
                   const { origin, pathname, hostname } = window.location;
