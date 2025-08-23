@@ -3308,11 +3308,20 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
       } catch(_) {}
       if (glb) {
         const abs = new URL(glb, window.location.href).toString();
-        // Build absolute URL to pseudo_ar.html under the current base path
-        const u = new URL('pseudo_ar.html', window.location.href);
-        u.searchParams.set('model', abs);
-        console.log('🎯 Opening pseudo AR:', u.toString());
-        window.location.href = u.toString();
+        // Build absolute URL to pseudo_ar.html; ensure correct repo path on GitHub Pages
+        const repoSlug = 'cofigurator_test';
+        const pageBase = new URL(window.location.href);
+        let target;
+        if (pageBase.hostname.endsWith('github.io') && !pageBase.pathname.includes('/' + repoSlug + '/')) {
+          // Force repo path when site is opened at domain root
+          target = new URL('/' + repoSlug + '/pseudo_ar.html', pageBase.origin);
+        } else {
+          target = new URL('pseudo_ar.html', pageBase);
+        }
+        target.searchParams.set('model', abs);
+        const dest = target.toString();
+        console.log('🎯 Opening pseudo AR:', dest);
+        window.location.href = dest;
       } else {
         console.log('❌ No GLB found, using fallback AR');
         const murl = (typeof buildArHtmlUrl === 'function') ? buildArHtmlUrl() : 'ar.html';
