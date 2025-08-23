@@ -3247,11 +3247,16 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
       }
 
       function ensureViewInRoomButton(){
+        console.log('🔧 ensureViewInRoomButton called');
         const configBtn = document.getElementById('config-overview-button');
-        if (!configBtn) return null;
+        if (!configBtn) {
+          console.log('❌ No config button found');
+          return null;
+        }
 
         let viewBtn = document.getElementById('view-in-room-button');
         if (!viewBtn) {
+          console.log('✨ Creating new view button');
           viewBtn = document.createElement('div');
           viewBtn.id = 'view-in-room-button';
           // Prefer SVG, fallback to PNG to keep transparency
@@ -3277,27 +3282,34 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
 
   // Click -> Mobile: open pseudo_ar.html with current GLB; Desktop: show QR to AR landing
           viewBtn.addEventListener('click', async (e) => {
+            console.log('🔥 AR button clicked!');
             e.stopPropagation();
             try {
               const isDesk = (typeof isDesktop === 'function') ? isDesktop() : !(typeof isIOS==='function'&&isIOS()) && !(typeof isAndroid==='function'&&isAndroid());
+              console.log('📱 isDesktop:', isDesk);
               if (isDesk) {
                 // Desktop unchanged – show QR to AR landing page (auto-open AR on mobile)
+                console.log('💻 Desktop flow - showing QR');
                 const url = (typeof buildArHtmlUrl === 'function') ? buildArHtmlUrl() : 'ar_viewer.html';
                 const qrUrl = url + (url.includes('?') ? '&' : '?') + 'open_ar=1';
                 if (typeof showQrWithUrl === 'function') showQrWithUrl(qrUrl);
                 return;
               }
       // Mobile – navigate to pseudo AR preview with current GLB; fallback to previous AR flow if no GLB
+      console.log('📱 Mobile flow - checking for GLB...');
       let glb = null;
       try {
         const assets = (typeof getCurrentArAssets === 'function') ? getCurrentArAssets() : null;
         glb = assets?.glb || (Array.isArray(assets?.glbCandidates) ? assets.glbCandidates[0] : null);
+        console.log('📦 Found GLB:', glb);
       } catch(_) {}
       if (glb) {
         const abs = new URL(glb, window.location.href).toString();
         const purl = 'pseudo_ar.html?model=' + encodeURIComponent(abs);
+        console.log('🎯 Opening pseudo AR:', purl);
         window.location.href = purl;
       } else {
+        console.log('❌ No GLB found, using fallback AR');
         const murl = (typeof buildArHtmlUrl === 'function') ? buildArHtmlUrl() : 'ar.html';
         window.location.href = murl + (murl.includes('?') ? '&' : '?') + 'open_ar=1';
       }
@@ -3305,7 +3317,9 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
           });
 
           document.body.appendChild(viewBtn);
+          console.log('✅ View button created and added to DOM');
         }
+        console.log('🔍 View button exists:', !!viewBtn);
         return viewBtn;
       }
 
