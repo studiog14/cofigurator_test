@@ -28,6 +28,17 @@
   <div id="tapOverlay" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.85);z-index:4;">
     <button id="tapStart" class="btn" style="font-size:16px;padding:12px 18px;border-radius:14px;border:1px solid rgba(255,255,255,0.3);background:#111;">Dotknij, aby uruchomić kamerę</button>
   </div>
+
+  <!-- Loading overlay -->
+  <div id="loadingOverlay" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.75);z-index:3;">
+    <div style="color:#fff;font-family:system-ui,sans-serif;text-align:center">
+      <div style="width:36px;height:36px;border:3px solid rgba(255,255,255,0.25);border-top-color:#fff;border-radius:50%;margin:0 auto 12px;animation:spin 1s linear infinite"></div>
+      <div id="loadingText">Ładowanie AR…</div>
+    </div>
+  </div>
+  <style>
+    @keyframes spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
+  </style>
   <!-- Use non-module scripts for broader iOS compatibility -->
   <script src="https://unpkg.com/three@0.157.0/build/three.min.js"></script>
   <script src="https://unpkg.com/three@0.157.0/examples/js/controls/OrbitControls.js"></script>
@@ -37,13 +48,15 @@
       const toast = (msg)=>{ const el = document.getElementById('toast'); el.textContent = msg; el.style.display = 'block'; clearTimeout(el._t); el._t = setTimeout(()=>{ el.style.display='none'; }, 2500); };
 
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-      const video = document.getElementById('videoBg');
+  const video = document.getElementById('videoBg');
       const canvas = document.getElementById('canvas3d');
       const backBtn = document.getElementById('backBtn');
       const resetBtn = document.getElementById('resetBtn');
       const configBtn = document.getElementById('configBtn');
       const tapOverlay = document.getElementById('tapOverlay');
       const tapStart = document.getElementById('tapStart');
+  const loadingOverlay = document.getElementById('loadingOverlay');
+  const loadingText = document.getElementById('loadingText');
 
       const urlParams = new URLSearchParams(location.search);
       let modelUrl = urlParams.get('model');
@@ -62,15 +75,27 @@
         location.href = 'index.html';
       }
 
-  backBtn.addEventListener('click', (e)=>{ e.preventDefault(); goBack(); });
-  configBtn.addEventListener('click', (e)=>{ e.preventDefault(); goBack(); });
+      function exitWithLoader(action){
+        loadingText.textContent = action === 'config' ? 'Powrót do konfiguratora…' : 'Powrót…';
+        loadingOverlay.style.display = 'flex';
+        setTimeout(() => {
+          if (action === 'config') {
+            // Go straight to configurator (ret if provided, else index)
+            if (retUrl) location.href = retUrl; else location.href = 'index.html';
+          } else {
+            goBack();
+          }
+        }, 120);
+      }
+      backBtn.addEventListener('click', (e)=>{ e.preventDefault(); exitWithLoader('back'); });
+      configBtn.addEventListener('click', (e)=>{ e.preventDefault(); exitWithLoader('config'); });
 
       // Three.js setup
       const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       renderer.setSize(innerWidth, innerHeight);
 
-      const scene = new THREE.Scene();
+  const scene = new THREE.Scene();
       const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.01, 100);
       camera.position.set(0.6, 0.5, 1.2);
 
@@ -95,6 +120,21 @@
       root.add(plane);
 
       // Load model
+      let cameraReady = false;
+      let modelReady = false;
+      const hideLoaderWhenReady = (() => {
+        let forced = false;
+        const maybe = () => {
+          if (!forced && cameraReady && modelReady) {
+            loadingOverlay.style.display = 'none';
+            forced = true;
+          }
+        };
+        // Safety timeout in case one of the sources is unavailable
+        setTimeout(() => { if (!forced) { loadingOverlay.style.display = 'none'; forced = true; } }, 3500);
+        return maybe;
+      })();
+
       (async function(){
         try {
           const loader = new THREE.GLTFLoader();
@@ -124,6 +164,7 @@
           loaded.position.add(new THREE.Vector3(-center.x, -box.min.y, -center.z).multiplyScalar(s));
           root.add(loaded);
           toast('Model wczytany');
+          modelReady = true; hideLoaderWhenReady();
         } catch (e) {
           console.warn('Nie udało się wczytać modelu', e);
           toast('Błąd wczytywania modelu');
@@ -155,6 +196,15 @@
       tick();
 
       // Camera start logic
+      async function pickBackCameraId(){
+        try {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const videos = devices.filter(d=>d.kind==='videoinput');
+          const back = videos.find(d=>/back|rear|environment/i.test(d.label)) || videos[1] || videos[0];
+          return back && back.deviceId;
+        } catch { return null; }
+      }
+
       async function startCamera(){
         try {
           const hasMedia = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
@@ -162,22 +212,38 @@
             toast('Kamera niedostępna na tym urządzeniu');
             return;
           }
-          const constraints = { video: { facingMode: { ideal: 'environment' } }, audio: false };
+          // Try a sequence of constraints
+          const trials = [
+            { video: { facingMode: { ideal: 'environment' } }, audio: false },
+            { video: { facingMode: 'environment' }, audio: false },
+            { video: true, audio: false }
+          ];
           let stream;
-          try {
-            stream = await navigator.mediaDevices.getUserMedia(constraints);
-          } catch (e1) {
-            // Retry with generic camera
-            stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+          let lastErr;
+          for (const c of trials) {
+            try { stream = await navigator.mediaDevices.getUserMedia(c); break; } catch (e) { lastErr = e; }
           }
+          if (!stream) {
+            // After permission, try selecting a specific back camera
+            const id = await pickBackCameraId();
+            if (id) {
+              try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: id } }, audio: false });
+              } catch (e) { lastErr = e; }
+            }
+          }
+          if (!stream) throw lastErr || new Error('Brak strumienia wideo');
           video.srcObject = stream;
           try { await video.play(); } catch(_) {}
           tapOverlay.style.display = 'none';
+          cameraReady = true; hideLoaderWhenReady();
         } catch (e) {
           console.warn('Camera unavailable', e);
           toast('Brak dostępu do kamery – sprawdź uprawnienia');
           // Keep overlay visible to allow retry
           tapOverlay.style.display = 'flex';
+          // As a visual fallback, use subtle gradient background
+          video.style.background = 'linear-gradient(180deg,#111,#222)';
         }
       }
 
