@@ -101,8 +101,9 @@
           }
         }, 120);
       }
-      backBtn.addEventListener('click', (e)=>{ e.preventDefault(); exitWithLoader('back'); });
-      configBtn.addEventListener('click', (e)=>{ e.preventDefault(); exitWithLoader('config'); });
+  backBtn.addEventListener('click', (e)=>{ e.preventDefault(); exitWithLoader('back'); });
+  // Konfiguruj: teraz identycznie jak Wróć, by zachować stan SPA bez odświeżenia
+  configBtn.addEventListener('click', (e)=>{ e.preventDefault(); goBack(); });
 
       // Three.js setup
       const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -194,18 +195,8 @@
           });
           const loaded = gltf.scene;
           loaded.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; } });
-          // Normalize height to ~1m and drop to ground
-          const preBox = new THREE.Box3().setFromObject(loaded);
-          const preSize = new THREE.Vector3(); preBox.getSize(preSize);
-          const maxY = Math.max(0.001, preSize.y);
-          const s = 1.0 / maxY;
-          loaded.scale.setScalar(s);
-          // Recompute bounds after scaling
+          // Ustaw na podłodze w oryginalnej skali modelu (bez normalizacji)
           const box = new THREE.Box3().setFromObject(loaded);
-          const center = new THREE.Vector3(); box.getCenter(center);
-          // Move XZ to center on origin and Y so that min.y is at 0
-          loaded.position.x -= center.x;
-          loaded.position.z -= center.z;
           loaded.position.y -= box.min.y;
           root.add(loaded);
           loadedModel = loaded;
