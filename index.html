@@ -3329,7 +3329,11 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
           const dir = pathname.endsWith('/') ? pathname : pathname.substring(0, pathname.lastIndexOf('/') + 1);
           base = origin + dir;
         }
-        const dest = base + 'pseudo_ar.html?model=' + encodeURIComponent(abs) + '&v=' + Date.now();
+  const ret = new URL(window.location.href);
+  // Keep only essential params to avoid re-triggering AR
+  ret.searchParams.delete('open_ar');
+  const chairName = encodeURIComponent((window.selectedChair && window.selectedChair.Nazwa) || '');
+  const dest = base + 'pseudo_ar.html?model=' + encodeURIComponent(abs) + '&name=' + chairName + '&ret=' + encodeURIComponent(ret.toString()) + '&v=' + Date.now();
         console.log('🎯 Opening pseudo AR:', dest);
         window.location.assign(dest);
       } else {
@@ -3420,7 +3424,9 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
                     const dir = pathname.endsWith('/') ? pathname : pathname.substring(0, pathname.lastIndexOf('/') + 1);
                     base = origin + dir;
                   }
-                  const dest = base + 'pseudo_ar.html?model=' + encodeURIComponent(abs) + '&v=' + Date.now();
+                  const ret = new URL(window.location.href); ret.searchParams.delete('open_ar');
+                  const chairName = encodeURIComponent((window.selectedChair && window.selectedChair.Nazwa) || '');
+                  const dest = base + 'pseudo_ar.html?model=' + encodeURIComponent(abs) + '&name=' + chairName + '&ret=' + encodeURIComponent(ret.toString()) + '&v=' + Date.now();
                   console.log('🎯 [capture] Opening pseudo AR:', dest);
                   window.location.assign(dest);
                 } catch (err) {
@@ -7158,7 +7164,9 @@ updateSummary();
                   const dir = pathname.endsWith('/') ? pathname : pathname.substring(0, pathname.lastIndexOf('/') + 1);
                   base = origin + dir;
                 }
-                const dest = base + 'pseudo_ar.html?model=' + encodeURIComponent(abs) + '&v=' + Date.now();
+                const ret = new URL(window.location.href); ret.searchParams.delete('open_ar');
+                const chairName = encodeURIComponent((window.selectedChair && window.selectedChair.Nazwa) || '');
+                const dest = base + 'pseudo_ar.html?model=' + encodeURIComponent(abs) + '&name=' + chairName + '&ret=' + encodeURIComponent(ret.toString()) + '&v=' + Date.now();
                 window.location.replace(dest);
                 return;
               }

@@ -21,6 +21,7 @@
   <div id="ui">
     <button id="backBtn" class="btn">Wróć</button>
     <button id="resetBtn" class="btn">Reset</button>
+  <button id="configBtn" class="btn">Konfiguruj</button>
   </div>
 
   <script type="module">
@@ -32,24 +33,34 @@
 
     const video = document.getElementById('videoBg');
     const canvas = document.getElementById('canvas3d');
-    const backBtn = document.getElementById('backBtn');
-    const resetBtn = document.getElementById('resetBtn');
+  const backBtn = document.getElementById('backBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const configBtn = document.getElementById('configBtn');
 
-    backBtn.addEventListener('click', () => { history.length > 1 ? history.back() : (location.href = 'index.html'); });
+    const retUrl = (() => { try { return new URLSearchParams(location.search).get('ret') || ''; } catch(_) { return ''; } })();
+    backBtn.addEventListener('click', () => {
+      if (retUrl) { location.href = retUrl; return; }
+      history.length > 1 ? history.back() : (location.href = 'index.html');
+    });
+    configBtn.addEventListener('click', () => {
+      if (retUrl) { location.href = retUrl; return; }
+      location.href = 'index.html';
+    });
 
     const urlParams = new URLSearchParams(location.search);
     const modelUrl = urlParams.get('model');
-    if (!modelUrl) {
-      toast('Brak modelu – wróć i wybierz krzesło');
-    }
+  const chairName = new URLSearchParams(location.search).get('name') || '';
+  if (!modelUrl) { toast('Brak modelu – wróć i wybierz krzesło'); }
 
     // Camera background
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+      const constraints = { video: { facingMode: { ideal: 'environment' } }, audio: false };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       video.srcObject = stream;
+      await video.play().catch(()=>{});
     } catch (e) {
       console.warn('Camera unavailable', e);
-      toast('Brak dostępu do kamery');
+      toast('Brak dostępu do kamery – sprawdź uprawnienia przeglądarki');
     }
 
     // Three.js setup
@@ -61,7 +72,7 @@
     const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.01, 100);
     camera.position.set(0.6, 0.5, 1.2);
 
-    const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0);
+  const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0);
     scene.add(light);
     const dir = new THREE.DirectionalLight(0xffffff, 0.6); dir.position.set(1,2,1); scene.add(dir);
 
@@ -98,7 +109,7 @@
         const center = new THREE.Vector3(); box.getCenter(center);
         loaded.position.add(new THREE.Vector3(-center.x, -box.min.y, -center.z).multiplyScalar(s));
         root.add(loaded);
-      } catch (e) {
+  } catch (e) {
         console.warn('Nie udało się wczytać modelu', e);
         toast('Błąd wczytywania modelu');
       }
@@ -127,6 +138,15 @@
       requestAnimationFrame(tick);
     }
     tick();
+
+    // Show a one-time hint if camera feed is black (e.g., permission denied)
+    setTimeout(() => {
+      try {
+        const w = video.videoWidth || 0;
+        const h = video.videoHeight || 0;
+        if (!w || !h) toast('Jeśli nie widzisz kamery, udziel dostępu w przeglądarce');
+      } catch(_){ }
+    }, 1500);
   </script>
 </body>
 </html>
