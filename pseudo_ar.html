@@ -2,122 +2,17 @@
 <html lang="pl">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-  <title>Pseudo AR podgląd</title>
-  <style>
-    html, body { height: 100%; margin: 0; background: #000; }
-    #videoBg { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; background: #000; }
-    #canvas3d { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 1; display: block; }
-    #ui { position: fixed; left: 0; right: 0; bottom: env(safe-area-inset-bottom, 0); display: flex; gap: 10px; justify-content: center; padding: 12px calc(12px + env(safe-area-inset-right, 0)) calc(12px + env(safe-area-inset-bottom, 0)) calc(12px + env(safe-area-inset-left, 0)); z-index: 2; }
-    .btn { background: rgba(0,0,0,0.6); color: #fff; border: 1px solid rgba(255,255,255,0.2); padding: 10px 14px; border-radius: 12px; font-family: system-ui, sans-serif; font-size: 14px; }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pseudo AR Test</title>
 </head>
 <body>
-  <video id="videoBg" playsinline autoplay muted></video>
-  <canvas id="canvas3d"></canvas>
-  <div id="ui">
-    <button id="backBtn" class="btn">Wróć</button>
-    <button id="resetBtn" class="btn">Reset</button>
-  </div>
-
-  <script type="module">
-    import * as THREE from 'https://unpkg.com/three@0.157.0/build/three.module.js';
-    import { OrbitControls } from 'https://unpkg.com/three@0.157.0/examples/jsm/controls/OrbitControls.js';
-    import { GLTFLoader } from 'https://unpkg.com/three@0.157.0/examples/jsm/loaders/GLTFLoader.js';
-
-    const video = document.getElementById('videoBg');
-    const canvas = document.getElementById('canvas3d');
-    const backBtn = document.getElementById('backBtn');
-    const resetBtn = document.getElementById('resetBtn');
-
-    backBtn.addEventListener('click', () => { history.length > 1 ? history.back() : (location.href = 'index.html'); });
-
-    const urlParams = new URLSearchParams(location.search);
-    const modelUrl = urlParams.get('model');
-
-    // Camera background
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
-      video.srcObject = stream;
-    } catch (e) {
-      console.warn('Camera unavailable, using black background', e);
-    }
-
-    // Three.js setup
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setSize(innerWidth, innerHeight);
-
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.01, 100);
-    camera.position.set(0.6, 0.5, 1.2);
-
-    const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0);
-    scene.add(light);
-    const dir = new THREE.DirectionalLight(0xffffff, 0.6); dir.position.set(1,2,1); scene.add(dir);
-
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.target.set(0, 0.4, 0);
-
-    let root = new THREE.Group();
-    scene.add(root);
-
-    let loaded;
-    if (modelUrl) {
-      const loader = new GLTFLoader();
-      try {
-        const gltf = await loader.loadAsync(modelUrl);
-        loaded = gltf.scene;
-        loaded.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; } });
-        // Normalize scale roughly to 1m height if possible
-        const box = new THREE.Box3().setFromObject(loaded);
-        const size = new THREE.Vector3(); box.getSize(size);
-        const maxY = Math.max(0.001, size.y);
-        const targetHeight = 1.0;
-        const s = targetHeight / maxY;
-        loaded.scale.setScalar(s);
-        // Center on ground
-        const center = new THREE.Vector3(); box.getCenter(center);
-        loaded.position.add(new THREE.Vector3(-center.x, -box.min.y, -center.z).multiplyScalar(s));
-        root.add(loaded);
-      } catch (e) {
-        console.warn('Failed to load model', e);
-      }
-    }
-
-    // Simple ground shadow
-    const plane = new THREE.Mesh(
-      new THREE.CircleGeometry(0.8, 48),
-      new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.15 })
-    );
-    plane.rotation.x = -Math.PI/2;
-    plane.position.y = 0;
-    root.add(plane);
-
-    // Reset view
-    resetBtn.addEventListener('click', () => {
-      camera.position.set(0.6, 0.5, 1.2);
-      controls.target.set(0, 0.4, 0);
-      controls.update();
-    });
-
-    // Resize
-    window.addEventListener('resize', () => {
-      renderer.setSize(innerWidth, innerHeight);
-      camera.aspect = innerWidth/innerHeight;
-      camera.updateProjectionMatrix();
-    });
-
-    // Animate
-    const clock = new THREE.Clock();
-    function tick(){
-      const dt = clock.getDelta();
-      controls.update();
-      renderer.render(scene, camera);
-      requestAnimationFrame(tick);
-    }
-    tick();
+  <h1>Pseudo AR działa!</h1>
+  <p>Model URL: <span id="modelUrl"></span></p>
+  <button onclick="history.back()">Wróć</button>
+  
+  <script>
+    const params = new URLSearchParams(location.search);
+    document.getElementById('modelUrl').textContent = params.get('model') || 'brak';
   </script>
 </body>
 </html>
