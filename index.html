@@ -3311,22 +3311,22 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
       } catch(_) {}
       if (glb) {
         const abs = new URL(glb, window.location.href).toString();
-        // Build absolute URL to pseudo_ar.html; ensure correct repo path on GitHub Pages
-        const repoSlug = 'cofigurator_test';
-        const pageBase = new URL(window.location.href);
-        let target;
-        if (pageBase.hostname.endsWith('github.io') && !pageBase.pathname.includes('/' + repoSlug + '/')) {
-          // Force repo path when site is opened at domain root
-          target = new URL('/' + repoSlug + '/pseudo_ar.html', pageBase.origin);
+        // Compute repo base path robustly (works on GitHub Pages and local)
+        const { origin, pathname, hostname } = window.location;
+        let base;
+        if (hostname.endsWith('github.io')) {
+          const parts = pathname.split('/').filter(Boolean);
+          // parts[0] should be repo name when served from project pages
+          const repo = parts[0] || 'cofigurator_test';
+          base = origin + '/' + repo + '/';
         } else {
-          target = new URL('pseudo_ar.html', pageBase);
+          // Use current directory as base
+          const dir = pathname.endsWith('/') ? pathname : pathname.substring(0, pathname.lastIndexOf('/') + 1);
+          base = origin + dir;
         }
-  target.searchParams.set('model', abs);
-  // Cache-bust to avoid stale service worker/cached index
-  target.searchParams.set('v', String(Date.now()));
-        const dest = target.toString();
+        const dest = base + 'pseudo_ar.html?model=' + encodeURIComponent(abs) + '&v=' + Date.now();
         console.log('🎯 Opening pseudo AR:', dest);
-        window.location.href = dest;
+        window.location.assign(dest);
       } else {
         console.log('❌ No GLB found, using fallback AR');
         const murl = (typeof buildArHtmlUrl === 'function') ? buildArHtmlUrl() : 'ar.html';
