@@ -68,9 +68,9 @@
   const loadingOverlay = document.getElementById('loadingOverlay');
   const loadingText = document.getElementById('loadingText');
 
-      const urlParams = new URLSearchParams(location.search);
-      let modelUrl = urlParams.get('model');
-      const chairName = urlParams.get('name') || '';
+  const urlParams = new URLSearchParams(location.search);
+  let modelUrl = urlParams.get('model');
+  const chairName = decodeURIComponent(urlParams.get('name') || '').trim();
       const retUrl = (() => { try { return urlParams.get('ret') || ''; } catch(_) { return ''; } })();
 
       if (!modelUrl) {
@@ -85,13 +85,15 @@
         location.href = 'index.html';
       }
 
-      function exitWithLoader(action){
+  function exitWithLoader(action){
         loadingText.textContent = action === 'config' ? 'Powrót do konfiguratora…' : 'Powrót…';
         loadingOverlay.style.display = 'flex';
         setTimeout(() => {
           if (action === 'config') {
-            // Go straight to configurator (ret if provided, else index)
-            if (retUrl) location.href = retUrl; else location.href = 'index.html';
+    // Prefer referrer to preserve state/UI; fallback to ret/index
+    const sameOriginRef = document.referrer && document.referrer.startsWith(location.origin) && !/pseudo_ar\.html/i.test(document.referrer);
+    if (sameOriginRef) location.href = document.referrer;
+    else if (retUrl) location.href = retUrl; else location.href = 'index.html';
           } else {
             goBack();
           }
@@ -154,10 +156,26 @@
         return maybe;
       })();
 
+      async function resolveModelUrl(initialUrl, name){
+        try {
+          const isDefault = !initialUrl || /\/Default\.glb(\b|$)/i.test(initialUrl);
+          if (isDefault && name) {
+            const res = await fetch('chairs/manifest.json', { cache: 'no-store' });
+            const list = await res.json();
+            const found = list.find(x => (x.name || '').toLowerCase() === name.toLowerCase() || (x.id || '').toLowerCase() === name.toLowerCase());
+            if (found && found.glb) return found.glb;
+          }
+          return initialUrl || 'chairs/Default.glb';
+        } catch {
+          return initialUrl || 'chairs/Default.glb';
+        }
+      }
+
       (async function(){
         try {
           const loader = new GLTFLoader();
-          const abs = new URL(modelUrl, location.href).toString();
+          const resolved = await resolveModelUrl(modelUrl, chairName);
+          const abs = new URL(resolved, location.href).toString();
           let lastPct = 0;
           toast('Ładowanie modelu...');
           const gltf = await new Promise((resolve, reject)=>{
@@ -174,13 +192,18 @@
           const loaded = gltf.scene;
           loaded.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; } });
           // Normalize height to ~1m and drop to ground
-          const box = new THREE.Box3().setFromObject(loaded);
-          const size = new THREE.Vector3(); box.getSize(size);
-          const maxY = Math.max(0.001, size.y);
+          const preBox = new THREE.Box3().setFromObject(loaded);
+          const preSize = new THREE.Vector3(); preBox.getSize(preSize);
+          const maxY = Math.max(0.001, preSize.y);
           const s = 1.0 / maxY;
           loaded.scale.setScalar(s);
+          // Recompute bounds after scaling
+          const box = new THREE.Box3().setFromObject(loaded);
           const center = new THREE.Vector3(); box.getCenter(center);
-          loaded.position.add(new THREE.Vector3(-center.x, -box.min.y, -center.z).multiplyScalar(s));
+          // Move XZ to center on origin and Y so that min.y is at 0
+          loaded.position.x -= center.x;
+          loaded.position.z -= center.z;
+          loaded.position.y -= box.min.y;
           root.add(loaded);
           toast('Model wczytany');
           modelReady = true; hideLoaderWhenReady();
