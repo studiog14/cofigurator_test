@@ -7319,27 +7319,7 @@ updateSummary();
           });
           arBtn._arBound = true;
         }
-        const bindView = (el) => {
-          if (!el || el._arBound) return;
-          el.addEventListener('click', (e) => { e.stopPropagation(); openArWebXRMobile(); });
-          el._arBound = true;
-        };
-        const viewBtn = document.getElementById('view-in-room-button');
-        if (viewBtn) {
-          if (!viewBtn._arBound) {
-            viewBtn.addEventListener('click', (e)=>{
-              e.stopPropagation();
-              openArWebXRMobile();
-            });
-            viewBtn._arBound = true;
-          }
-        }
-        // If it's injected later, observe and bind once
-        const mo = new MutationObserver(() => {
-          const vb = document.getElementById('view-in-room-button');
-          if (vb) { bindView(vb); mo.disconnect(); }
-        });
-        mo.observe(document.body, { childList: true, subtree: true });
+        // Removed duplicate view button handler - handled by ensureViewInRoomButton() above
       })();
 
       // Enable overlay preview via URL param (?ar_ui_preview=1)
