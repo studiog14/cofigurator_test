@@ -3308,9 +3308,11 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
       } catch(_) {}
       if (glb) {
         const abs = new URL(glb, window.location.href).toString();
-        const purl = 'pseudo_ar.html?model=' + encodeURIComponent(abs);
-        console.log('🎯 Opening pseudo AR:', purl);
-        window.location.href = purl;
+        // Build absolute URL to pseudo_ar.html under the current base path
+        const u = new URL('pseudo_ar.html', window.location.href);
+        u.searchParams.set('model', abs);
+        console.log('🎯 Opening pseudo AR:', u.toString());
+        window.location.href = u.toString();
       } else {
         console.log('❌ No GLB found, using fallback AR');
         const murl = (typeof buildArHtmlUrl === 'function') ? buildArHtmlUrl() : 'ar.html';
