@@ -3286,8 +3286,11 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
             e.stopPropagation();
             try {
               const isDesk = (typeof isDesktop === 'function') ? isDesktop() : !(typeof isIOS==='function'&&isIOS()) && !(typeof isAndroid==='function'&&isAndroid());
-              console.log('📱 isDesktop:', isDesk);
-              if (isDesk) {
+              const isMobileWidth = window.innerWidth <= 820;
+              const isMobileMode = document.body.classList.contains('mobile-mode');
+              const shouldUsePseudoAR = isMobileWidth || isMobileMode || !isDesk;
+              console.log('📱 isDesktop:', isDesk, 'isMobileWidth:', isMobileWidth, 'isMobileMode:', isMobileMode, 'shouldUsePseudoAR:', shouldUsePseudoAR);
+              if (isDesk && !isMobileWidth && !isMobileMode) {
                 // Desktop unchanged – show QR to AR landing page (auto-open AR on mobile)
                 console.log('💻 Desktop flow - showing QR');
                 const url = (typeof buildArHtmlUrl === 'function') ? buildArHtmlUrl() : 'ar_viewer.html';
