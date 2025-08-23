@@ -3318,7 +3318,9 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
         } else {
           target = new URL('pseudo_ar.html', pageBase);
         }
-        target.searchParams.set('model', abs);
+  target.searchParams.set('model', abs);
+  // Cache-bust to avoid stale service worker/cached index
+  target.searchParams.set('v', String(Date.now()));
         const dest = target.toString();
         console.log('🎯 Opening pseudo AR:', dest);
         window.location.href = dest;
