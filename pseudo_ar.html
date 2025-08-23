@@ -39,11 +39,12 @@
   <style>
     @keyframes spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
   </style>
-  <!-- Use non-module scripts for broader iOS compatibility -->
-  <script src="https://unpkg.com/three@0.157.0/build/three.min.js"></script>
-  <script src="https://unpkg.com/three@0.157.0/examples/js/controls/OrbitControls.js"></script>
-  <script src="https://unpkg.com/three@0.157.0/examples/js/loaders/GLTFLoader.js"></script>
-  <script>
+  <!-- Use ESM modules from examples/jsm (non-module examples/js removed in r157) -->
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.157.0/build/three.module.js';
+    import { OrbitControls } from 'https://unpkg.com/three@0.157.0/examples/jsm/controls/OrbitControls.js';
+    import { GLTFLoader } from 'https://unpkg.com/three@0.157.0/examples/jsm/loaders/GLTFLoader.js';
+
     (function(){
       const toast = (msg)=>{ const el = document.getElementById('toast'); el.textContent = msg; el.style.display = 'block'; clearTimeout(el._t); el._t = setTimeout(()=>{ el.style.display='none'; }, 2500); };
 
@@ -103,7 +104,7 @@
       scene.add(light);
       const dir = new THREE.DirectionalLight(0xffffff, 0.6); dir.position.set(1,2,1); scene.add(dir);
 
-      const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  const controls = new OrbitControls(camera, renderer.domElement);
       controls.enableDamping = true;
       controls.target.set(0, 0.4, 0);
 
@@ -131,13 +132,22 @@
           }
         };
         // Safety timeout in case one of the sources is unavailable
-        setTimeout(() => { if (!forced) { loadingOverlay.style.display = 'none'; forced = true; } }, 3500);
+        setTimeout(() => {
+          if (!forced) {
+            loadingOverlay.style.display = 'none';
+            forced = true;
+            // If still no camera video, inform user to allow permissions
+            if (!(video.videoWidth && video.videoHeight)) {
+              toast('Brak podglądu kamery – sprawdź uprawnienia');
+            }
+          }
+        }, 3500);
         return maybe;
       })();
 
       (async function(){
         try {
-          const loader = new THREE.GLTFLoader();
+          const loader = new GLTFLoader();
           const abs = new URL(modelUrl, location.href).toString();
           let lastPct = 0;
           toast('Ładowanie modelu...');
