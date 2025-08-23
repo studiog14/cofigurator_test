@@ -3379,6 +3379,54 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
         const btn = ensureViewInRoomButton();
         if (!btn) return;
         updateViewButtonLayout();
+
+            // Extra safety: intercept clicks early (capture) to always route to pseudo AR on mobile
+            // This prevents any later-bound handlers from overriding our behavior.
+            try {
+              const captureHandler = async (e) => {
+                const target = e.target.closest ? e.target.closest('#view-in-room-button') : null;
+                if (!target) return;
+                // Don’t interfere on desktop
+                const ua = navigator.userAgent || '';
+                const isTouchMac = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+                const isUADevice = /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(ua);
+                const isMobileWidth = window.innerWidth <= 1024;
+                const isMobileMode = document.body.classList.contains('mobile-mode');
+                const isMobileDevice = isUADevice || isTouchMac || isMobileWidth || isMobileMode;
+                if (!isMobileDevice) return;
+                // Stop other listeners and navigate
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation?.();
+                try {
+                  const assets = (typeof getCurrentArAssets === 'function') ? getCurrentArAssets() : null;
+                  const glb = assets?.glb || (Array.isArray(assets?.glbCandidates) ? assets.glbCandidates[0] : null);
+                  if (!glb) return; // let default flow happen if no model
+                  const abs = new URL(glb, window.location.href).toString();
+                  // Compute repo base path robustly (works on GitHub Pages and local)
+                  const { origin, pathname, hostname } = window.location;
+                  let base;
+                  if (hostname.endsWith('github.io')) {
+                    const parts = pathname.split('/').filter(Boolean);
+                    const repo = parts[0] || 'cofigurator_test';
+                    base = origin + '/' + repo + '/';
+                  } else {
+                    const dir = pathname.endsWith('/') ? pathname : pathname.substring(0, pathname.lastIndexOf('/') + 1);
+                    base = origin + dir;
+                  }
+                  const dest = base + 'pseudo_ar.html?model=' + encodeURIComponent(abs) + '&v=' + Date.now();
+                  console.log('🎯 [capture] Opening pseudo AR:', dest);
+                  window.location.assign(dest);
+                } catch (err) {
+                  console.warn('Capture handler error:', err);
+                }
+              };
+              // Attach once; capture phase to run before bubbling listeners
+              if (!window.__viewInRoomCaptureBound) {
+                document.addEventListener('click', captureHandler, true);
+                window.__viewInRoomCaptureBound = true;
+              }
+            } catch(_) {}
       }
 
       // Initialize after load to ensure base scripts/styles ran
@@ -7087,8 +7135,29 @@ updateSummary();
             // remove the param to avoid loops on back
             url.searchParams.delete('open_ar');
             window.history.replaceState({}, '', url.toString());
-            try { showModelLoader('Uruchamianie trybu AR...'); } catch(_) {}
-            // Use the same mobile AR routine
+            try { showModelLoader('Uruchamianie trybu podglądu AR...'); } catch(_) {}
+            // Route to pseudo AR on mobile landing as well (consistent with button behavior)
+            try {
+              const assets = (typeof getCurrentArAssets === 'function') ? getCurrentArAssets() : null;
+              const glb = assets?.glb || (Array.isArray(assets?.glbCandidates) ? assets.glbCandidates[0] : null);
+              if (glb) {
+                const abs = new URL(glb, window.location.href).toString();
+                const { origin, pathname, hostname } = window.location;
+                let base;
+                if (hostname.endsWith('github.io')) {
+                  const parts = pathname.split('/').filter(Boolean);
+                  const repo = parts[0] || 'cofigurator_test';
+                  base = origin + '/' + repo + '/';
+                } else {
+                  const dir = pathname.endsWith('/') ? pathname : pathname.substring(0, pathname.lastIndexOf('/') + 1);
+                  base = origin + dir;
+                }
+                const dest = base + 'pseudo_ar.html?model=' + encodeURIComponent(abs) + '&v=' + Date.now();
+                window.location.replace(dest);
+                return;
+              }
+            } catch(_) {}
+            // If no GLB found, fallback to previous AR routine
             if (typeof openArWebXRMobile === 'function') openArWebXRMobile(); else openArFlow();
           }
         } catch {}
