@@ -8,7 +8,7 @@
   <style>
     html, body { height: 100%; margin: 0; background: #000; }
     #videoBg { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; background: #000; }
-    #canvas3d { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 1; display: block; }
+  #canvas3d { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 1; display: block; touch-action: none; }
     #ui { position: fixed; left: 0; right: 0; bottom: env(safe-area-inset-bottom, 0); display: flex; gap: 10px; justify-content: center; padding: 12px calc(12px + env(safe-area-inset-right, 0)) calc(12px + env(safe-area-inset-bottom, 0)) calc(12px + env(safe-area-inset-left, 0)); z-index: 2; }
     .btn { background: rgba(0,0,0,0.6); color: #fff; border: 1px solid rgba(255,255,255,0.2); padding: 10px 14px; border-radius: 12px; font-family: system-ui, sans-serif; font-size: 14px; }
     #toast { position: fixed; top: calc(10px + env(safe-area-inset-top, 0)); left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); color:#fff; padding:8px 12px; border-radius:10px; z-index:3; font-family: system-ui, sans-serif; font-size: 13px; display:none; }
@@ -51,8 +51,7 @@
   </style>
   <!-- Use ESM modules from examples/jsm (non-module examples/js removed in r157) -->
   <script type="module-shim">
-    import * as THREE from 'three';
-    import { OrbitControls } from 'https://unpkg.com/three@0.157.0/examples/jsm/controls/OrbitControls.js';
+  import * as THREE from 'three';
     import { GLTFLoader } from 'https://unpkg.com/three@0.157.0/examples/jsm/loaders/GLTFLoader.js';
 
     (function(){
@@ -118,13 +117,19 @@
       scene.add(light);
       const dir = new THREE.DirectionalLight(0xffffff, 0.6); dir.position.set(1,2,1); scene.add(dir);
 
-  const controls = new OrbitControls(camera, renderer.domElement);
-      controls.enableDamping = true;
-      controls.target.set(0, 0.4, 0);
-
   const root = new THREE.Group();
       scene.add(root);
   let loadedModel = null;
+  let modelYOffset = 0; // keep model touching the floor
+  const raycaster = new THREE.Raycaster();
+  const ndc = new THREE.Vector2();
+  const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); // y = 0 plane
+  const tmpVec3 = new THREE.Vector3();
+  let isDragging = false;
+  let dragMode = null; // 'move' | 'rotate'
+  const dragOffset = new THREE.Vector3();
+  let startRotationY = 0;
+  let startAngle = 0;
 
       // Optional: simple ground shadow
       const plane = new THREE.Mesh(
@@ -197,7 +202,8 @@
           loaded.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; } });
           // Ustaw na podłodze w oryginalnej skali modelu (bez normalizacji)
           const box = new THREE.Box3().setFromObject(loaded);
-          loaded.position.y -= box.min.y;
+          modelYOffset = -box.min.y;
+          loaded.position.y = modelYOffset;
           root.add(loaded);
           loadedModel = loaded;
           toast('Model wczytany');
@@ -211,12 +217,9 @@
       // Reset view
       resetBtn.addEventListener('click', () => {
         camera.position.set(0.6, 0.5, 1.2);
-        controls.target.set(0, 0.4, 0);
-        controls.update();
-        // Also ensure model sits on the floor again
         if (loadedModel) {
-          const box = new THREE.Box3().setFromObject(loadedModel);
-          loadedModel.position.y -= box.min.y;
+          loadedModel.position.set(0, modelYOffset, 0);
+          loadedModel.rotation.y = 0;
         }
       });
 
@@ -229,7 +232,7 @@
       });
 
       // Resize
-      window.addEventListener('resize', () => {
+  window.addEventListener('resize', () => {
         renderer.setSize(innerWidth, innerHeight);
         camera.aspect = innerWidth/innerHeight;
         camera.updateProjectionMatrix();
@@ -239,11 +242,91 @@
       const clock = new THREE.Clock();
       function tick(){
         clock.getDelta();
-        controls.update();
         renderer.render(scene, camera);
         requestAnimationFrame(tick);
       }
       tick();
+
+      // ===== AR-like gestures: move on floor with one finger/mouse, rotate with two fingers =====
+      function setNDCFromEvent(clientX, clientY){
+        ndc.x = (clientX / innerWidth) * 2 - 1;
+        ndc.y = -(clientY / innerHeight) * 2 + 1;
+      }
+      function intersectFloor(clientX, clientY){
+        setNDCFromEvent(clientX, clientY);
+        raycaster.setFromCamera(ndc, camera);
+        return raycaster.ray.intersectPlane(floorPlane, tmpVec3);
+      }
+
+      // Touch: one finger move, two fingers rotate
+      canvas.addEventListener('touchstart', (e) => {
+        if (!loadedModel) return;
+        if (e.touches.length === 1) {
+          const t = e.touches[0];
+          const hit = intersectFloor(t.clientX, t.clientY);
+          if (hit) {
+            dragMode = 'move';
+            isDragging = true;
+            dragOffset.copy(loadedModel.position).sub(hit);
+          }
+        } else if (e.touches.length === 2) {
+          const [t0, t1] = e.touches;
+          const dx = t1.clientX - t0.clientX;
+          const dy = t1.clientY - t0.clientY;
+          startAngle = Math.atan2(dy, dx);
+          startRotationY = loadedModel.rotation.y;
+          dragMode = 'rotate';
+          isDragging = true;
+        }
+        e.preventDefault();
+      }, { passive: false });
+
+      canvas.addEventListener('touchmove', (e) => {
+        if (!isDragging || !loadedModel) return;
+        if (dragMode === 'move' && e.touches.length === 1) {
+          const t = e.touches[0];
+          const hit = intersectFloor(t.clientX, t.clientY);
+          if (hit) {
+            loadedModel.position.x = hit.x + dragOffset.x;
+            loadedModel.position.z = hit.z + dragOffset.z;
+            loadedModel.position.y = modelYOffset;
+          }
+        } else if (dragMode === 'rotate' && e.touches.length === 2) {
+          const [t0, t1] = e.touches;
+          const dx = t1.clientX - t0.clientX;
+          const dy = t1.clientY - t0.clientY;
+          const angle = Math.atan2(dy, dx);
+          loadedModel.rotation.y = startRotationY + (angle - startAngle);
+        }
+        e.preventDefault();
+      }, { passive: false });
+
+      canvas.addEventListener('touchend', (e) => {
+        if (e.touches.length === 0) { isDragging = false; dragMode = null; }
+      });
+
+      // Mouse: left button drag to move on floor
+      let mouseDown = false;
+      canvas.addEventListener('mousedown', (e) => {
+        if (!loadedModel || e.button !== 0) return;
+        const hit = intersectFloor(e.clientX, e.clientY);
+        if (hit) {
+          dragMode = 'move';
+          isDragging = true;
+          mouseDown = true;
+          dragOffset.copy(loadedModel.position).sub(hit);
+        }
+      });
+      window.addEventListener('mousemove', (e) => {
+        if (!mouseDown || !isDragging || dragMode !== 'move' || !loadedModel) return;
+        const hit = intersectFloor(e.clientX, e.clientY);
+        if (hit) {
+          loadedModel.position.x = hit.x + dragOffset.x;
+          loadedModel.position.z = hit.z + dragOffset.z;
+          loadedModel.position.y = modelYOffset;
+        }
+      });
+      window.addEventListener('mouseup', () => { mouseDown = false; isDragging = false; dragMode = null; });
 
       // Camera start logic
       async function pickBackCameraId(){

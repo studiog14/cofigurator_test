@@ -16,6 +16,6 @@
   { "id": "soren", "name": "Soren", "glb": "chairs/Soren.glb" },
   { "id": "soul-plus", "name": "Soul Plus", "glb": "chairs/Soul Plus.glb" },
   { "id": "soul", "name": "Soul", "glb": "chairs/Soul.glb" },
-  { "id": "tulla-2", "name": "Tulla-2", "glb": "chairs/Tulla-2.glb", "usdz": "chairs/Tulla-2.usdz" },
+  { "id": "tulla-2", "name": "Tulla-2", "glb": "chairs/Tulla-2.glb" },
   { "id": "tulla", "name": "Tulla", "glb": "chairs/Tulla.glb" }
 ]
