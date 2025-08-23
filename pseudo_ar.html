@@ -16,12 +16,12 @@
 </head>
 <body>
   <div id="toast"></div>
-  <video id="videoBg" playsinline autoplay muted></video>
+  <video id="videoBg" playsinline webkit-playsinline autoplay muted></video>
   <canvas id="canvas3d"></canvas>
   <div id="ui">
-    <button id="backBtn" class="btn">Wróć</button>
-    <button id="resetBtn" class="btn">Reset</button>
-  <button id="configBtn" class="btn">Konfiguruj</button>
+    <button id="backBtn" type="button" class="btn">Wróć</button>
+    <button id="resetBtn" type="button" class="btn">Reset</button>
+  <button id="configBtn" type="button" class="btn">Konfiguruj</button>
   </div>
 
   <!-- iOS/Safari: tap-to-enable camera overlay -->
@@ -56,14 +56,14 @@
       }
 
       function goBack(){
+        if (history.length > 1) { history.back(); return; }
         if (retUrl) { location.href = retUrl; return; }
         if (document.referrer) { location.href = document.referrer; return; }
-        if (history.length > 1) { history.back(); return; }
         location.href = 'index.html';
       }
 
-      backBtn.addEventListener('click', goBack);
-      configBtn.addEventListener('click', goBack);
+  backBtn.addEventListener('click', (e)=>{ e.preventDefault(); goBack(); });
+  configBtn.addEventListener('click', (e)=>{ e.preventDefault(); goBack(); });
 
       // Three.js setup
       const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -99,8 +99,18 @@
         try {
           const loader = new THREE.GLTFLoader();
           const abs = new URL(modelUrl, location.href).toString();
+          let lastPct = 0;
+          toast('Ładowanie modelu...');
           const gltf = await new Promise((resolve, reject)=>{
-            loader.load(abs, resolve, undefined, reject);
+            loader.load(abs, resolve, (ev)=>{
+              if (ev && ev.total) {
+                const pct = Math.min(100, Math.round(ev.loaded * 100 / ev.total));
+                if (pct !== lastPct && (pct === 100 || pct % 10 === 0)) {
+                  toast('Ładowanie modelu: ' + pct + '%');
+                  lastPct = pct;
+                }
+              }
+            }, reject);
           });
           const loaded = gltf.scene;
           loaded.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; } });
@@ -113,6 +123,7 @@
           const center = new THREE.Vector3(); box.getCenter(center);
           loaded.position.add(new THREE.Vector3(-center.x, -box.min.y, -center.z).multiplyScalar(s));
           root.add(loaded);
+          toast('Model wczytany');
         } catch (e) {
           console.warn('Nie udało się wczytać modelu', e);
           toast('Błąd wczytywania modelu');
@@ -170,21 +181,15 @@
         }
       }
 
-      // Show overlay on iOS or if autoplay may fail
-      const autoShowOverlay = isIOS;
-      if (autoShowOverlay) {
-        tapOverlay.style.display = 'flex';
-      } else {
-        // Try to start immediately
-        startCamera().then(() => {
-          // If camera didn't start (no dimensions), show overlay
-          setTimeout(() => {
-            if (!video.videoWidth || !video.videoHeight) {
-              tapOverlay.style.display = 'flex';
-            }
-          }, 1200);
-        });
-      }
+      // Always present overlay first; try auto-start in background and hide if it succeeds
+      tapOverlay.style.display = 'flex';
+      startCamera().then(() => {
+        setTimeout(() => {
+          if (video.videoWidth && video.videoHeight) {
+            tapOverlay.style.display = 'none';
+          }
+        }, 800);
+      });
       tapStart.addEventListener('click', startCamera);
 
       // Hint if still black after a while
