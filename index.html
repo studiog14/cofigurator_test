@@ -3285,12 +3285,15 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
             console.log('🔥 AR button clicked!');
             e.stopPropagation();
             try {
-              const isDesk = (typeof isDesktop === 'function') ? isDesktop() : !(typeof isIOS==='function'&&isIOS()) && !(typeof isAndroid==='function'&&isAndroid());
-              const isMobileWidth = window.innerWidth <= 820;
+              // Self-contained mobile detection (no external helpers required)
+              const ua = navigator.userAgent || '';
+              const isTouchMac = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1; // iPadOS
+              const isUADevice = /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(ua);
+              const isMobileWidth = window.innerWidth <= 1024;
               const isMobileMode = document.body.classList.contains('mobile-mode');
-              const shouldUsePseudoAR = isMobileWidth || isMobileMode || !isDesk;
-              console.log('📱 isDesktop:', isDesk, 'isMobileWidth:', isMobileWidth, 'isMobileMode:', isMobileMode, 'shouldUsePseudoAR:', shouldUsePseudoAR);
-              if (isDesk && !isMobileWidth && !isMobileMode) {
+              const isMobileDevice = isUADevice || isTouchMac || isMobileWidth || isMobileMode;
+              console.log('📱 isMobileDevice:', isMobileDevice, { isUADevice, isTouchMac, isMobileWidth, isMobileMode });
+              if (!isMobileDevice) {
                 // Desktop unchanged – show QR to AR landing page (auto-open AR on mobile)
                 console.log('💻 Desktop flow - showing QR');
                 const url = (typeof buildArHtmlUrl === 'function') ? buildArHtmlUrl() : 'ar_viewer.html';
