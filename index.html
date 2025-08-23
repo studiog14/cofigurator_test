@@ -3280,7 +3280,7 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
             viewBtn.style.background = 'linear-gradient(135deg, #F5C842, #E5B432)';
           });
 
-  // Click -> Mobile: open pseudo_ar.html with current GLB; Desktop: show QR to AR landing
+  // Click -> Mobile: open ar.html with current GLB; Desktop: show QR to AR landing
           viewBtn.addEventListener('click', async (e) => {
             console.log('🔥 AR button clicked!');
             e.stopPropagation();
@@ -3301,7 +3301,7 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
                 if (typeof showQrWithUrl === 'function') showQrWithUrl(qrUrl);
                 return;
               }
-      // Mobile – navigate to pseudo AR preview with current GLB; fallback to previous AR flow if no GLB
+  // Mobile – navigate to native AR page with current GLB; fallback to default if no GLB
       console.log('📱 Mobile flow - checking for GLB...');
       let glb = null;
       try {
@@ -3333,8 +3333,8 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
   // Keep only essential params to avoid re-triggering AR
   ret.searchParams.delete('open_ar');
   const chairName = encodeURIComponent((window.selectedChair && window.selectedChair.Nazwa) || '');
-  const dest = base + 'pseudo_ar.html?model=' + encodeURIComponent(abs) + '&name=' + chairName + '&ret=' + encodeURIComponent(ret.toString()) + '&v=' + Date.now();
-        console.log('🎯 Opening pseudo AR:', dest);
+  const dest = base + 'ar.html?model=' + encodeURIComponent(abs) + '&ret=' + encodeURIComponent(ret.toString()) + '&open_ar=1&v=' + Date.now();
+        console.log('🎯 Opening AR (native):', dest);
         window.location.assign(dest);
       } else {
         console.log('❌ No GLB and fallback missing');
@@ -3387,7 +3387,7 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
         if (!btn) return;
         updateViewButtonLayout();
 
-            // Extra safety: intercept clicks early (capture) to always route to pseudo AR on mobile
+            // Extra safety: intercept clicks early (capture) to always route to AR on mobile
             // This prevents any later-bound handlers from overriding our behavior.
             try {
               const captureHandler = async (e) => {
@@ -3426,8 +3426,8 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
                   }
                   const ret = new URL(window.location.href); ret.searchParams.delete('open_ar');
                   const chairName = encodeURIComponent((window.selectedChair && window.selectedChair.Nazwa) || '');
-                  const dest = base + 'pseudo_ar.html?model=' + encodeURIComponent(abs) + '&name=' + chairName + '&ret=' + encodeURIComponent(ret.toString()) + '&v=' + Date.now();
-                  console.log('🎯 [capture] Opening pseudo AR:', dest);
+                  const dest = base + 'ar.html?model=' + encodeURIComponent(abs) + '&ret=' + encodeURIComponent(ret.toString()) + '&open_ar=1&v=' + Date.now();
+                  console.log('🎯 [capture] Opening AR (native):', dest);
                   window.location.assign(dest);
                 } catch (err) {
                   console.warn('Capture handler error:', err);
