@@ -2391,15 +2391,15 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
   <!-- Hand prompt animations/styles (model-viewer style) -->
   <style>
     @keyframes circle {
-      from { transform: translateX(-50%) rotate(0deg) translateX(50px) rotate(0deg); }
-      to   { transform: translateX(-50%) rotate(360deg) translateX(50px) rotate(-360deg); }
+      from { transform: translateX(-50%) rotate(0deg) translateX(36px) rotate(0deg); }
+      to   { transform: translateX(-50%) rotate(360deg) translateX(36px) rotate(-360deg); }
     }
     @keyframes elongate {
       from { transform: translateX(100px); }
       to   { transform: translateX(-100px); }
     }
     #hand-prompt { animation: elongate 2s infinite ease-in-out alternate; }
-    #hand-prompt img { position: relative; left: 50%; transform: translateX(-50%); animation: circle 4s linear infinite; }
+    #hand-prompt img { position: relative; left: 50%; animation: circle 4s linear infinite; }
   </style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
@@ -2571,7 +2571,7 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
     <div id="canvas-container" style="flex: 1 1 0; position: relative; height: 100%; background: #ededed15;">
       <canvas id="canvas"></canvas>
         <!-- Hand prompt for 3D viewer (not AR). Shown after chair selection; hidden on first interaction. -->
-        <div id="hand-prompt" style="position:absolute; left:50%; bottom:20%; transform: translateX(-50%); display:none; pointer-events:none;">
+  <div id="hand-prompt" style="position:absolute; left:50%; bottom:175px; display:none; pointer-events:none;">
           <img src="icons/hand.svg" alt="gesture" onerror="this.style.display='none'; const f=this.nextElementSibling; if(f) f.style.display='block';" style="width:36px;height:36px; filter: drop-shadow(0 2px 4px rgba(0,0,0,.45));" />
           <div class="hand-fallback" style="display:none; background: rgba(0,0,0,0.55); color:#fff; padding:6px 10px; border-radius:10px; font-size:12px;">Przeciągnij, aby obrócić</div>
         </div>
