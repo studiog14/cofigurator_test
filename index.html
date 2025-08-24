@@ -2575,12 +2575,8 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
 
     <!-- CANVAS CONTAINER z WELCOME SCREEN -->
     <div id="canvas-container" style="flex: 1 1 0; position: relative; height: 100%; background: #ededed15;">
-      <div class="userInput show" tabindex="0" role="img" aria-label="A 3D model carousel. Use mouse, touch or arrow keys to move." style="cursor: grab; touch-action: pan-y;">
-        <div class="slot canvas">
-          <slot name="canvas">
-            <canvas id="canvas" class="show"></canvas>
-          </slot>
-        </div>
+      <div class="userInput show" tabindex="0" role="img" aria-label="A 3D model carousel. Use mouse, touch or arrow keys to move;" style="cursor: grab; touch-action: pan-y; width:100%; height:100%;">
+        <canvas id="canvas" class="show"></canvas>
       </div>
         <!-- Hand prompt for 3D viewer (not AR). Shown after chair selection; hidden on first interaction. -->
   <div id="hand-prompt" style="position:absolute; left:50%; bottom:175px; display:none; pointer-events:none; z-index:1800;">
@@ -7315,6 +7311,20 @@ updateSummary();
             s.onerror = () => reject(new Error('model-viewer failed to load'));
             document.head.appendChild(s);
           });
+          // After the element is defined, set decoder locations explicitly (DRACO/meshopt/ktx2)
+          try {
+            const MVClass = (window.customElements && window.customElements.get) ? window.customElements.get('model-viewer') : null;
+            if (MVClass) {
+              // Use jsDelivr CDN for decoders
+              // Note: model-viewer will fetch the decoders lazily when needed
+              try { MVClass.dracoDecoderLocation = 'https://cdn.jsdelivr.net/npm/'; } catch(_) {}
+              try { MVClass.meshoptDecoderLocation = 'https://cdn.jsdelivr.net/npm/meshoptimizer/'; } catch(_) {}
+              try { MVClass.ktx2TranscoderLocation = 'https://cdn.jsdelivr.net/npm/'; } catch(_) {}
+              console.log('✅ model-viewer decoders configured (DRACO, meshopt, KTX2)');
+            }
+          } catch (e) {
+            console.warn('model-viewer decoder configuration skipped:', e);
+          }
         } catch (_) {}
       }
 
@@ -7336,6 +7346,18 @@ updateSummary();
           // Prefer WebXR but keep native fallbacks available (Scene Viewer/Quick Look)
           mv.setAttribute('ar-modes', 'webxr scene-viewer quick-look');
           mv.setAttribute('ar-placement', 'floor');
+          // Enable camera-controls to keep feature parity for preview if ever shown
+          mv.setAttribute('camera-controls', '');
+          // Performance and quality tweaks
+          mv.setAttribute('exposure', '1');
+          mv.setAttribute('shadow-intensity', '0.8');
+          mv.setAttribute('reveal', 'manual');
+          // Optional: environment image (use existing HDR thumb if present)
+          try {
+            const defaultEnv = 'hdr/hamburg_hbf_1k.hdr';
+            // model-viewer v3 supports .hdr as environment-image
+            mv.setAttribute('environment-image', defaultEnv);
+          } catch(_) {}
           // Request DOM overlay and hit-test for WebXR sessions; bind overlay root
           try {
             const xrInit = {
@@ -7345,8 +7367,6 @@ updateSummary();
             };
             mv.setAttribute('xr-session-init', JSON.stringify(xrInit));
           } catch(_) {}
-          mv.setAttribute('reveal', 'manual');
-          mv.setAttribute('shadow-intensity', '0.8');
           mv.setAttribute('style', 'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;');
           // Loader progress hook
           const onProgress = (ev) => {
@@ -7505,6 +7525,10 @@ updateSummary();
   const prevIos = mv.getAttribute('ios-src') || '';
   const iosChanged = !!prevIos; // ensure no Quick Look source
   if (prevIos) mv.removeAttribute('ios-src');
+        // Keep a neutral sky/environment for better lighting in AR preview if needed
+        if (!mv.hasAttribute('environment-image')) {
+          try { mv.setAttribute('environment-image', 'hdr/hamburg_hbf_1k.hdr'); } catch(_) {}
+        }
         // If we changed src or ios-src, wait a moment so AR intent/anchor points to the new model
         if (srcChanged || iosChanged) {
           await __waitForArAnchorRefresh(mv, { timeoutMs: 900 });
