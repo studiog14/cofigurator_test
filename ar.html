@@ -1,221 +1,575 @@
 <!DOCTYPE html>
 <html lang="pl">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>AR — WebXR (GLB)</title>
-    <link rel="icon" href="icons/favicon.png" />
-    <style>
-      html, body { height:100%; margin:0; background:#000; font-family: system-ui, Arial, sans-serif; }
-      canvas { display:block; position:fixed; inset:0; width:100%; height:100%; }
-      #overlay { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:12px; background: rgba(0,0,0,0.7); color:#fff; z-index: 10; }
-      #overlay.hidden { display:none; }
-      #startBtn { background:#F5C842; color:#333; border:0; padding:12px 16px; border-radius: 12px; font-weight:700; }
-      #loading { position:fixed; top:12px; left:50%; transform:translateX(-50%); background: rgba(0,0,0,0.6); color:#fff; padding:8px 12px; border-radius:10px; z-index: 11; display:none; }
-      #reticle { position:fixed; width:48px; height:48px; left:50%; top:50%; transform: translate(-50%, -50%); border:2px solid rgba(255,255,255,0.9); border-radius:50%; box-shadow: 0 0 0 8px rgba(255,255,255,0.08) inset; display:none; z-index: 5; }
-      #ui { position:fixed; left:0; right:0; bottom: env(safe-area-inset-bottom, 0); display:flex; gap:10px; justify-content:center; padding: 12px calc(12px + env(safe-area-inset-right, 0)) calc(12px + env(safe-area-inset-bottom, 0)) calc(12px + env(safe-area-inset-left, 0)); z-index: 11; pointer-events: none; }
-      #ui .btn { pointer-events: auto; background: rgba(0,0,0,0.6); color:#fff; border:1px solid rgba(255,255,255,0.2); padding:10px 14px; border-radius:12px; font-size:14px; }
-      .back { position:fixed; top:12px; left:12px; z-index:11; background: rgba(0,0,0,0.6); color:#fff; border:0; border-radius:10px; padding:8px 12px; }
-      #unsupported { position:fixed; inset:0; display:none; align-items:center; justify-content:center; text-align:center; background:rgba(0,0,0,0.8); color:#fff; padding:20px; z-index:12; }
-      #unsupported.show { display:flex; }
-    </style>
-  </head>
-  <body>
-    <button class="back" id="backBtn">← Wróć</button>
-    <div id="overlay">
-      <img src="icons/AR_icon.png" alt="AR" width="72" height="72" style="opacity:.9"/>
-      <div>Dotknij, aby uruchomić AR (WebXR)</div>
-      <button id="startBtn" type="button">Uruchom AR</button>
-    </div>
-    <div id="loading">Ładowanie modelu… <span id="progress">0%</span></div>
-    <div id="reticle" aria-hidden="true"></div>
-    <div id="ui">
-      <button id="reset" class="btn" type="button">Reset</button>
-      <button id="repose" class="btn" type="button">Na podłodze</button>
-      <button id="config" class="btn" type="button">Konfiguruj</button>
-    </div>
-    <div id="unsupported">
-      <div>
-        <h3>WebXR AR nie jest wspierane</h3>
-        <p>Twoja przeglądarka/urządzenie nie obsługuje trybu AR w przeglądarce (WebXR).</p>
-        <p><button id="goBack" class="btn" type="button" style="background:#F5C842;color:#333;border:0">Wróć</button></p>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>AR — Zobacz w pomieszczeniu</title>
+  <link rel="icon" href="icons/favicon.png" />
+  <style>
+    html, body { height: 100%; margin: 0; background: #000; font-family: system-ui, Arial, sans-serif; }
+    #wrap { position: fixed; inset: 0; display: grid; place-items: center; }
+    #start { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,0.85); z-index: 10; }
+    #start .box { text-align: center; color: #fff; padding: 16px; }
+    #start button { background: #1e88e5; color: #fff; border: 0; border-radius: 12px; padding: 12px 18px; font-size: 16px; }
+    model-viewer { width: 1px; height: 1px; opacity: 0; position: absolute; left: -9999px; }
+    .back { position: fixed; top: 12px; left: 12px; z-index: 11; background: rgba(0,0,0,0.6); color:#fff; border:0; border-radius:10px; padding:8px 12px; }
+  /* Bottom UI like in pseudo AR */
+  #ui { position: fixed; left: 0; right: 0; bottom: env(safe-area-inset-bottom, 0); display: flex; gap: 10px; justify-content: center; padding: 12px calc(12px + env(safe-area-inset-right, 0)) calc(12px + env(safe-area-inset-bottom, 0)) calc(12px + env(safe-area-inset-left, 0)); z-index: 11; }
+  #ui .btn { background: rgba(0,0,0,0.6); color: #fff; border: 1px solid rgba(255,255,255,0.2); padding: 10px 14px; border-radius: 12px; font-size: 14px; }
+  </style>
+  <!-- Stable model-viewer (v3.x) -->
+  <script type="module" src="https://unpkg.com/@google/model-viewer@3.3.0/dist/model-viewer.min.js"></script>
+  <script nomodule src="https://unpkg.com/@google/model-viewer@3.3.0/dist/model-viewer-legacy.js"></script>
+</head>
+<body>
+  <button class="back" onclick="history.length>1?history.back():location.assign('index.html')">← Wróć</button>
+  <div id="wrap">
+    <div id="start">
+      <div class="box">
+        <h2 style="margin:0 0 8px 0;">Zobacz w pomieszczeniu</h2>
+        <p style="margin:0 0 12px 0; opacity:0.9;">Dotknij, aby otworzyć widok AR.</p>
+        <button id="open-ar">Otwórz AR</button>
       </div>
     </div>
 
-    <script type="module">
-      import * as THREE from 'https://unpkg.com/three@0.157.0/build/three.module.js';
-      import { GLTFLoader } from 'https://unpkg.com/three@0.157.0/examples/jsm/loaders/GLTFLoader.js';
-      import { DRACOLoader } from 'https://unpkg.com/three@0.157.0/examples/jsm/loaders/DRACOLoader.js';
+    <!-- Invisible viewer used only to trigger native AR (Scene Viewer / Quick Look) -->
+    <model-viewer id="mv"
+      ar
+      ar-modes="scene-viewer quick-look webxr"
+      ar-placement="floor"
+      ar-scale="fixed"
+      camera-controls
+      poster="icons/AR_icon.png"
+      exposure="1.0"
+    ></model-viewer>
+  </div>
 
-      // URL params
-      const url = new URL(window.location.href);
-      const modelUrl = url.searchParams.get('model') || 'chairs/Tulla-2.glb';
-      const retUrl = url.searchParams.get('ret') || document.referrer || 'index.html';
+  <!-- Bottom controls (as in pseudo AR) -->
+  <div id="ui">
+    <button id="backBtn" type="button" class="btn">Wróć</button>
+    <button id="resetBtn" type="button" class="btn">Reset</button>
+    <button id="floorBtn" type="button" class="btn">Na podłodze</button>
+    <button id="configBtn" type="button" class="btn">Konfiguruj</button>
+  </div>
 
-      // DOM
-      const overlayEl = document.getElementById('overlay');
-      const startBtn = document.getElementById('startBtn');
-      const backBtn = document.getElementById('backBtn');
-      const resetBtn = document.getElementById('reset');
-      const reposeBtn = document.getElementById('repose');
-      const configBtn = document.getElementById('config');
-      const loadingEl = document.getElementById('loading');
-      const progressEl = document.getElementById('progress');
-      const reticleEl = document.getElementById('reticle');
-      const unsupportedEl = document.getElementById('unsupported');
-      const goBackBtn = document.getElementById('goBack');
+  <script>
+    // Minimal platform flags
+    const ua = navigator.userAgent || '';
+    const isAndroid = /Android/i.test(ua);
+    const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
-      function goBack(){
-        try { if (history.length > 1) { history.back(); return; } } catch(e){}
-        window.location.assign(retUrl || 'index.html');
-      }
-      backBtn.addEventListener('click', (e)=>{ e.preventDefault(); goBack(); });
-      goBackBtn.addEventListener('click', (e)=>{ e.preventDefault(); goBack(); });
-      configBtn.addEventListener('click', (e)=>{ e.preventDefault(); goBack(); });
+    // Read ?model= from URL and map to src (GLB) and ios-src (USDZ)
+    const url = new URL(window.location.href);
+    const model = url.searchParams.get('model') || 'chairs/Tulla-2.glb';
+    const base = model.replace(/\.(glb|gltf|usdz)$/i, '');
+    const glb = base + '.glb';
+    // Prefer -2 variant for USDZ if provided model points to -2
+    const usdz = /-2\.(glb|gltf|usdz)$/i.test(model) ? base + '.usdz' : (base + '.usdz');
 
-      // Three.js basics
-      const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.xr.enabled = true;
-      document.body.appendChild(renderer.domElement);
+    const mv = document.getElementById('mv');
+    mv.src = glb;
+    mv.setAttribute('ios-src', usdz);
 
-      const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.01, 100);
-      const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0);
-      scene.add(light);
+    // Bottom UI handlers
+    const backBtn = document.getElementById('backBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const floorBtn = document.getElementById('floorBtn');
+    const configBtn = document.getElementById('configBtn');
 
-      // Load model (GLB)
-      const loader = new GLTFLoader();
-      const draco = new DRACOLoader();
-      draco.setDecoderPath('https://unpkg.com/three@0.157.0/examples/jsm/libs/draco/');
-      loader.setDRACOLoader(draco);
+    function goBack(){
+      const urlParams = new URLSearchParams(location.search);
+      const retUrl = (() => { try { return urlParams.get('ret') || ''; } catch(_) { return ''; } })();
+      if (history.length > 1) { history.back(); return; }
+      if (retUrl) { location.href = retUrl; return; }
+      if (document.referrer) { location.href = document.referrer; return; }
+      location.href = 'index.html';
+    }
 
-      let modelRoot = null;
-      async function loadModel() {
-        loadingEl.style.display = 'block';
-        return new Promise((resolve, reject) => {
-          loader.load(modelUrl, (gltf)=>{
-            modelRoot = gltf.scene || gltf.scenes?.[0];
-            if (!modelRoot) { reject(new Error('Brak sceny w GLB')); return; }
-            // Normalize scale a bit
-            modelRoot.traverse((o)=>{ if (o.isMesh) { o.castShadow = o.receiveShadow = false; } });
-            modelRoot.visible = false; // show after placement
-            scene.add(modelRoot);
-            loadingEl.style.display = 'none';
-            resolve();
-          }, (e)=>{
-            if (e && e.total) {
-              const pct = Math.round(100 * e.loaded / e.total);
-              progressEl.textContent = `${pct}%`;
-            } else {
-              progressEl.textContent = '...';
-            }
-          }, (err)=>{
-            loadingEl.style.display = 'none';
-            reject(err);
-          });
-        });
-      }
+    backBtn?.addEventListener('click', (e)=>{ e.preventDefault(); goBack(); });
+    configBtn?.addEventListener('click', (e)=>{ e.preventDefault(); goBack(); });
+    resetBtn?.addEventListener('click', (e)=>{
+      e.preventDefault();
+      try { document.getElementById('start').style.display = 'grid'; } catch(_){}
+      try { mv.removeAttribute('camera-orbit'); mv.removeAttribute('camera-target'); } catch(_){}
+    });
+    floorBtn?.addEventListener('click', (e)=>{
+      e.preventDefault();
+      try { mv.setAttribute('ar-placement','floor'); } catch(_){}
+    });
 
-      // XR state
-      let xrSession = null;
-      let refSpace = null;
-      let viewerSpace = null;
-      let hitTestSource = null;
-      let placed = false;
-      let lastHitMatrix = new THREE.Matrix4();
+    // AR open button (manual)
+    document.getElementById('open-ar').addEventListener('click', () => {
+      mv.activateAR();
+    });
 
-      function setModelMatrixFromPoseMatrix(mat){
-        if (!modelRoot) return;
-        modelRoot.matrixAutoUpdate = false;
-        modelRoot.matrix.copy(mat);
-        modelRoot.updateMatrixWorld(true);
-      }
+    // Auto-open AR when coming from desktop QR or mobile button
+    const shouldAuto = url.searchParams.get('open_ar') === '1';
+    async function autoOpenAR() {
+      try {
+        if (!shouldAuto) return;
+        // Give model-viewer a moment to attach
+        await new Promise(r => setTimeout(r, 50));
 
-      async function startAR(){
-        if (!navigator.xr || typeof navigator.xr.isSessionSupported !== 'function') {
-          unsupportedEl.classList.add('show');
+        if (isAndroid) {
+          mv.activateAR();
           return;
         }
-        const supported = await navigator.xr.isSessionSupported('immersive-ar');
-        if (!supported) { unsupportedEl.classList.add('show'); return; }
+        if (isIOS) {
+          // Prefer Quick Look direct open via a rel="ar" anchor
+          const absUsdz = new URL(usdz, window.location.href).toString();
+          const a = document.createElement('a');
+          a.setAttribute('rel', 'ar');
+          a.setAttribute('href', absUsdz);
+          document.body.appendChild(a);
+          let engaged = false;
+          const mark = () => { engaged = true; };
+          window.addEventListener('pagehide', mark, { once: true });
+          document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState !== 'visible') engaged = true;
+          }, { once: true });
+          a.click();
+          setTimeout(() => { try { a.remove(); } catch(_){} }, 0);
+          // If not engaged, leave the overlay and allow manual open
+          setTimeout(() => {
+            if (!engaged) {
+              // Fallback: try model-viewer activateAR once
+              try { mv.activateAR(); } catch(_) {}
+            }
+          }, 800);
+          return;
+        }
+      } catch(e) {
+        console.warn('Auto-open AR failed:', e);
+      }
+    }
+    autoOpenAR();
 
-        await loadModel();
+    // Basic AR status logging
+    mv.addEventListener('ar-status', (ev) => {
+      console.log('model-viewer ar-status:', ev.detail.status);
+      // Hide start overlay once AR starts
+      if (ev.detail.status === 'session-started' || ev.detail.status === 'quick-look-browser') {
+        document.getElementById('start').style.display = 'none';
+      }
+    });
+  </script>
+</body>
+</html>
+        
+        // Setup obsugi wyjcia
+        exitBtn.onclick = endAR;
 
-        overlayEl.classList.add('hidden');
-        xrSession = await navigator.xr.requestSession('immersive-ar', {
-          requiredFeatures: ['local-floor'],
-          optionalFeatures: ['hit-test', 'dom-overlay', 'light-estimation'],
-          domOverlay: { root: document.body }
+        // Setup przestrzeni referencyjnych
+        const refSpace = await session.requestReferenceSpace('local-floor');
+        xrState.refSpace = refSpace;
+        
+        const viewerSpace = await session.requestReferenceSpace('viewer');
+        xrState.hitTestSource = await session.requestHitTestSource?.({ 
+          space: viewerSpace 
         });
-        renderer.xr.setReferenceSpaceType('local-floor');
-        await renderer.xr.setSession(xrSession);
 
-        refSpace = await xrSession.requestReferenceSpace('local-floor');
-        viewerSpace = await xrSession.requestReferenceSpace('viewer');
-        if (xrSession.requestHitTestSource) {
-          hitTestSource = await xrSession.requestHitTestSource({ space: viewerSpace });
+  // Add model to scene immediately (preview in front); user will place it
+        if (modelRoot) {
+          xrState.model = modelRoot;
+          scene.add(modelRoot);
+          modelRoot.position.set(0, 0, -1.5); // Place 1.5m in front
+          modelRoot.scale.setScalar(0.5); // Start with reasonable scale
+          console.log('Model added to WebXR scene');
         }
 
-        xrSession.addEventListener('end', ()=>{
-          placed = false; hitTestSource = null; xrSession = null; reticleEl.style.display='none';
-          goBack();
-        });
-        xrSession.addEventListener('select', ()=>{
-          if (lastHitMatrix && modelRoot) {
-            setModelMatrixFromPoseMatrix(lastHitMatrix);
-            modelRoot.visible = true;
-            placed = true;
-            reticleEl.style.display='none';
-          }
-        });
-
-        renderer.setAnimationLoop((t, frame)=>{
-          if (!frame) return;
-          const pose = frame.getViewerPose(refSpace);
-          if (!pose) return;
-
-          // Hit testing until placed
-          if (!placed && hitTestSource) {
-            const hits = frame.getHitTestResults(hitTestSource);
-            if (hits && hits.length) {
-              const hit = hits[0];
-              const hitPose = hit.getPose(refSpace);
-              if (hitPose) {
-                lastHitMatrix.fromArray(hitPose.transform.matrix);
-                reticleEl.style.display = 'block';
-              }
-            } else {
-              reticleEl.style.display = 'none';
+        // Event listenery
+        session.addEventListener('end', () => { endAR(); });
+        session.addEventListener('select', () => { 
+          console.log('Select event - próba umieszczenia modelu');
+          if (xrState.model && xrState.lastHitMatrix) {
+            xrState.model.matrixAutoUpdate = false;
+            xrState.model.matrix.copy(xrState.lastHitMatrix);
+            xrState.model.updateMatrixWorld(true);
+            console.log('Model ustawiony na wykrytej powierzchni');
+          } else {
+            // If no hit, keep it in front
+            if (xrState.model) {
+              xrState.model.matrixAutoUpdate = true;
+              xrState.model.position.set(0, 0, -1.2);
             }
           }
+          xrState.placed = true; 
+          // Reveal AR UI after placement, hide reticle, show exit
+          try {
+            reticle.style.display = 'none';
+            arUI.style.display = 'flex';
+            exitBtn.style.display = 'block';
+          } catch(_) {}
+        });
 
+        // Setup kontrolek UI
+        btnRotate.onclick = () => {
+          if (xrState.model) {
+            xrState.model.rotateY(THREE.MathUtils.degToRad(15));
+            console.log('Obrócono model o 15 stopni');
+          }
+        };
+        
+        btnScaleUp.onclick = () => {
+          if (xrState.model) {
+            xrState.model.scale.multiplyScalar(1.1);
+            console.log('Powiększono model');
+          }
+        };
+        
+        btnScaleDown.onclick = () => {
+          if (xrState.model) {
+            xrState.model.scale.multiplyScalar(0.9);
+            console.log('Pomniejszono model');
+          }
+        };
+
+        // Pętla renderowania z hit-test
+        renderer.setAnimationLoop((timestamp, frame) => {
+          if (!frame) return;
+          
+          const pose = frame.getViewerPose(refSpace);
+          if (!pose) return;
+          
+          // Hit testing - wykrywanie powierzchni (przed umieszczeniem obiektu)
+          if (xrState.hitTestSource && !xrState.placed) {
+            const results = frame.getHitTestResults(xrState.hitTestSource);
+            if (results && results.length > 0) {
+              const hit = results[0];
+              const hitPose = hit.getPose(refSpace);
+              if (hitPose) {
+                // Cache hit pose matrix to place model on select
+                xrState.lastHitMatrix = new THREE.Matrix4().fromArray(hitPose.transform.matrix);
+                // Show reticle since we have a valid plane
+                if (reticle.style.display !== 'block') reticle.style.display = 'block';
+              }
+            } else {
+              // Hide reticle if no plane found
+              if (reticle.style.display !== 'none') reticle.style.display = 'none';
+            }
+          }
+          
           renderer.render(scene, camera);
         });
+        loading.style.display = 'none';
+  console.log('WebXR AR sesja uruchomiona pomyślnie!');
+        
+      } catch(error) {
+  console.error('Błąd uruchamiania AR:', error);
+        loading.style.display = 'none';
+        alert('Nie udało się uruchomić AR: ' + error.message);
       }
+    }
 
-      // UI actions
-      startBtn.addEventListener('click', ()=>{ startAR().catch(err=>{ console.error(err); unsupportedEl.classList.add('show'); }); });
-      resetBtn.addEventListener('click', ()=>{
+    // Zakończ sesję AR
+    async function endAR() {
+      console.log('Kończenie sesji AR...');
+      
+      try {
+        loading.style.display = 'none';
+        exitBtn.style.display = 'none';
+        reticle.style.display = 'none';
+        arUI.style.display = 'none';
+      } catch(e) {}
+      
+      try {
+        renderer.setAnimationLoop(null);
+      } catch(e) {}
+      
+      if (xrState.session) {
         try {
-          if (!modelRoot) return;
-          modelRoot.visible = false;
-          modelRoot.matrixAutoUpdate = true;
-          modelRoot.position.set(0,0,-1.2);
-          modelRoot.rotation.set(0,0,0);
-          modelRoot.scale.set(1,1,1);
-          placed = false;
-        } catch(e){}
-      });
-      reposeBtn.addEventListener('click', ()=>{ placed = false; reticleEl.style.display='block'; });
+          await xrState.session.end();
+        } catch(e) {
+          console.warn('Bd koczenia sesji:', e);
+        }
+      }
+      
+      // Reset stanu
+      xrState = { 
+        session: null, 
+        refSpace: null, 
+        hitTestSource: null, 
+        placed: false, 
+        model: null 
+      };
+      
+      // Nawiguj z powrotem
+      try {
+        if (history.length > 1) {
+          history.back();
+        } else {
+          window.location.assign('index.html');
+        }
+      } catch(e) {
+        window.location.href = 'index.html';
+      }
+    }
 
-      // Resize
-      window.addEventListener('resize', ()=>{
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
+    // Start AR only after user gesture to ensure camera permission prompt (esp. iOS)
+    const startOverlay = document.getElementById('xr-start');
+    const startBtn = document.getElementById('xr-start-btn');
+    function quickLookImmediateGuess() {
+      // Guess a USDZ path synchronously to keep within the user gesture
+      const cur = modelUrl || '';
+      let guess = cur;
+      if (/\.(glb|gltf)$/i.test(cur)) {
+        guess = cur.replace(/\.(glb|gltf)$/i, '.usdz');
+      }
+      // Prefer -2 variant if base likely exists
+      if (!/-2\.usdz$/i.test(guess)) {
+        const base = guess.replace(/\.usdz$/i, '');
+        guess = `${base}-2.usdz`;
+      }
+      // Final fallback that we know exists in repo
+      if (!/\.usdz$/i.test(guess)) guess = 'chairs/Tulla-2.usdz';
+      try {
+        const abs = new URL(guess, window.location.href).toString();
+        window.location.href = abs; // Direct navigation opens Quick Look
+      } catch(_) {
+        window.location.href = 'chairs/Tulla-2.usdz';
+      }
+    }
+
+    startBtn?.addEventListener('click', async () => {
+      try {
+        // iOS: if WebXR is likely unavailable (no navigator.xr or insecure), jump straight to Quick Look
+        const likelyNoXR = !window.isSecureContext || !navigator.xr || typeof navigator.xr.isSessionSupported !== 'function';
+        if (isIOS && likelyNoXR) {
+          quickLookImmediateGuess();
+          return;
+        }
+
+        startOverlay.style.display = 'none';
+        await startAR();
+
+        // Safety fallback for iOS: if session did not start within 2s, try Quick Look
+        if (isIOS && (!xrState.session)) {
+          setTimeout(() => {
+            if (!xrState.session) quickLookImmediateGuess();
+          }, 2000);
+        }
+      } catch(e) {
+        console.error('Start AR failed:', e);
+        // Last resort on iOS
+        if (isIOS) { quickLookImmediateGuess(); return; }
+        startOverlay.style.display = 'flex';
+        alert('Nie udało się uruchomić AR: ' + (e?.message||e));
+      }
+    });
+
+    // ===== Mini konfigurator (MVP: wybór modelu) =====
+    const cfgToggle = document.getElementById('config-toggle');
+    const cfgPanel = document.getElementById('config-panel');
+    const cfgClose = document.getElementById('cfg-close');
+    const cfgSearch = document.getElementById('config-search');
+    const cfgList = document.getElementById('config-list');
+    const diag = document.getElementById('ar-diagnostics');
+
+    function setDiagnostics(text) {
+      if (!diag) return;
+      diag.style.display = 'block';
+      diag.textContent = text;
+    }
+
+    cfgToggle?.addEventListener('click', () => {
+      cfgPanel.style.display = cfgPanel.style.display === 'none' || cfgPanel.style.display === '' ? 'block' : 'none';
+    });
+    cfgClose?.addEventListener('click', () => { cfgPanel.style.display = 'none'; });
+
+    const SHEET_ID = '1ftI8CkA2Itav_h45KOap__JYtup28V1FiBmpP0p_Cjc';
+    const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Baza Danych`;
+    let sheetData = [];
+
+    async function loadSheet() {
+      try {
+        const res = await fetch(SHEET_URL + '&v=' + Date.now(), { cache: 'no-store' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const csv = await res.text();
+        const rows = csv.trim().split('\n');
+        const headers = (rows.shift() || '').match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g).map(h=>h.replace(/"/g,'').trim());
+        sheetData = rows.map(r => {
+          const vals = r.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
+          const o = {}; headers.forEach((h,i)=> o[h] = (vals[i]||'').replace(/"/g,'').trim()); return o;
+        }).filter(it => (it.Visible||'').toLowerCase() !== 'false');
+        renderList('');
+      } catch(e) {
+        console.warn('Nie udało się wczytać arkusza do AR UI:', e);
+      }
+    }
+
+    function renderList(filter) {
+      if (!cfgList) return;
+      cfgList.innerHTML = '';
+      const q = (filter||'').toLowerCase();
+      const models = sheetData.filter(it => (it.Typ||'').toLowerCase()==='model' && (!q || (it.Nazwa||'').toLowerCase().includes(q)));
+      models.slice(0,100).forEach(m => {
+        const div = document.createElement('div');
+        div.className = 'cfg-item';
+        const img = document.createElement('img'); img.src = m.Obrazek || 'icons/AR_icon.png'; img.alt = m.Nazwa||''; div.appendChild(img);
+        const name = document.createElement('div'); name.className='name'; name.textContent = m.Nazwa || ''; div.appendChild(name);
+        div.onclick = () => chooseModel(m.Nazwa);
+        cfgList.appendChild(div);
       });
-    </script>
-  </body>
+    }
+
+    cfgSearch?.addEventListener('input', e => renderList(e.target.value));
+    loadSheet();
+
+    async function headOk(p) {
+      try {
+        const abs = new URL(p, window.location.href).toString();
+        const r= await fetch(abs,{method:'HEAD'});
+        return r.ok;
+      } catch { return false; }
+    }
+
+    async function resolveUsdzCandidate(fromUrl) {
+      // Szukaj USDZ odpowiadającego bazie nazwy
+      try {
+        const base = fromUrl.replace(/\.(glb|gltf|usdz)$/i,'');
+        const name = base.split('/').pop() || '';
+        
+        // Try multiple naming patterns for USDZ
+        const tries = [ 
+          `${base}.usdz`, 
+          `${base}-2.usdz`, 
+          `chairs/${name}.usdz`,
+          `chairs/${name}-2.usdz`,
+          `chairs/Tulla-2.usdz` // Known working fallback
+        ];
+        
+        console.log('Searching for USDZ candidates:', tries);
+        
+        for (const t of tries) { 
+          console.log('Checking:', t);
+          if (await headOk(t)) {
+            console.log('Found USDZ:', t);
+            return t; 
+          }
+        }
+        
+        console.warn('No USDZ found for:', fromUrl);
+      } catch(e) {
+        console.error('Error resolving USDZ:', e);
+      }
+      return null;
+    }
+
+    async function resolvePosterForModel() {
+      // Spróbuj obrazka z arkusza dla aktualnego modelu, jeśli jest dostępny; w przeciwnym razie użyj ikony AR
+      const cur = (new URL(window.location.href)).searchParams.get('model') || '';
+      const name = (cur.split('/').pop() || '').replace(/\.(glb|gltf|usdz)$/i,'');
+      const hit = sheetData.find(it => (it.Typ||'').toLowerCase()==='model' && (it.Nazwa||'').toLowerCase()===name.toLowerCase());
+      return hit?.Obrazek || 'icons/AR_icon.png';
+    }
+
+    async function openQuickLook(usdzUrl, posterUrl) {
+      try {
+        const link = document.getElementById('ql-link');
+        const img = document.getElementById('ql-poster');
+        const abs = new URL(usdzUrl, window.location.href).toString();
+        
+        // Quick Look options to improve experience
+        const opts = `#allowsContentScaling=1&canonicalWebPageURL=${encodeURIComponent(window.location.href)}&checkoutTitle=${encodeURIComponent('AR Model')}&checkoutSubtitle=${encodeURIComponent('Zobacz w rzeczywistości')}`;
+        
+        link.setAttribute('href', abs + opts);
+        if (img && posterUrl) {
+          img.src = posterUrl;
+          img.style.display = 'none'; // Hide poster to avoid white background
+        }
+
+        console.log('Opening Quick Look with URL:', abs + opts);
+        
+        // Immediate click to bypass white poster screen
+        link.click();
+        
+        // Show our custom UI while Quick Look is loading
+        setDiagnostics('Uruchamianie Quick Look AR...');
+        
+        // Monitor visibility changes to track AR state
+        const handleVisibilityChange = () => {
+          if (document.hidden) {
+            setDiagnostics('Quick Look AR aktywny');
+          } else {
+            setDiagnostics('Powrót z Quick Look AR');
+            // Show our configurator UI when returning
+            if (cfgPanel) cfgPanel.style.display = 'none';
+          }
+        };
+        
+        document.addEventListener('visibilitychange', handleVisibilityChange, { once: false });
+        
+        // Cleanup after 10 seconds
+        setTimeout(() => {
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+        }, 10000);
+        
+      } catch(e) {
+        console.error('Failed to open Quick Look:', e);
+        // Fallback to direct URL navigation
+        try {
+          window.location.href = new URL(usdzUrl, window.location.href).toString();
+        } catch(e2) {
+          console.error('Direct navigation also failed:', e2);
+        }
+      }
+    }
+
+    async function chooseModel(name) {
+      // Zbuduj listę kandydatów jak w index.html, zależnie od platformy
+      const norm = (s)=> s.normalize?.('NFD').replace(/\p{Diacritic}/gu,'').replace(/[^\w\s-]/g,'').trim();
+      const bases = Array.from(new Set([
+        name,
+        norm(name),
+        norm(name).replace(/\s+/g,' '),
+        norm(name).replace(/\s+/g,''),
+        norm(name).replace(/\s+/g,'-'),
+        norm(name).replace(/\s+/g,'_')
+      ].filter(Boolean)));
+      const dirs=['chairs','models'];
+      const glbs=[]; const usdz=[];
+      for (const d of dirs) { for (const b of bases) { glbs.push(`${d}/${b}.glb`, `${d}/${b}-2.glb`); usdz.push(`${d}/${b}.usdz`, `${d}/${b}-2.usdz`); } }
+      if (isIOS) {
+        // iOS: prefer USDZ for WebXR, fallback to GLB
+        for (const u of usdz) { 
+          if (await headOk(u)) { 
+            const next = new URL(window.location.href); 
+            next.searchParams.set('model', u); 
+            window.location.href = next.toString(); 
+            return; 
+          } 
+        }
+        for (const g of glbs) { 
+          if (await headOk(g)) { 
+            const next = new URL(window.location.href); 
+            next.searchParams.set('model', g); 
+            window.location.href = next.toString(); 
+            return; 
+          } 
+        }
+        alert('Nie znaleziono plików dla: ' + name);
+        return;
+      } else {
+        // Android: prefer GLB for WebXR, fallback to USDZ
+        for (const g of glbs) { 
+          if (await headOk(g)) { 
+            const next = new URL(window.location.href); 
+            next.searchParams.set('model', g); 
+            window.location.href = next.toString(); 
+            return; 
+          } 
+        }
+        for (const u of usdz) { 
+          if (await headOk(u)) { 
+            const next = new URL(window.location.href); 
+            next.searchParams.set('model', u); 
+            window.location.href = next.toString(); 
+            return; 
+          } 
+        }
+        alert('Nie znaleziono plików dla: ' + name);
+      }
+    }
+  </script>
+</body>
 </html>

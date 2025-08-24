@@ -2386,26 +2386,7 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
   100% { transform: rotate(0deg); }
 }
 
-  /* === Hand prompt wrapper styles per provided snippet === */
-  .userInput { width: 100%; height: 100%; display: none; position: relative; outline-offset: -1px; outline-width: 1px; }
-  .userInput.show { display: block; }
-  .slot.canvas { width: 100%; height: 100%; }
-  #canvas.show { display: block; width: 100%; height: 100%; }
 
-
-  </style>
-  <!-- Hand prompt animations/styles (model-viewer style) -->
-  <style>
-    @keyframes circle {
-      from { transform: translateX(-50%) rotate(0deg) translateX(36px) rotate(0deg); }
-      to   { transform: translateX(-50%) rotate(360deg) translateX(36px) rotate(-360deg); }
-    }
-    @keyframes elongate {
-      from { transform: translateX(100px); }
-      to   { transform: translateX(-100px); }
-    }
-    #hand-prompt { animation: elongate 2s infinite ease-in-out alternate; }
-    #hand-prompt img { position: relative; left: 50%; animation: circle 4s linear infinite; }
   </style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
@@ -2575,14 +2556,7 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
 
     <!-- CANVAS CONTAINER z WELCOME SCREEN -->
     <div id="canvas-container" style="flex: 1 1 0; position: relative; height: 100%; background: #ededed15;">
-      <div class="userInput show" tabindex="0" role="img" aria-label="A 3D model carousel. Use mouse, touch or arrow keys to move;" style="cursor: grab; touch-action: pan-y; width:100%; height:100%;">
-        <canvas id="canvas" class="show"></canvas>
-      </div>
-        <!-- Hand prompt for 3D viewer (not AR). Shown after chair selection; hidden on first interaction. -->
-  <div id="hand-prompt" style="position:absolute; left:50%; bottom:175px; display:none; pointer-events:none; z-index:1800;">
-          <img src="icons/hand.svg" alt="gesture" onerror="this.style.display='none'; const f=this.nextElementSibling; if(f) f.style.display='block';" style="width:36px;height:36px; filter: drop-shadow(0 2px 4px rgba(0,0,0,.45));" />
-          <div class="hand-fallback" style="display:none; background: rgba(0,0,0,0.55); color:#fff; padding:6px 10px; border-radius:10px; font-size:12px;">Przeciągnij, aby obrócić</div>
-        </div>
+      <canvas id="canvas"></canvas>
       
       <!-- 🎯 WELCOME SCREEN - tylko nad canvas -->
       <div id="welcome-screen">
@@ -3327,8 +3301,8 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
                 if (typeof showQrWithUrl === 'function') showQrWithUrl(qrUrl);
                 return;
               }
-  // Mobile – always go to WebXR ar.html with GLB (no Quick Look)
-  console.log('📱 Mobile flow - checking for GLB...');
+  // Mobile – navigate to native AR page with current GLB; fallback to default if no GLB
+      console.log('📱 Mobile flow - checking for GLB...');
       let glb = null;
       try {
         const assets = (typeof getCurrentArAssets === 'function') ? getCurrentArAssets() : null;
@@ -3358,9 +3332,7 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
   const ret = new URL(window.location.href);
   // Keep only essential params to avoid re-triggering AR
   ret.searchParams.delete('open_ar');
-
-  // Always route to ar.html WebXR
-
+  const chairName = encodeURIComponent((window.selectedChair && window.selectedChair.Nazwa) || '');
   const dest = base + 'ar.html?model=' + encodeURIComponent(abs) + '&ret=' + encodeURIComponent(ret.toString()) + '&open_ar=1&v=' + Date.now();
         console.log('🎯 Opening AR (native):', dest);
         window.location.assign(dest);
@@ -3453,7 +3425,7 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
                     base = origin + dir;
                   }
                   const ret = new URL(window.location.href); ret.searchParams.delete('open_ar');
-                  // Always route to ar.html WebXR
+                  const chairName = encodeURIComponent((window.selectedChair && window.selectedChair.Nazwa) || '');
                   const dest = base + 'ar.html?model=' + encodeURIComponent(abs) + '&ret=' + encodeURIComponent(ret.toString()) + '&open_ar=1&v=' + Date.now();
                   console.log('🎯 [capture] Opening AR (native):', dest);
                   window.location.assign(dest);
@@ -3883,90 +3855,6 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
       // Eksport viewer dla PWA
       window.viewer = viewer;
       console.log('🎯 Viewer initialized and exported to window');
-
-      // Hand prompt controller (3D only): show once after model selection, hide on first interaction
-      (function(){
-        const hand = document.getElementById('hand-prompt');
-        if (!hand) return;
-        let shown = false;
-        let dismissed = false;
-
-        function hidePrompt(){
-          if (!hand) return;
-          hand.style.display = 'none';
-          dismissed = true;
-          try { if (viewer && viewer.controls) viewer.controls.autoRotate = false; } catch(_){}
-          // Remove listeners after first interaction
-          ['pointerdown','touchstart','wheel','keydown'].forEach(ev=>{
-            window.removeEventListener(ev, hidePrompt, true);
-          });
-          try { viewer?.controls?.removeEventListener && viewer.controls.removeEventListener('start', hidePrompt); } catch(_){}
-        }
-
-        function showPrompt(){
-          if (!hand || shown || dismissed) return;
-          hand.style.display = 'block';
-          shown = true;
-          // Hide on first interaction anywhere or when controls start
-          ['pointerdown','touchstart','wheel','keydown'].forEach(ev=>{
-            window.addEventListener(ev, hidePrompt, { once:true, capture:true });
-          });
-          try { viewer?.controls?.addEventListener && viewer.controls.addEventListener('start', hidePrompt, { once:true }); } catch(_){}
-        }
-
-        // Expose for manual triggering if needed
-        window.showHandPrompt = showPrompt;
-        window.hideHandPrompt = hidePrompt;
-
-        // Watch for chair selection flag toggled elsewhere
-        const mo = new MutationObserver(() => {
-          if (document.body.classList.contains('has-chair') && !dismissed) {
-            showPrompt();
-          }
-        });
-        mo.observe(document.body, { attributes:true, attributeFilter:['class'] });
-
-        // In case the class is already present on load
-        if (document.body.classList.contains('has-chair')) showPrompt();
-      })();
-
-      // Hand prompt utilities: shown only after model selection
-      try {
-        const hand = document.getElementById('hand-prompt');
-        const state = { interacted: false, raf: 0 };
-        function stopIdle(){ if (state.raf) { cancelAnimationFrame(state.raf); state.raf = 0; } }
-        function startIdle(){
-          let t0 = performance.now();
-          const loop = ()=>{
-            if (state.interacted || !viewer || !viewer.scene?.mainCamera) { stopIdle(); return; }
-            const cam = viewer.scene.mainCamera;
-            const a = 0.05; // radians
-            const w = 0.0015; // speed
-            const dt = performance.now() - t0;
-            cam.rotation.y = Math.sin(dt * w) * a;
-            viewer.render?.();
-            state.raf = requestAnimationFrame(loop);
-          };
-          state.raf = requestAnimationFrame(loop);
-        }
-        function hidePrompt(){
-          if (hand) hand.style.display='none';
-          state.interacted = true; stopIdle();
-          try { if (viewer?.controls) { viewer.controls.autoRotate = false; } } catch(_){}
-        }
-        function showPrompt(){
-          state.interacted = false;
-          if (hand) hand.style.display = 'flex';
-          // Remove any previous listeners by using once:true
-          ['pointerdown','touchstart','wheel','keydown'].forEach(ev=>{
-            window.addEventListener(ev, hidePrompt, { once:true, capture:true });
-          });
-          if (viewer?.controls) viewer.controls.addEventListener('start', hidePrompt, { once:true });
-          setTimeout(()=>{ if (!state.interacted) startIdle(); }, 400);
-        }
-        window.showHandPrompt = showPrompt;
-        window.hideHandPrompt = hidePrompt;
-      } catch(_) {}
       
       if (viewer.controls) {
         viewer.controls.minDistance = MIN_ZOOM_DISTANCE;
@@ -4437,16 +4325,12 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
   try { window.selectedChair = variant; } catch(_) {}
 
       
-  // Wyśrodkuj kamerę na modelu
+      // Wyśrodkuj kamerę na modelu
       const box = new Box3().setFromObject(currentModelContainer);
       const center = box.getCenter(new Vector3());
       setCameraView(center);
       currentModelContainer.position.sub(center);
-  if (viewer?.render) viewer.render();
-  // Start hint and gentle auto-rotate until first interaction
-  try { if (viewer?.controls) { viewer.controls.autoRotate = true; viewer.controls.autoRotateSpeed = 0.5; } } catch(_){}
-  try { if (typeof window.showHandPrompt === 'function') window.showHandPrompt(); } catch(_) {}
-  updateSummary();
+      updateSummary();
       renderPartButtons();
     }
 
@@ -4456,7 +4340,6 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
   if (welcomeScreen) {
     welcomeScreen.style.display = 'none';
   }
-  try { if (typeof window.hideHandPrompt === 'function') window.hideHandPrompt(); } catch(_) {}
   
   if (currentModelContainer) {
     viewer.scene.remove(currentModelContainer);
@@ -4517,11 +4400,8 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
       const center = box.getCenter(new Vector3());
       setCameraView(center);
       currentModelContainer.position.sub(center);
-      if (viewer && viewer.render) viewer.render();
-  } catch(e) { console.warn('Nie udało się ustawić kamery po załadowaniu modelu', e); }
-    // Start hint and gentle auto-rotate until first interaction
-    try { if (viewer?.controls) { viewer.controls.autoRotate = true; viewer.controls.autoRotateSpeed = 0.5; } } catch(_){ }
-    try { if (typeof window.showHandPrompt === 'function') window.showHandPrompt(); } catch(_) {}
+  if (viewer && viewer.render) viewer.render();
+    } catch(e) { console.warn('Nie udało się ustawić kamery po załadowaniu modelu', e); }
 
     // Jeśli kubełek, to ewentualnie załaduj domyślne nogi
     if (selectedChair.Grupa && selectedChair.Grupa.toLowerCase() === 'kubełek') {
@@ -7311,20 +7191,6 @@ updateSummary();
             s.onerror = () => reject(new Error('model-viewer failed to load'));
             document.head.appendChild(s);
           });
-          // After the element is defined, set decoder locations explicitly (DRACO/meshopt/ktx2)
-          try {
-            const MVClass = (window.customElements && window.customElements.get) ? window.customElements.get('model-viewer') : null;
-            if (MVClass) {
-              // Use jsDelivr CDN for decoders
-              // Note: model-viewer will fetch the decoders lazily when needed
-              try { MVClass.dracoDecoderLocation = 'https://cdn.jsdelivr.net/npm/'; } catch(_) {}
-              try { MVClass.meshoptDecoderLocation = 'https://cdn.jsdelivr.net/npm/meshoptimizer/'; } catch(_) {}
-              try { MVClass.ktx2TranscoderLocation = 'https://cdn.jsdelivr.net/npm/'; } catch(_) {}
-              console.log('✅ model-viewer decoders configured (DRACO, meshopt, KTX2)');
-            }
-          } catch (e) {
-            console.warn('model-viewer decoder configuration skipped:', e);
-          }
         } catch (_) {}
       }
 
@@ -7346,18 +7212,6 @@ updateSummary();
           // Prefer WebXR but keep native fallbacks available (Scene Viewer/Quick Look)
           mv.setAttribute('ar-modes', 'webxr scene-viewer quick-look');
           mv.setAttribute('ar-placement', 'floor');
-          // Enable camera-controls to keep feature parity for preview if ever shown
-          mv.setAttribute('camera-controls', '');
-          // Performance and quality tweaks
-          mv.setAttribute('exposure', '1');
-          mv.setAttribute('shadow-intensity', '0.8');
-          mv.setAttribute('reveal', 'manual');
-          // Optional: environment image (use existing HDR thumb if present)
-          try {
-            const defaultEnv = 'hdr/hamburg_hbf_1k.hdr';
-            // model-viewer v3 supports .hdr as environment-image
-            mv.setAttribute('environment-image', defaultEnv);
-          } catch(_) {}
           // Request DOM overlay and hit-test for WebXR sessions; bind overlay root
           try {
             const xrInit = {
@@ -7367,6 +7221,8 @@ updateSummary();
             };
             mv.setAttribute('xr-session-init', JSON.stringify(xrInit));
           } catch(_) {}
+          mv.setAttribute('reveal', 'manual');
+          mv.setAttribute('shadow-intensity', '0.8');
           mv.setAttribute('style', 'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;');
           // Loader progress hook
           const onProgress = (ev) => {
@@ -7525,10 +7381,6 @@ updateSummary();
   const prevIos = mv.getAttribute('ios-src') || '';
   const iosChanged = !!prevIos; // ensure no Quick Look source
   if (prevIos) mv.removeAttribute('ios-src');
-        // Keep a neutral sky/environment for better lighting in AR preview if needed
-        if (!mv.hasAttribute('environment-image')) {
-          try { mv.setAttribute('environment-image', 'hdr/hamburg_hbf_1k.hdr'); } catch(_) {}
-        }
         // If we changed src or ios-src, wait a moment so AR intent/anchor points to the new model
         if (srcChanged || iosChanged) {
           await __waitForArAnchorRefresh(mv, { timeoutMs: 900 });
