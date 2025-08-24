@@ -52,12 +52,39 @@
     const model = url.searchParams.get('model') || 'chairs/Tulla-2.glb';
     const base = model.replace(/\.(glb|gltf|usdz)$/i, '');
     const glb = base + '.glb';
-    // Prefer -2 variant for USDZ if provided model points to -2
-    const usdz = /-2\.(glb|gltf|usdz)$/i.test(model) ? base + '.usdz' : (base + '.usdz');
+
+    async function headOk(p) {
+      try {
+        const abs = new URL(p, window.location.href).toString();
+        const r = await fetch(abs, { method: 'HEAD' });
+        return r.ok;
+      } catch { return false; }
+    }
+
+    async function resolveUsdzCandidate(fromUrl) {
+      try {
+        const b = fromUrl.replace(/\.(glb|gltf|usdz)$/i,'');
+        const name = b.split('/').pop() || '';
+        const tries = [
+          `${b}.usdz`,
+          `${b}-2.usdz`,
+          `chairs/${name}.usdz`,
+          `chairs/${name}-2.usdz`,
+          `chairs/Tulla-2.usdz`
+        ];
+        for (const t of tries) { if (await headOk(t)) return t; }
+      } catch {}
+      return null;
+    }
 
     const mv = document.getElementById('mv');
     mv.src = glb;
-    mv.setAttribute('ios-src', usdz);
+    let usdzFound = null;
+    (async () => {
+      usdzFound = await resolveUsdzCandidate(model);
+      if (usdzFound) mv.setAttribute('ios-src', usdzFound);
+      else mv.removeAttribute('ios-src');
+    })();
 
     // Bottom UI handlers
     const backBtn = document.getElementById('backBtn');
@@ -87,7 +114,7 @@
     });
 
   // Auto-open AR immediately on load (no confirmation overlay)
-  const shouldAuto = true; // always try to auto-open
+  const shouldAuto = true; // try to auto-open
   async function autoOpenAR() {
       try {
         if (!shouldAuto) return;
@@ -99,8 +126,10 @@
           return;
         }
         if (isIOS) {
+          // Only attempt Quick Look if a valid USDZ exists to avoid 404
+          if (!usdzFound) return;
           // Prefer Quick Look direct open via a rel="ar" anchor
-          const absUsdz = new URL(usdz, window.location.href).toString();
+          const absUsdz = new URL(usdzFound, window.location.href).toString();
           const a = document.createElement('a');
           a.setAttribute('rel', 'ar');
           a.setAttribute('href', absUsdz);
