@@ -2388,6 +2388,19 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
 
 
   </style>
+  <!-- Hand prompt animations/styles (model-viewer style) -->
+  <style>
+    @keyframes circle {
+      from { transform: translateX(-50%) rotate(0deg) translateX(50px) rotate(0deg); }
+      to   { transform: translateX(-50%) rotate(360deg) translateX(50px) rotate(-360deg); }
+    }
+    @keyframes elongate {
+      from { transform: translateX(100px); }
+      to   { transform: translateX(-100px); }
+    }
+    #hand-prompt { animation: elongate 2s infinite ease-in-out alternate; }
+    #hand-prompt img { position: relative; left: 50%; transform: translateX(-50%); animation: circle 4s linear infinite; }
+  </style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 
@@ -2557,12 +2570,10 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
     <!-- CANVAS CONTAINER z WELCOME SCREEN -->
     <div id="canvas-container" style="flex: 1 1 0; position: relative; height: 100%; background: #ededed15;">
       <canvas id="canvas"></canvas>
-        <!-- Hand prompt for 3D viewer (not AR). Hidden after first interaction) -->
-    <div id="hand-prompt" style="position:absolute; inset:auto 0 20% 0; display:none; justify-content:center; pointer-events:none;">
-          <div style="display:flex; align-items:center; gap:8px; background: rgba(0,0,0,0.55); color:#fff; padding:10px 12px; border-radius: 12px; font-size:14px; backdrop-filter: blur(6px);">
-            <img src="icons/hand_gesture.png" onerror="this.style.display='none'" alt="" style="width:20px;height:20px;opacity:.9;"/>
-            Przeciągnij, aby obrócić • Szczypnij, aby przybliżyć
-          </div>
+        <!-- Hand prompt for 3D viewer (not AR). Shown after chair selection; hidden on first interaction. -->
+        <div id="hand-prompt" style="position:absolute; left:50%; bottom:20%; transform: translateX(-50%); display:none; pointer-events:none;">
+          <img src="icons/hand.svg" alt="gesture" onerror="this.style.display='none'; const f=this.nextElementSibling; if(f) f.style.display='block';" style="width:36px;height:36px; filter: drop-shadow(0 2px 4px rgba(0,0,0,.45));" />
+          <div class="hand-fallback" style="display:none; background: rgba(0,0,0,0.55); color:#fff; padding:6px 10px; border-radius:10px; font-size:12px;">Przeciągnij, aby obrócić</div>
         </div>
       
       <!-- 🎯 WELCOME SCREEN - tylko nad canvas -->
@@ -3865,6 +3876,52 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
       window.viewer = viewer;
       console.log('🎯 Viewer initialized and exported to window');
 
+      // Hand prompt controller (3D only): show once after model selection, hide on first interaction
+      (function(){
+        const hand = document.getElementById('hand-prompt');
+        if (!hand) return;
+        let shown = false;
+        let dismissed = false;
+
+        function hidePrompt(){
+          if (!hand) return;
+          hand.style.display = 'none';
+          dismissed = true;
+          try { if (viewer && viewer.controls) viewer.controls.autoRotate = false; } catch(_){}
+          // Remove listeners after first interaction
+          ['pointerdown','touchstart','wheel','keydown'].forEach(ev=>{
+            window.removeEventListener(ev, hidePrompt, true);
+          });
+          try { viewer?.controls?.removeEventListener && viewer.controls.removeEventListener('start', hidePrompt); } catch(_){}
+        }
+
+        function showPrompt(){
+          if (!hand || shown || dismissed) return;
+          hand.style.display = 'block';
+          shown = true;
+          // Hide on first interaction anywhere or when controls start
+          ['pointerdown','touchstart','wheel','keydown'].forEach(ev=>{
+            window.addEventListener(ev, hidePrompt, { once:true, capture:true });
+          });
+          try { viewer?.controls?.addEventListener && viewer.controls.addEventListener('start', hidePrompt, { once:true }); } catch(_){}
+        }
+
+        // Expose for manual triggering if needed
+        window.showHandPrompt = showPrompt;
+        window.hideHandPrompt = hidePrompt;
+
+        // Watch for chair selection flag toggled elsewhere
+        const mo = new MutationObserver(() => {
+          if (document.body.classList.contains('has-chair') && !dismissed) {
+            showPrompt();
+          }
+        });
+        mo.observe(document.body, { attributes:true, attributeFilter:['class'] });
+
+        // In case the class is already present on load
+        if (document.body.classList.contains('has-chair')) showPrompt();
+      })();
+
       // Hand prompt utilities: shown only after model selection
       try {
         const hand = document.getElementById('hand-prompt');
@@ -3884,7 +3941,11 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
           };
           state.raf = requestAnimationFrame(loop);
         }
-        function hidePrompt(){ if (hand) hand.style.display='none'; state.interacted = true; stopIdle(); }
+        function hidePrompt(){
+          if (hand) hand.style.display='none';
+          state.interacted = true; stopIdle();
+          try { if (viewer?.controls) { viewer.controls.autoRotate = false; } } catch(_){}
+        }
         function showPrompt(){
           state.interacted = false;
           if (hand) hand.style.display = 'flex';
@@ -4368,13 +4429,16 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
   try { window.selectedChair = variant; } catch(_) {}
 
       
-      // Wyśrodkuj kamerę na modelu
+  // Wyśrodkuj kamerę na modelu
       const box = new Box3().setFromObject(currentModelContainer);
       const center = box.getCenter(new Vector3());
       setCameraView(center);
       currentModelContainer.position.sub(center);
-  updateSummary();
+  if (viewer?.render) viewer.render();
+  // Start hint and gentle auto-rotate until first interaction
+  try { if (viewer?.controls) { viewer.controls.autoRotate = true; viewer.controls.autoRotateSpeed = 0.5; } } catch(_){}
   try { if (typeof window.showHandPrompt === 'function') window.showHandPrompt(); } catch(_) {}
+  updateSummary();
       renderPartButtons();
     }
 
@@ -4445,9 +4509,11 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
       const center = box.getCenter(new Vector3());
       setCameraView(center);
       currentModelContainer.position.sub(center);
-  if (viewer && viewer.render) viewer.render();
+      if (viewer && viewer.render) viewer.render();
   } catch(e) { console.warn('Nie udało się ustawić kamery po załadowaniu modelu', e); }
-  try { if (typeof window.showHandPrompt === 'function') window.showHandPrompt(); } catch(_) {}
+    // Start hint and gentle auto-rotate until first interaction
+    try { if (viewer?.controls) { viewer.controls.autoRotate = true; viewer.controls.autoRotateSpeed = 0.5; } } catch(_){ }
+    try { if (typeof window.showHandPrompt === 'function') window.showHandPrompt(); } catch(_) {}
 
     // Jeśli kubełek, to ewentualnie załaduj domyślne nogi
     if (selectedChair.Grupa && selectedChair.Grupa.toLowerCase() === 'kubełek') {
