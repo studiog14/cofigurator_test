@@ -3301,7 +3301,7 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
                 if (typeof showQrWithUrl === 'function') showQrWithUrl(qrUrl);
                 return;
               }
-  // Mobile – navigate to native AR page with current GLB; fallback to default if no GLB
+      // Mobile – iOS: open Quick Look directly (keeps user gesture). Android: go to ar.html to activate Scene Viewer.
       console.log('📱 Mobile flow - checking for GLB...');
       let glb = null;
       try {
@@ -3332,7 +3332,29 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
   const ret = new URL(window.location.href);
   // Keep only essential params to avoid re-triggering AR
   ret.searchParams.delete('open_ar');
-  const chairName = encodeURIComponent((window.selectedChair && window.selectedChair.Nazwa) || '');
+
+  const isIOS = /iPad|iPhone|iPod/i.test(ua) || isTouchMac;
+  if (isIOS) {
+    // Try to resolve a valid USDZ and navigate to it directly (Quick Look) within this user gesture
+    async function headOk(p){ try { const r= await fetch(new URL(p, base).toString(), {method:'HEAD'}); return r.ok; } catch { return false; } }
+    async function resolveUsdz(fromUrl){
+      const b = fromUrl.replace(/\.(glb|gltf|usdz)$/i,'');
+      const name = b.split('/').pop() || '';
+      const tries = [ `${b}.usdz`, `${b}-2.usdz`, `chairs/${name}.usdz`, `chairs/${name}-2.usdz`, `chairs/Tulla-2.usdz` ];
+      for (const t of tries) { if (await headOk(t)) return t; }
+      return null;
+    }
+    const usdz = await resolveUsdz(glb);
+    if (usdz) {
+      const opts = `#allowsContentScaling=1&canonicalWebPageURL=${encodeURIComponent(window.location.href)}`;
+      const target = new URL(usdz, base).toString() + opts;
+      console.log('🎯 Opening Quick Look (direct):', target);
+      window.location.assign(target);
+      return;
+    }
+    // Fallback to ar.html if no USDZ available
+  }
+
   const dest = base + 'ar.html?model=' + encodeURIComponent(abs) + '&ret=' + encodeURIComponent(ret.toString()) + '&open_ar=1&v=' + Date.now();
         console.log('🎯 Opening AR (native):', dest);
         window.location.assign(dest);
@@ -3425,7 +3447,25 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
                     base = origin + dir;
                   }
                   const ret = new URL(window.location.href); ret.searchParams.delete('open_ar');
-                  const chairName = encodeURIComponent((window.selectedChair && window.selectedChair.Nazwa) || '');
+                  const isIOS = /iPad|iPhone|iPod/i.test(ua) || isTouchMac;
+                  if (isIOS) {
+                    async function headOk(p){ try { const r= await fetch(new URL(p, base).toString(), {method:'HEAD'}); return r.ok; } catch { return false; } }
+                    async function resolveUsdz(fromUrl){
+                      const b = fromUrl.replace(/\.(glb|gltf|usdz)$/i,'');
+                      const name = b.split('/').pop() || '';
+                      const tries = [ `${b}.usdz`, `${b}-2.usdz`, `chairs/${name}.usdz`, `chairs/${name}-2.usdz`, `chairs/Tulla-2.usdz` ];
+                      for (const t of tries) { if (await headOk(t)) return t; }
+                      return null;
+                    }
+                    const usdz = await resolveUsdz(glb);
+                    if (usdz) {
+                      const opts = `#allowsContentScaling=1&canonicalWebPageURL=${encodeURIComponent(window.location.href)}`;
+                      const target = new URL(usdz, base).toString() + opts;
+                      console.log('🎯 [capture] Opening Quick Look (direct):', target);
+                      window.location.assign(target);
+                      return;
+                    }
+                  }
                   const dest = base + 'ar.html?model=' + encodeURIComponent(abs) + '&ret=' + encodeURIComponent(ret.toString()) + '&open_ar=1&v=' + Date.now();
                   console.log('🎯 [capture] Opening AR (native):', dest);
                   window.location.assign(dest);
