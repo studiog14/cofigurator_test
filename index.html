@@ -2557,6 +2557,13 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
     <!-- CANVAS CONTAINER z WELCOME SCREEN -->
     <div id="canvas-container" style="flex: 1 1 0; position: relative; height: 100%; background: #ededed15;">
       <canvas id="canvas"></canvas>
+        <!-- Hand prompt for 3D viewer (not AR). Hidden after first interaction) -->
+    <div id="hand-prompt" style="position:absolute; inset:auto 0 20% 0; display:none; justify-content:center; pointer-events:none;">
+          <div style="display:flex; align-items:center; gap:8px; background: rgba(0,0,0,0.55); color:#fff; padding:10px 12px; border-radius: 12px; font-size:14px; backdrop-filter: blur(6px);">
+            <img src="icons/hand_gesture.png" onerror="this.style.display='none'" alt="" style="width:20px;height:20px;opacity:.9;"/>
+            Przeciągnij, aby obrócić • Szczypnij, aby przybliżyć
+          </div>
+        </div>
       
       <!-- 🎯 WELCOME SCREEN - tylko nad canvas -->
       <div id="welcome-screen">
@@ -3301,8 +3308,8 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
                 if (typeof showQrWithUrl === 'function') showQrWithUrl(qrUrl);
                 return;
               }
-      // Mobile – iOS: open Quick Look directly (keeps user gesture). Android: go to ar.html to activate Scene Viewer.
-      console.log('📱 Mobile flow - checking for GLB...');
+  // Mobile – always go to WebXR ar.html with GLB (no Quick Look)
+  console.log('📱 Mobile flow - checking for GLB...');
       let glb = null;
       try {
         const assets = (typeof getCurrentArAssets === 'function') ? getCurrentArAssets() : null;
@@ -3333,37 +3340,7 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
   // Keep only essential params to avoid re-triggering AR
   ret.searchParams.delete('open_ar');
 
-  const isIOS = /iPad|iPhone|iPod/i.test(ua) || isTouchMac;
-  if (isIOS) {
-    // Try to resolve a valid USDZ and navigate to it directly (Quick Look) within this user gesture
-    async function headOk(p){ try { const r= await fetch(new URL(p, base).toString(), {method:'HEAD'}); return r.ok; } catch { return false; } }
-    async function resolveUsdz(fromUrl){
-      const b = fromUrl.replace(/\.(glb|gltf|usdz)$/i,'');
-      const name = b.split('/').pop() || '';
-      const tries = [ `${b}.usdz`, `${b}-2.usdz`, `chairs/${name}.usdz`, `chairs/${name}-2.usdz`, `chairs/Tulla-2.usdz` ];
-      for (const t of tries) { if (await headOk(t)) return t; }
-      return null;
-    }
-    const usdz = await resolveUsdz(glb);
-    if (usdz) {
-      const opts = `#allowsContentScaling=1&canonicalWebPageURL=${encodeURIComponent(window.location.href)}`;
-      const target = new URL(usdz, base).toString() + opts;
-      console.log('🎯 Opening Quick Look (anchor):', target);
-      const a = document.createElement('a');
-      a.setAttribute('rel','ar');
-      a.setAttribute('href', target);
-      // Optional hidden poster image to satisfy iOS quirks
-      const img = document.createElement('img');
-      img.alt = '';
-      img.style.display = 'none';
-      a.appendChild(img);
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(()=>{ try{ a.remove(); }catch(_){} }, 0);
-      return;
-    }
-    // Fallback to ar.html if no USDZ available
-  }
+  // Always route to ar.html WebXR
 
   const dest = base + 'ar.html?model=' + encodeURIComponent(abs) + '&ret=' + encodeURIComponent(ret.toString()) + '&open_ar=1&v=' + Date.now();
         console.log('🎯 Opening AR (native):', dest);
@@ -3457,31 +3434,7 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
                     base = origin + dir;
                   }
                   const ret = new URL(window.location.href); ret.searchParams.delete('open_ar');
-                  const isIOS = /iPad|iPhone|iPod/i.test(ua) || isTouchMac;
-                  if (isIOS) {
-                    async function headOk(p){ try { const r= await fetch(new URL(p, base).toString(), {method:'HEAD'}); return r.ok; } catch { return false; } }
-                    async function resolveUsdz(fromUrl){
-                      const b = fromUrl.replace(/\.(glb|gltf|usdz)$/i,'');
-                      const name = b.split('/').pop() || '';
-                      const tries = [ `${b}.usdz`, `${b}-2.usdz`, `chairs/${name}.usdz`, `chairs/${name}-2.usdz`, `chairs/Tulla-2.usdz` ];
-                      for (const t of tries) { if (await headOk(t)) return t; }
-                      return null;
-                    }
-                    const usdz = await resolveUsdz(glb);
-                    if (usdz) {
-                      const opts = `#allowsContentScaling=1&canonicalWebPageURL=${encodeURIComponent(window.location.href)}`;
-                      const target = new URL(usdz, base).toString() + opts;
-                      console.log('🎯 [capture] Opening Quick Look (anchor):', target);
-                      const a = document.createElement('a');
-                      a.setAttribute('rel','ar');
-                      a.setAttribute('href', target);
-                      const img = document.createElement('img'); img.alt=''; img.style.display='none'; a.appendChild(img);
-                      document.body.appendChild(a);
-                      a.click();
-                      setTimeout(()=>{ try{ a.remove(); }catch(_){} }, 0);
-                      return;
-                    }
-                  }
+                  // Always route to ar.html WebXR
                   const dest = base + 'ar.html?model=' + encodeURIComponent(abs) + '&ret=' + encodeURIComponent(ret.toString()) + '&open_ar=1&v=' + Date.now();
                   console.log('🎯 [capture] Opening AR (native):', dest);
                   window.location.assign(dest);
@@ -3911,6 +3864,40 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
       // Eksport viewer dla PWA
       window.viewer = viewer;
       console.log('🎯 Viewer initialized and exported to window');
+
+      // Hand prompt utilities: shown only after model selection
+      try {
+        const hand = document.getElementById('hand-prompt');
+        const state = { interacted: false, raf: 0 };
+        function stopIdle(){ if (state.raf) { cancelAnimationFrame(state.raf); state.raf = 0; } }
+        function startIdle(){
+          let t0 = performance.now();
+          const loop = ()=>{
+            if (state.interacted || !viewer || !viewer.scene?.mainCamera) { stopIdle(); return; }
+            const cam = viewer.scene.mainCamera;
+            const a = 0.05; // radians
+            const w = 0.0015; // speed
+            const dt = performance.now() - t0;
+            cam.rotation.y = Math.sin(dt * w) * a;
+            viewer.render?.();
+            state.raf = requestAnimationFrame(loop);
+          };
+          state.raf = requestAnimationFrame(loop);
+        }
+        function hidePrompt(){ if (hand) hand.style.display='none'; state.interacted = true; stopIdle(); }
+        function showPrompt(){
+          state.interacted = false;
+          if (hand) hand.style.display = 'flex';
+          // Remove any previous listeners by using once:true
+          ['pointerdown','touchstart','wheel','keydown'].forEach(ev=>{
+            window.addEventListener(ev, hidePrompt, { once:true, capture:true });
+          });
+          if (viewer?.controls) viewer.controls.addEventListener('start', hidePrompt, { once:true });
+          setTimeout(()=>{ if (!state.interacted) startIdle(); }, 400);
+        }
+        window.showHandPrompt = showPrompt;
+        window.hideHandPrompt = hidePrompt;
+      } catch(_) {}
       
       if (viewer.controls) {
         viewer.controls.minDistance = MIN_ZOOM_DISTANCE;
@@ -4386,7 +4373,8 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
       const center = box.getCenter(new Vector3());
       setCameraView(center);
       currentModelContainer.position.sub(center);
-      updateSummary();
+  updateSummary();
+  try { if (typeof window.showHandPrompt === 'function') window.showHandPrompt(); } catch(_) {}
       renderPartButtons();
     }
 
@@ -4396,6 +4384,7 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
   if (welcomeScreen) {
     welcomeScreen.style.display = 'none';
   }
+  try { if (typeof window.hideHandPrompt === 'function') window.hideHandPrompt(); } catch(_) {}
   
   if (currentModelContainer) {
     viewer.scene.remove(currentModelContainer);
@@ -4457,7 +4446,8 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
       setCameraView(center);
       currentModelContainer.position.sub(center);
   if (viewer && viewer.render) viewer.render();
-    } catch(e) { console.warn('Nie udało się ustawić kamery po załadowaniu modelu', e); }
+  } catch(e) { console.warn('Nie udało się ustawić kamery po załadowaniu modelu', e); }
+  try { if (typeof window.showHandPrompt === 'function') window.showHandPrompt(); } catch(_) {}
 
     // Jeśli kubełek, to ewentualnie załaduj domyślne nogi
     if (selectedChair.Grupa && selectedChair.Grupa.toLowerCase() === 'kubełek') {
