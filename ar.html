@@ -8,9 +8,7 @@
   <style>
     html, body { height: 100%; margin: 0; background: #000; font-family: system-ui, Arial, sans-serif; }
     #wrap { position: fixed; inset: 0; display: grid; place-items: center; }
-    #start { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,0.85); z-index: 10; }
-    #start .box { text-align: center; color: #fff; padding: 16px; }
-    #start button { background: #1e88e5; color: #fff; border: 0; border-radius: 12px; padding: 12px 18px; font-size: 16px; }
+  /* Removed confirmation overlay: AR starts immediately */
     model-viewer { width: 1px; height: 1px; opacity: 0; position: absolute; left: -9999px; }
     .back { position: fixed; top: 12px; left: 12px; z-index: 11; background: rgba(0,0,0,0.6); color:#fff; border:0; border-radius:10px; padding:8px 12px; }
   /* Bottom UI like in pseudo AR */
@@ -24,19 +22,10 @@
 <body>
   <button class="back" onclick="history.length>1?history.back():location.assign('index.html')">← Wróć</button>
   <div id="wrap">
-    <div id="start">
-      <div class="box">
-        <h2 style="margin:0 0 8px 0;">Zobacz w pomieszczeniu</h2>
-        <p style="margin:0 0 12px 0; opacity:0.9;">Dotknij, aby otworzyć widok AR.</p>
-        <button id="open-ar">Otwórz AR</button>
-      </div>
-    </div>
-
     <!-- Invisible viewer used only to trigger native AR (Scene Viewer / Quick Look) -->
     <model-viewer id="mv"
       ar
-      ar-modes="scene-viewer quick-look webxr"
-      ar-placement="floor"
+  ar-modes="scene-viewer quick-look webxr"
       ar-scale="fixed"
       camera-controls
       poster="icons/AR_icon.png"
@@ -97,14 +86,9 @@
       try { mv.setAttribute('ar-placement','floor'); } catch(_){}
     });
 
-    // AR open button (manual)
-    document.getElementById('open-ar').addEventListener('click', () => {
-      mv.activateAR();
-    });
-
-    // Auto-open AR when coming from desktop QR or mobile button
-    const shouldAuto = url.searchParams.get('open_ar') === '1';
-    async function autoOpenAR() {
+  // Auto-open AR immediately on load (no confirmation overlay)
+  const shouldAuto = true; // always try to auto-open
+  async function autoOpenAR() {
       try {
         if (!shouldAuto) return;
         // Give model-viewer a moment to attach
@@ -148,9 +132,7 @@
     mv.addEventListener('ar-status', (ev) => {
       console.log('model-viewer ar-status:', ev.detail.status);
       // Hide start overlay once AR starts
-      if (ev.detail.status === 'session-started' || ev.detail.status === 'quick-look-browser') {
-        document.getElementById('start').style.display = 'none';
-      }
+  // No start overlay to hide
     });
   </script>
 </body>
