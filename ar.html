@@ -1,0 +1,302 @@
+﻿<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>AR Viewer</title>
+  <meta name="theme-color" content="#000000">
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: #000;
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+    
+    model-viewer {
+      width: 100%;
+      height: 100%;
+      background: #000;
+      --poster-color: transparent;
+    }
+    
+    .ar-ui {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: env(safe-area-inset-bottom, 0);
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      padding: 16px;
+      z-index: 10;
+      pointer-events: none;
+    }
+    
+    .ar-btn {
+      pointer-events: auto;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .ar-btn:hover {
+      background: rgba(0, 0, 0, 0.85);
+      border-color: rgba(255, 255, 255, 0.5);
+    }
+    
+    .loading {
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(135deg, #0f0f23, #1a1a2e);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+      color: white;
+      text-align: center;
+    }
+    
+    .loading-card {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 32px;
+      backdrop-filter: blur(10px);
+    }
+    
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(255, 255, 255, 0.2);
+      border-top-color: #00b7ff;
+      border-radius: 50%;
+      margin: 0 auto 16px;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .loading h2 {
+      margin: 0 0 8px;
+      font-size: 18px;
+      font-weight: 700;
+    }
+    
+    .loading p {
+      margin: 0;
+      opacity: 0.8;
+      font-size: 14px;
+    }
+    
+    .status {
+      position: fixed;
+      top: calc(16px + env(safe-area-inset-top, 0));
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      z-index: 15;
+      display: none;
+    }
+    
+    model-viewer[ar-status="session-started"] ~ .ar-ui {
+      display: none;
+    }
+  </style>
+  
+  <script type="module" src="https://unpkg.com/@google/model-viewer@v3.5.0/dist/model-viewer.min.js"></script>
+</head>
+
+<body>
+  <div id="loading" class="loading">
+    <div class="loading-card">
+      <div class="spinner"></div>
+      <h2>Uruchamianie AR</h2>
+      <p id="loading-text">Ładowanie modelu...</p>
+    </div>
+  </div>
+  
+  <div id="status" class="status"></div>
+  
+  <model-viewer 
+    id="model"
+    ar
+    ar-modes="webxr scene-viewer"
+    ar-placement="floor"
+    ar-scale="fixed"
+    camera-controls
+    shadow-intensity="0.8"
+    environment-image="hdr/cayley_interior_1k.hdr"
+    exposure="1"
+    auto-rotate-delay="0"
+    loading="lazy">
+  </model-viewer>
+  
+  <div class="ar-ui">
+    <button id="back-btn" class="ar-btn"> Wróć</button>
+    <button id="ar-btn" class="ar-btn"> AR</button>
+    <button id="reset-btn" class="ar-btn"> Reset</button>
+  </div>
+
+  <script>
+    const config = {
+      autoEnterAR: new URLSearchParams(location.search).get('open_ar') === '1',
+      model: new URLSearchParams(location.search).get('model') || 'chairs/Default.glb',
+      name: new URLSearchParams(location.search).get('name') || '',
+      returnUrl: new URLSearchParams(location.search).get('ret') || ''
+    };
+    
+    console.log('AR Viewer starting with config:', config);
+    
+    const loading = document.getElementById('loading');
+    const loadingText = document.getElementById('loading-text');
+    const status = document.getElementById('status');
+    const model = document.getElementById('model');
+    const backBtn = document.getElementById('back-btn');
+    const arBtn = document.getElementById('ar-btn');
+    const resetBtn = document.getElementById('reset-btn');
+    
+    function showStatus(message, duration = 3000) {
+      status.textContent = message;
+      status.style.display = 'block';
+      clearTimeout(status.timeout);
+      status.timeout = setTimeout(() => {
+        status.style.display = 'none';
+      }, duration);
+    }
+    
+    function hideLoading() {
+      loading.style.display = 'none';
+    }
+    
+    function goBack() {
+      if (config.returnUrl) {
+        location.href = config.returnUrl;
+      } else if (history.length > 1) {
+        history.back();
+      } else {
+        location.href = '/';
+      }
+    }
+    
+    async function resolveModel() {
+      if (config.model && config.model.endsWith('.glb')) {
+        return config.model;
+      }
+      
+      if (config.name) {
+        try {
+          const response = await fetch('chairs/manifest.json');
+          if (response.ok) {
+            const chairs = await response.json();
+            const chair = chairs.find(c => 
+              c.name && c.name.toLowerCase() === config.name.toLowerCase()
+            );
+            if (chair && chair.glb) {
+              return chair.glb;
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to load manifest:', e);
+        }
+      }
+      
+      return 'chairs/Default.glb';
+    }
+    
+    backBtn.addEventListener('click', goBack);
+    
+    arBtn.addEventListener('click', () => {
+      model.activateAR().catch(error => {
+        console.error('AR activation failed:', error);
+        showStatus('AR nie jest dostępne na tym urządzeniu');
+      });
+    });
+    
+    resetBtn.addEventListener('click', () => {
+      model.cameraTarget = "auto auto auto";
+      model.cameraOrbit = "auto auto auto";
+      model.fieldOfView = "auto";
+      showStatus('Widok zresetowany');
+    });
+    
+    model.addEventListener('load', () => {
+      console.log('Model loaded successfully');
+      loadingText.textContent = 'Model załadowany!';
+      
+      setTimeout(() => {
+        hideLoading();
+        
+        if (config.autoEnterAR) {
+          console.log('Auto-entering AR...');
+          model.activateAR().catch(error => {
+            console.error('Auto AR failed:', error);
+            showStatus('Nie można uruchomić AR automatycznie');
+          });
+        }
+      }, 500);
+    });
+    
+    model.addEventListener('error', (event) => {
+      console.error('Model loading failed:', event);
+      loadingText.textContent = 'Błąd ładowania modelu';
+      setTimeout(() => {
+        hideLoading();
+        showStatus('Nie można załadować modelu 3D');
+      }, 1000);
+    });
+    
+    model.addEventListener('ar-status', (event) => {
+      const status = event.detail.status;
+      console.log('AR Status:', status);
+      
+      switch (status) {
+        case 'session-started':
+          showStatus('AR uruchomiony!', 1000);
+          break;
+        case 'not-presenting':
+          if (config.autoEnterAR && config.returnUrl) {
+            goBack();
+          }
+          break;
+        case 'failed':
+          showStatus('AR nie jest dostępne');
+          break;
+      }
+    });
+    
+    async function init() {
+      try {
+        loadingText.textContent = 'Rozpoznawanie modelu...';
+        const modelSrc = await resolveModel();
+        
+        loadingText.textContent = 'Ładowanie ' + modelSrc.split('/').pop() + '...';
+        model.src = modelSrc;
+        
+        console.log('Loading model:', modelSrc);
+      } catch (error) {
+        console.error('Initialization failed:', error);
+        loadingText.textContent = 'Błąd inicjalizacji';
+        setTimeout(hideLoading, 2000);
+      }
+    }
+    
+    init();
+  </script>
+</body>
+</html>
