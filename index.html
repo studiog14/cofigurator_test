@@ -2392,6 +2392,83 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
 </head>
 
 <body>
+    <script>
+      // Mobile-only fix: remove stray inline debug text like "// Auto-AR functionality and gesture controls added"
+      (function () {
+        const isMobile = () => window.innerWidth <= 820 || /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        if (!isMobile()) return;
+
+        function looksLikeDebugComment(text) {
+          if (!text) return false;
+          const t = text.trim();
+          if (!t) return false;
+          // Typical JS single-line comment dumped into DOM
+          if (t.startsWith('//')) return true;
+          // Specific known phrases reported on mobile
+          const lower = t.toLowerCase();
+          return lower.includes('auto-ar') || lower.includes('gesture controls');
+        }
+
+        function cleanNode(node) {
+          try {
+            if (!node) return;
+            // Skip script/style content entirely
+            const parent = node.parentNode;
+            if (!parent || parent.nodeType !== 1) return;
+            const tag = parent.tagName;
+            if (tag === 'SCRIPT' || tag === 'STYLE') return;
+            if (node.nodeType === Node.TEXT_NODE && looksLikeDebugComment(node.nodeValue)) {
+              parent.removeChild(node);
+              return;
+            }
+            if (node.nodeType === Node.ELEMENT_NODE && node.childNodes && node.childNodes.length === 1) {
+              const only = node.childNodes[0];
+              if (only.nodeType === Node.TEXT_NODE && looksLikeDebugComment(only.nodeValue)) {
+                node.remove();
+              }
+            }
+          } catch (_) { /* noop */ }
+        }
+
+        function sweep(root) {
+          try {
+            const walker = document.createTreeWalker(root || document.body, NodeFilter.SHOW_TEXT, null);
+            const toRemove = [];
+            let n;
+            while ((n = walker.nextNode())) {
+              const parent = n.parentNode;
+              if (!parent) continue;
+              const tag = parent.tagName;
+              if (tag === 'SCRIPT' || tag === 'STYLE') continue;
+              if (looksLikeDebugComment(n.nodeValue)) toRemove.push(n);
+            }
+            toRemove.forEach((tn) => tn.parentNode && tn.parentNode.removeChild(tn));
+          } catch (_) { /* noop */ }
+        }
+
+        // Initial sweep and observer for future insertions
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', () => sweep(document.body));
+        } else {
+          sweep(document.body);
+        }
+        try {
+          const mo = new MutationObserver((mutations) => {
+            for (const m of mutations) {
+              m.addedNodes && m.addedNodes.forEach((node) => {
+                if (node.nodeType === Node.TEXT_NODE) cleanNode(node);
+                else if (node.nodeType === Node.ELEMENT_NODE) {
+                  // Check element itself, then its text children
+                  cleanNode(node);
+                  node.childNodes && node.childNodes.forEach((ch) => cleanNode(ch));
+                }
+              });
+            }
+          });
+          mo.observe(document.body, { childList: true, subtree: true });
+        } catch (_) { /* noop */ }
+      })();
+    </script>
     <!-- 🔄 NOWY KOMUNIKAT OBROTU EKRANU -->
     <div id="rotation-overlay" style="
         position: fixed;
@@ -11034,5 +11111,6 @@ function setDefaultMaterialsFromSheet() {
 </body>
 
 </html>
-/ /   A u t o - A R   f u n c t i o n a l i t y   a n d   g e s t u r e   c o n t r o l s   a d d e d  
+/ /   A u t o - A R   f u n c t i o n a l i t y   a n d   g e s t u r e   c o n t r o l s   a d d e d 
+ 
  
