@@ -5811,7 +5811,8 @@ renderOptions('legs-thumbnails', legs, item => {
         const sheetURL = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=Baza Danych&v=${new Date().getTime()}`;
         
   try {
-          const response = await fetch(sheetURL + '?nocache=' + Date.now(), { 
+          const bust1 = sheetURL + (sheetURL.includes('?') ? '&' : '?') + 'nocache=' + Date.now();
+          const response = await fetch(bust1, { 
             cache: 'no-store'
           });
           
@@ -5948,7 +5949,10 @@ renderOptions('legs-thumbnails', legs, item => {
         }
       }
         
-        try {
+        // If data was already loaded by an earlier path, skip this duplicate loader
+        if ((window.allData || []).length) {
+          console.log('⚠️ Data already present in window.allData; skipping secondary loading block');
+        } else try {
           console.log('Loading data from Google Sheets...');
           
           // Definicje brakujących zmiennych
@@ -5969,11 +5973,11 @@ renderOptions('legs-thumbnails', legs, item => {
           
           console.log('Making fetch request...');
           
-          const fetchPromise = fetch(sheetURL + '?nocache=' + Date.now(), { 
+          const bust2 = sheetURL + (sheetURL.includes('?') ? '&' : '?') + 'nocache=' + Date.now();
+          const fetchPromise = fetch(bust2, { 
             cache: 'no-store',
             headers: {
-              'Accept': 'text/plain,text/csv,application/csv',
-              'User-Agent': navigator.userAgent
+              'Accept': 'text/plain,text/csv,application/csv'
             }
           });
           
