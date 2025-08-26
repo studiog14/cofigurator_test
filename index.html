@@ -10843,52 +10843,57 @@ function setDefaultMaterialsFromSheet() {
         });
       }
 
-      // Pokaż/ukryj popup
-      const emailModal = document.getElementById('emailModal');
-      const closeBtn = emailModal.querySelector('.close-button');
-      const buyButton = document.getElementById('buy-button');
-      const emailForm = document.getElementById('emailForm');
-      const successMessage = document.getElementById('success-message');
+      // Pokaż/ukryj popup (bezpiecznie na mobile: elementy mogą nie istnieć)
+      (function initEmailPopup() {
+        const emailModal = document.getElementById('emailModal');
+        const buyButton = document.getElementById('buy-button');
+        const emailForm = document.getElementById('emailForm');
+        const successMessage = document.getElementById('success-message');
+        const closeBtn = emailModal ? emailModal.querySelector('.close-button') : null;
 
-      buyButton.addEventListener('click', () => {
-        emailModal.classList.remove('hidden');
-        emailModal.classList.add('visible');
-        successMessage.classList.remove('visible'); // ukryj komunikat na otwarciu
-        successMessage.classList.add('hidden');
-      });
+        // Guard when any required element is missing (e.g., simplified mobile UI)
+        if (!emailModal || !successMessage) return;
 
-      closeBtn.addEventListener('click', () => {
-        emailModal.classList.remove('visible');
-        emailModal.classList.add('hidden');
-      });
-
-      emailModal.addEventListener('click', (e) => {
-        if (e.target === emailModal) {
-          emailModal.classList.remove('visible');
-          emailModal.classList.add('hidden');
+        if (buyButton) {
+          buyButton.addEventListener('click', () => {
+            emailModal.classList.remove('hidden');
+            emailModal.classList.add('visible');
+            successMessage.classList.remove('visible');
+            successMessage.classList.add('hidden');
+          });
         }
-      });
 
-      emailForm.addEventListener('submit', (e) => {
-        e.preventDefault();
+        if (closeBtn) {
+          closeBtn.addEventListener('click', () => {
+            emailModal.classList.remove('visible');
+            emailModal.classList.add('hidden');
+          });
+        }
 
-        // Tutaj wysyłka danych formularza (jeśli masz backend)
-        // Można dodać fetch lub EmailJS
+        emailModal.addEventListener('click', (e) => {
+          if (e.target === emailModal) {
+            emailModal.classList.remove('visible');
+            emailModal.classList.add('hidden');
+          }
+        });
 
-        // Po wysłaniu:
-        emailModal.classList.remove('visible');
-        emailModal.classList.add('hidden');
-
-        successMessage.classList.remove('hidden');
-        successMessage.classList.add('visible');
-
-        setTimeout(() => {
-          successMessage.classList.remove('visible');
-          successMessage.classList.add('hidden');
-        }, 3000);
-
-        emailForm.reset(); // wyczyść formularz
-      });
+        if (emailForm) {
+          emailForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            emailModal.classList.remove('visible');
+            emailModal.classList.add('hidden');
+            if (successMessage) {
+              successMessage.classList.remove('hidden');
+              successMessage.classList.add('visible');
+              setTimeout(() => {
+                successMessage.classList.remove('visible');
+                successMessage.classList.add('hidden');
+              }, 3000);
+            }
+            try { emailForm.reset(); } catch (_) {}
+          });
+        }
+      })();
 
 
       const btn = document.getElementById('dimensions-show');
