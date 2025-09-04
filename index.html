@@ -3107,7 +3107,7 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
   position: fixed;
   top: 50%;
   left: 50%;
-  transform: translate(-100%, -50%);
+  transform: translate(-108%, -50%);
   background: white;
   padding: 20px 30px;
   border-radius: 12px;
@@ -3118,8 +3118,8 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
   max-width: 300px;
 ">
     <img src="icons/AR_icon.png" alt="AR Ikona" style="width: 60px; margin-bottom: 10px;" />
-    <div style="font-size: 18px; font-weight: bold;">Dostępne wkrótce</div>
-    <div style="margin-top: 6px; font-size: 14px;">Tryb AR zostanie wkrótce uruchomiony.</div>
+  <div style="font-size: 18px; font-weight: bold;">Tryb AR dostępny wkrótce</div>
+  <div style="margin-top: 6px; font-size: 14px;">Funkcja zostanie uruchomiona niebawem.</div>
   <button onclick="closeArPopup()" style="
     margin-top: 12px;
     background: #141414;
@@ -3274,10 +3274,10 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
 
   <!-- Mobile-only: hide AR button and style/position config + view-in-room buttons -->
   <style>
-    /* Hide AR button only on mobile */
-    body.mobile-mode #bottom-toolbar #ar-button { display: none !important; }
+    /* Show AR button on mobile too (click shows "coming soon" popup) */
+    body.mobile-mode #bottom-toolbar #ar-button { display: inline-flex !important; }
     @media (max-width: 820px) {
-      #bottom-toolbar #ar-button { display: none !important; }
+      #bottom-toolbar #ar-button { display: inline-flex !important; }
     }
 
     /* On mobile, hide both buttons until a chair is selected */
@@ -3358,65 +3358,10 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
           });
 
   // Click -> Mobile: open ar.html with current GLB; Desktop: show QR to AR landing
-          viewBtn.addEventListener('click', async (e) => {
-            console.log('🔥 AR button clicked!');
+          viewBtn.addEventListener('click', (e) => {
+            console.log('🔥 AR button clicked! (disabled, showing popup)');
             e.stopPropagation();
-            try {
-              // Self-contained mobile detection (no external helpers required)
-              const ua = navigator.userAgent || '';
-              const isTouchMac = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1; // iPadOS
-              const isUADevice = /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(ua);
-              const isMobileWidth = window.innerWidth <= 1024;
-              const isMobileMode = document.body.classList.contains('mobile-mode');
-              const isMobileDevice = isUADevice || isTouchMac || isMobileWidth || isMobileMode;
-              console.log('📱 isMobileDevice:', isMobileDevice, { isUADevice, isTouchMac, isMobileWidth, isMobileMode });
-              if (!isMobileDevice) {
-                // Desktop unchanged – show QR to AR landing page (auto-open AR on mobile)
-                console.log('💻 Desktop flow - showing QR');
-                const url = (typeof buildArHtmlUrl === 'function') ? buildArHtmlUrl() : 'ar_viewer.html';
-                const qrUrl = url + (url.includes('?') ? '&' : '?') + 'open_ar=1';
-                if (typeof showQrWithUrl === 'function') showQrWithUrl(qrUrl);
-                return;
-              }
-  // Mobile – navigate to native AR page with current GLB; fallback to default if no GLB
-      console.log('📱 Mobile flow - checking for GLB...');
-      let glb = null;
-      try {
-        const assets = (typeof getCurrentArAssets === 'function') ? getCurrentArAssets() : null;
-        glb = assets?.glb || (Array.isArray(assets?.glbCandidates) ? assets.glbCandidates[0] : null);
-        console.log('📦 Found GLB:', glb);
-      } catch(_) {}
-      // If no GLB resolved, use a safe default to guarantee pseudo AR opens
-      if (!glb) {
-        glb = 'chairs/Default.glb';
-        console.log('⚠️ No GLB from selection, using fallback:', glb);
-      }
-      if (glb) {
-        const abs = new URL(glb, window.location.href).toString();
-        // Compute repo base path robustly (works on GitHub Pages and local)
-        const { origin, pathname, hostname } = window.location;
-        let base;
-        if (hostname.endsWith('github.io')) {
-          const parts = pathname.split('/').filter(Boolean);
-          // parts[0] should be repo name when served from project pages
-          const repo = parts[0] || 'cofigurator_test';
-          base = origin + '/' + repo + '/';
-        } else {
-          // Use current directory as base
-          const dir = pathname.endsWith('/') ? pathname : pathname.substring(0, pathname.lastIndexOf('/') + 1);
-          base = origin + dir;
-        }
-  const ret = new URL(window.location.href);
-  // Keep only essential params to avoid re-triggering AR
-  ret.searchParams.delete('open_ar');
-  const chairName = encodeURIComponent((window.selectedChair && window.selectedChair.Nazwa) || '');
-  const dest = base + 'ar.html?model=' + encodeURIComponent(abs) + '&ret=' + encodeURIComponent(ret.toString()) + '&open_ar=1&v=' + Date.now();
-        console.log('🎯 Opening AR (native):', dest);
-        window.location.assign(dest);
-      } else {
-        console.log('❌ No GLB and fallback missing');
-      }
-            } catch(err){ console.warn('AR open error:', err); }
+            if (typeof openArPopup === 'function') openArPopup();
           });
 
           document.body.appendChild(viewBtn);
@@ -6966,8 +6911,11 @@ updateSummary();
 
       // === AR popup helpers and outside-to-dismiss ===
       window.openArPopup = function openArPopup() {
-        const popup = document.getElementById('ar-popup');
-        if (!popup) return;
+  // Hide QR popup if visible to avoid overlapping popups
+  const qr = document.getElementById('qr-popup');
+  if (qr) qr.style.display = 'none';
+  const popup = document.getElementById('ar-popup');
+  if (!popup) return;
         popup.style.display = 'block';
       };
 
@@ -6992,6 +6940,15 @@ updateSummary();
       document.getElementById('ar-popup')?.addEventListener('click', (e) => {
         e.stopPropagation();
       });
+
+      // Bind toolbar AR button to show "coming soon" popup (disable AR flow)
+      const arToolbarBtn = document.getElementById('ar-button');
+      if (arToolbarBtn) {
+        arToolbarBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openArPopup();
+        });
+      }
 
       // === AR MVP helpers ===
       function isIOS() {
@@ -7228,32 +7185,8 @@ updateSummary();
             // remove the param to avoid loops on back
             url.searchParams.delete('open_ar');
             window.history.replaceState({}, '', url.toString());
-            try { showModelLoader('Uruchamianie trybu podglądu AR...'); } catch(_) {}
-            // Route to pseudo AR on mobile landing as well (consistent with button behavior)
-            try {
-              const assets = (typeof getCurrentArAssets === 'function') ? getCurrentArAssets() : null;
-              const glb = assets?.glb || (Array.isArray(assets?.glbCandidates) ? assets.glbCandidates[0] : null);
-              if (glb) {
-                const abs = new URL(glb, window.location.href).toString();
-                const { origin, pathname, hostname } = window.location;
-                let base;
-                if (hostname.endsWith('github.io')) {
-                  const parts = pathname.split('/').filter(Boolean);
-                  const repo = parts[0] || 'cofigurator_test';
-                  base = origin + '/' + repo + '/';
-                } else {
-                  const dir = pathname.endsWith('/') ? pathname : pathname.substring(0, pathname.lastIndexOf('/') + 1);
-                  base = origin + dir;
-                }
-                const ret = new URL(window.location.href); ret.searchParams.delete('open_ar');
-                const chairName = encodeURIComponent((window.selectedChair && window.selectedChair.Nazwa) || '');
-                const dest = base + 'pseudo_ar.html?model=' + encodeURIComponent(abs) + '&name=' + chairName + '&ret=' + encodeURIComponent(ret.toString()) + '&v=' + Date.now();
-                window.location.replace(dest);
-                return;
-              }
-            } catch(_) {}
-            // If no GLB found, fallback to previous AR routine
-            if (typeof openArWebXRMobile === 'function') openArWebXRMobile(); else openArFlow();
+            // AR disabled for now — show info popup instead of launching
+            if (typeof openArPopup === 'function') openArPopup();
           }
         } catch {}
       })();
@@ -7500,19 +7433,13 @@ updateSummary();
         }
       }
 
-      // Wire bottom AR button (desktop shows QR via existing UI elsewhere)
+  // Wire bottom AR button (always show AR-coming-soon popup)
       (function wireArButtons() {
         const arBtn = document.getElementById('ar-button');
         if (arBtn && !arBtn._arBound) {
           arBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (typeof isAndroid === 'function' && isAndroid() || (typeof isIOS === 'function' && isIOS())) {
-              openArWebXRMobile();
-            } else if (typeof showQrWithUrl === 'function' && typeof buildArLandingUrl === 'function') {
-              const u = new URL(buildArLandingUrl(), window.location.href);
-              u.searchParams.set('open_ar', '1');
-              showQrWithUrl(u.toString());
-            }
+    if (typeof openArPopup === 'function') openArPopup();
           });
           arBtn._arBound = true;
         }
@@ -7950,18 +7877,12 @@ updateSummary();
 
 
       const arButton = document.getElementById('ar-button');
-      if (arButton) {
-        arButton.addEventListener('click', async (e) => {
+      if (arButton && !arButton._arInfoBound) {
+        arButton.addEventListener('click', (e) => {
           e.stopPropagation();
-          if (typeof isDesktop === 'function' && isDesktop()) {
-            const url = (typeof buildArLandingUrl === 'function') ? buildArLandingUrl() : 'ar.html';
-            const qrUrl = url + (url.includes('?') ? '&' : '?') + 'open_ar=1';
-            if (typeof showQrWithUrl === 'function') showQrWithUrl(qrUrl); else window.location.href = url;
-          } else {
-            const url = (typeof buildArHtmlUrl === 'function') ? buildArHtmlUrl() : 'ar.html';
-            window.location.href = url + (url.includes('?') ? '&' : '?') + 'open_ar=1';
-          }
+          if (typeof openArPopup === 'function') openArPopup();
         });
+        arButton._arInfoBound = true;
       }
 
 
