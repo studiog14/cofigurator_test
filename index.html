@@ -3425,35 +3425,11 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
                 const isMobileMode = document.body.classList.contains('mobile-mode');
                 const isMobileDevice = isUADevice || isTouchMac || isMobileWidth || isMobileMode;
                 if (!isMobileDevice) return;
-                // Stop other listeners and navigate
+                // Stop other listeners and show AR-coming-soon popup instead of navigating
                 e.preventDefault();
                 e.stopPropagation();
                 e.stopImmediatePropagation?.();
-                try {
-                  const assets = (typeof getCurrentArAssets === 'function') ? getCurrentArAssets() : null;
-                  let glb = assets?.glb || (Array.isArray(assets?.glbCandidates) ? assets.glbCandidates[0] : null);
-                  if (!glb) glb = 'chairs/Default.glb';
-                  if (!glb) return; // safety
-                  const abs = new URL(glb, window.location.href).toString();
-                  // Compute repo base path robustly (works on GitHub Pages and local)
-                  const { origin, pathname, hostname } = window.location;
-                  let base;
-                  if (hostname.endsWith('github.io')) {
-                    const parts = pathname.split('/').filter(Boolean);
-                    const repo = parts[0] || 'cofigurator_test';
-                    base = origin + '/' + repo + '/';
-                  } else {
-                    const dir = pathname.endsWith('/') ? pathname : pathname.substring(0, pathname.lastIndexOf('/') + 1);
-                    base = origin + dir;
-                  }
-                  const ret = new URL(window.location.href); ret.searchParams.delete('open_ar');
-                  const chairName = encodeURIComponent((window.selectedChair && window.selectedChair.Nazwa) || '');
-                  const dest = base + 'ar.html?model=' + encodeURIComponent(abs) + '&ret=' + encodeURIComponent(ret.toString()) + '&open_ar=1&v=' + Date.now();
-                  console.log('🎯 [capture] Opening AR (native):', dest);
-                  window.location.assign(dest);
-                } catch (err) {
-                  console.warn('Capture handler error:', err);
-                }
+                try { if (typeof openArPopup === 'function') openArPopup(); } catch(_) {}
               };
               // Attach once; capture phase to run before bubbling listeners
               if (!window.__viewInRoomCaptureBound) {
@@ -6476,25 +6452,27 @@ updateSummary();
       const exportButton = document.getElementById("export-config");
       const exportPanel = document.getElementById("export-panel");
 
-      exportButton.addEventListener("click", () => {
-        exportPanel.classList.toggle("hidden");
-      });
-
-      // Opcjonalnie – ukrywanie po kliknięciu poza panelem
-      document.addEventListener("click", (e) => {
-        if (!exportPanel.contains(e.target) && !exportButton.contains(e.target)) {
-          exportPanel.classList.add("hidden");
-        }
-      });
-
-      // Obsługa kliknięć eksportu (przykładowo)
-      document.querySelectorAll(".export-btn").forEach(btn => {
-        btn.addEventListener("click", () => {
-          const format = btn.dataset.format;
-          alert(`Eksport jako: ${format.toUpperCase()}`);
-          exportPanel.classList.add("hidden");
+      if (exportButton && exportPanel) {
+        exportButton.addEventListener("click", () => {
+          exportPanel.classList.toggle("hidden");
         });
-      });
+
+        // Opcjonalnie – ukrywanie po kliknięciu poza panelem
+        document.addEventListener("click", (e) => {
+          if (!exportPanel.contains(e.target) && !exportButton.contains(e.target)) {
+            exportPanel.classList.add("hidden");
+          }
+        });
+
+        // Obsługa kliknięć eksportu (przykładowo)
+        document.querySelectorAll(".export-btn").forEach(btn => {
+          btn.addEventListener("click", () => {
+            const format = btn.dataset.format;
+            alert(`Eksport jako: ${format.toUpperCase()}`);
+            exportPanel.classList.add("hidden");
+          });
+        });
+      }
 
 
 
@@ -8781,9 +8759,41 @@ function setDefaultMaterialsFromSheet() {
         
         if (promotionalModels.length > 0) {
           console.log('🎉 Found promotional models, rendering them and activating Promocje button');
-          // Pokaż sekcję modeli
-          document.getElementById('model-section').style.display = 'block';
-          document.getElementById('config-section').style.display = 'none';
+          // Pokaż sekcję modeli (bezpiecznie, tworząc brakujące elementy)
+          (function ensureSections(){
+            const sidebar = document.getElementById('sidebar');
+            let ms = document.getElementById('model-section');
+            if (!ms && sidebar) {
+              ms = document.createElement('div');
+              ms.id = 'model-section';
+              ms.innerHTML = '<div class="selection-section"><h3>Wybierz model:</h3><div id="model-thumbnails" class="options-grid"></div></div>';
+              const cat = document.getElementById('category-buttons');
+              if (cat) cat.after(ms); else sidebar.appendChild(ms);
+              console.log('✅ Created model-section (promotions)');
+            }
+            let cs = document.getElementById('config-section');
+            if (!cs && sidebar) {
+              cs = document.createElement('div');
+              cs.id = 'config-section';
+              cs.style.display = 'none';
+              cs.innerHTML = '<div id="back-to-models-container" style="margin-bottom: 15px;"></div>\
+                <div id="legs-section" class="selection-section"><h3>Nogi:</h3><div id="legs-thumbnails" class="options-grid"></div></div>\
+                <div id="parts-section" class="selection-section"><h3>Wybierz element:</h3><div id="part-tabs" class="options-grid"></div></div>\
+                <div id="materials-section" class="selection-section"><h3>Wybierz materiał:</h3><div id="material-options" style="display: none;"></div>\
+                  <div id="collection-container" style="display: flex; gap: 24px; margin-top: 20px;">\
+                    <div id="collection-icons" style="display: flex; flex-direction: column; gap: 14px; width: 88px;"></div>\
+                    <div id="material-panel-viewer" class="options-grid" style="flex-grow: 1;"></div>\
+                  </div>\
+                </div>\
+                <div id="summary"></div>';
+              sidebar.appendChild(cs);
+              console.log('✅ Created config-section (promotions)');
+            }
+          })();
+          const msEl = document.getElementById('model-section');
+          const csEl = document.getElementById('config-section');
+          if (msEl) msEl.style.display = 'block';
+          if (csEl) csEl.style.display = 'none';
           
           renderOptions('model-thumbnails', promotionalModels, item => loadModel(item));
           
@@ -8809,7 +8819,7 @@ function setDefaultMaterialsFromSheet() {
               console.log('❌ Promotion button not found in DOM');
             }
           }, 100);
-        } else {
+  } else {
           console.log('🎉 No promotional models, showing all models instead');
           renderAllModels();
           // Aktywuj przycisk "Wszystkie" jeśli nie ma promocji
