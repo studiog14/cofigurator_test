@@ -3838,6 +3838,32 @@ body.mobile-mode #mobile-right-panel .thumbnail div { font-size:13px; margin-top
       init();
     });
 
+    // 🛡️ Safety: ensure the initial loader is hidden on all devices (esp. mobile)
+    (function ensureLoaderHidesSafely(){
+      function forceHideInitialLoader(reason){
+        try {
+          const loader = document.getElementById('custom-loader');
+          const app = document.getElementById('app');
+          if (loader && loader.style.display !== 'none') {
+            console.log('🛡️ Force-hiding loader (' + (reason||'safety') + ')');
+            loader.classList.add('fade-out');
+            setTimeout(() => { try { loader.style.display = 'none'; } catch(_) {} }, 150);
+          }
+          if (app) app.style.visibility = 'visible';
+          const toolbar = document.getElementById('bottom-toolbar');
+          if (toolbar) { toolbar.style.display = 'flex'; toolbar.classList.add('visible'); }
+        } catch(_) {}
+      }
+      // Hide after window load as a backstop
+      window.addEventListener('load', () => setTimeout(() => forceHideInitialLoader('window-load'), 800), { once: true });
+      // Hide when tab becomes visible (iOS/Safari quirks)
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(() => forceHideInitialLoader('visibilitychange'), 100); });
+      // Absolute timeout backstop
+      setTimeout(() => forceHideInitialLoader('timeout-5s'), 5000);
+      // Expose helper for manual use
+      window.forceHideInitialLoader = forceHideInitialLoader;
+    })();
+
     // 📱 NOWY SYSTEM ORIENTACJI - prosty i niezawodny
     // 🔄 FLAGA ZAPOBIEGAJĄCA WIELOKROTNEJ INICJALIZACJI
     let isAppInitialized = false;
@@ -7447,7 +7473,7 @@ updateSummary();
       })();
 
       // Enable overlay preview via URL param (?ar_ui_preview=1)
-      (function maybeEnableArUiPreview(){
+  (function maybeEnableArUiPreview(){
         try {
           const u = new URL(window.location.href);
           // Preview and post-AR overlays disabled
@@ -7459,7 +7485,7 @@ updateSummary();
       })();
 
       // Restore previously selected chair after returning from AR (even if the page reloaded)
-      (function restoreChairAfterAr(){
+  (function restoreChairAfterAr(){
         const tryRestore = () => {
           let payload = null;
           try { payload = JSON.parse(sessionStorage.getItem('__ar_resume') || 'null'); } catch(_) { payload = null; }
