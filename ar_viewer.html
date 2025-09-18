@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>AR — Zobacz w pomieszczeniu</title>
+  <link rel="icon" href="icons/favicon.png" />
+  <style>
+    html, body { height: 100%; margin: 0; background: #000; font-family: system-ui, Arial, sans-serif; }
+    #wrap { position: fixed; inset: 0; display: grid; place-items: center; }
+    #start { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,0.85); z-index: 10; }
+    #start .box { text-align: center; color: #fff; padding: 16px; }
+    #start button { background: #1e88e5; color: #fff; border: 0; border-radius: 12px; padding: 12px 18px; font-size: 16px; }
+    model-viewer { width: 1px; height: 1px; opacity: 0; position: absolute; left: -9999px; }
+    .back { position: fixed; top: 12px; left: 12px; z-index: 11; background: rgba(0,0,0,0.6); color:#fff; border:0; border-radius:10px; padding:8px 12px; }
+  </style>
+  <!-- Stable model-viewer (v3.x) -->
+  <script type="module" src="https://unpkg.com/@google/model-viewer@3.3.0/dist/model-viewer.min.js"></script>
+  <script nomodule src="https://unpkg.com/@google/model-viewer@3.3.0/dist/model-viewer-legacy.js"></script>
+</head>
+<body>
+  <button class="back" onclick="history.length>1?history.back():location.assign('index.html')">← Wróć</button>
+  <div id="wrap">
+    <div id="start">
+      <div class="box">
+        <h2 style="margin:0 0 8px 0;">Zobacz w pomieszczeniu</h2>
+        <p style="margin:0 0 12px 0; opacity:0.9;">Dotknij, aby otworzyć widok AR.</p>
+        <button id="open-ar">Otwórz AR</button>
+      </div>
+    </div>
+
+    <!-- Invisible viewer used only to trigger native AR (Scene Viewer / Quick Look) -->
+    <model-viewer id="mv"
+      ar
+      ar-modes="scene-viewer quick-look webxr"
+      ar-scale="fixed"
+      camera-controls
+      poster="icons/AR_icon.png"
+      exposure="1.0"
+    ></model-viewer>
+  </div>
+
+  <script>
+    // Minimal platform flags
+    const ua = navigator.userAgent || '';
+    const isAndroid = /Android/i.test(ua);
+    const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+    // Read ?model= from URL and map to src (GLB) and ios-src (USDZ)
+    const url = new URL(window.location.href);
+    const model = url.searchParams.get('model') || 'chairs/Tulla-2.glb';
+    const base = model.replace(/\.(glb|gltf|usdz)$/i, '');
+    const glb = base + '.glb';
+    // Prefer -2 variant for USDZ if provided model points to -2
+    const usdz = /-2\.(glb|gltf|usdz)$/i.test(model) ? base + '.usdz' : (base + '.usdz');
+
+    const mv = document.getElementById('mv');
+    mv.src = glb;
+    mv.setAttribute('ios-src', usdz);
+
+    // AR open button
+    document.getElementById('open-ar').addEventListener('click', () => {
+      // model-viewer handles correct native AR based on platform
+      mv.activateAR();
+    });
+
+    // Optional auto-open if explicitly requested: ?auto=1
+    if ((isAndroid || isIOS) && url.searchParams.get('auto') === '1') {
+      // Still require a user gesture on iOS to be safe; keep the button visible
+      // On Android, Scene Viewer often works without strict gesture, but we keep UX consistent
+    }
+
+    // Basic AR status logging
+    mv.addEventListener('ar-status', (ev) => {
+      console.log('model-viewer ar-status:', ev.detail.status);
+      // Hide start overlay once AR starts
+      if (ev.detail.status === 'session-started' || ev.detail.status === 'quick-look-browser') {
+        document.getElementById('start').style.display = 'none';
+      }
+    });
+  </script>
+</body>
+</html>

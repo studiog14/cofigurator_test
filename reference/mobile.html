@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <title>FK Krzesła - Mobile</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/favicon.png">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f5f5f5;
+            padding: 10px;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .card:hover { transform: scale(1.02); }
+        .card img {
+            width: 100%;
+            height: 120px;
+            object-fit: cover;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        .card h3 {
+            font-size: 14px;
+            margin-bottom: 5px;
+            color: #333;
+        }
+        .card p {
+            font-size: 12px;
+            color: #666;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .btn {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+            margin: 5px 0;
+        }
+        .filters {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            overflow-x: auto;
+            padding: 5px 0;
+        }
+        .filter-btn {
+            background: #e0e0e0;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            white-space: nowrap;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .filter-btn.active {
+            background: #007AFF;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🪑 Fajne Krzesła</h1>
+        <p>Mobile Configurator</p>
+    </div>
+
+    <div id="error-container"></div>
+    
+    <div class="filters" id="filters">
+        <button class="filter-btn active" onclick="filterCategory('all')">Wszystkie</button>
+    </div>
+
+    <div id="loading" class="loading">
+        <div>⏳ Ładowanie danych...</div>
+    </div>
+
+    <div class="grid" id="products" style="display: none;"></div>
+
+    <div style="margin-top: 30px; text-align: center;">
+        <button class="btn" onclick="openFullApp()">🚀 Otwórz pełną aplikację</button>
+        <button class="btn" onclick="installPWA()" style="background: #34C759;">📱 Zainstaluj aplikację</button>
+    </div>
+
+    <script>
+        let allData = [];
+        let filteredData = [];
+        let currentCategory = 'all';
+
+        async function loadData() {
+            try {
+                console.log('Loading data for mobile...');
+                
+                const sheetId = '1lZMJ-4Qd0nDY-7Hl9iV-pJnZSTVzYiA-A3rDq_bC16U';
+                const url = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=0`;
+                
+                const response = await fetch(url, {
+                    cache: 'no-store',
+                    headers: { 'Accept': 'text/csv,text/plain' }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Błąd HTTP: ${response.status}`);
+                }
+                
+                const csvText = await response.text();
+                console.log('CSV loaded, length:', csvText.length);
+                
+                // Parse CSV
+                const lines = csvText.trim().split('\n');
+                const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+                
+                allData = lines.slice(1).map(line => {
+                    const values = line.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
+                    const obj = {};
+                    headers.forEach((header, index) => {
+                        obj[header] = values[index]?.trim().replace(/"/g, '') || '';
+                    });
+                    return obj;
+                }).filter(item => 
+                    item.Visible?.toLowerCase() !== 'false' && 
+                    item.Typ?.toLowerCase() === 'model'
+                );
+                
+                console.log('Parsed data:', allData.length, 'items');
+                
+                // Setup categories
+                setupCategories();
+                
+                // Show products
+                filterCategory('all');
+                
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('products').style.display = 'grid';
+                
+            } catch (error) {
+                console.error('Error loading data:', error);
+                showError(`Nie udało się załadować danych: ${error.message}`);
+            }
+        }
+        
+        function showError(message) {
+            const errorContainer = document.getElementById('error-container');
+            errorContainer.innerHTML = `
+                <div class="error">
+                    ⚠️ ${message}
+                    <br><br>
+                    <button class="btn" onclick="location.reload()">🔄 Spróbuj ponownie</button>
+                    <button class="btn" onclick="openFullApp()" style="background: #34C759;">🚀 Otwórz pełną wersję</button>
+                </div>
+            `;
+            document.getElementById('loading').style.display = 'none';
+        }
+        
+        function setupCategories() {
+            const categories = [...new Set(allData.map(item => item.Kategoria))].filter(Boolean);
+            console.log('Categories found:', categories);
+            
+            const filtersContainer = document.getElementById('filters');
+            categories.forEach(category => {
+                const btn = document.createElement('button');
+                btn.className = 'filter-btn';
+                btn.textContent = category;
+                btn.onclick = () => filterCategory(category);
+                filtersContainer.appendChild(btn);
+            });
+        }
+        
+        function filterCategory(category) {
+            currentCategory = category;
+            
+            // Update active button
+            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+            event?.target?.classList.add('active') || document.querySelector('.filter-btn').classList.add('active');
+            
+            // Filter data
+            filteredData = category === 'all' ? allData : allData.filter(item => item.Kategoria === category);
+            
+            renderProducts();
+        }
+        
+        function renderProducts() {
+            const container = document.getElementById('products');
+            container.innerHTML = '';
+            
+            if (filteredData.length === 0) {
+                container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #666;">Brak produktów w tej kategorii</div>';
+                return;
+            }
+            
+            filteredData.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.onclick = () => selectProduct(item);
+                
+                const img = item.Obrazek || 'icons/placeholder.svg';
+                const name = item.Nazwa || 'Bez nazwy';
+                const price = item.Cena ? `${item.Cena} PLN` : 'Cena na zapytanie';
+                
+                card.innerHTML = `
+                    <img src="${img}" alt="${name}" onerror="this.src='icons/placeholder.svg'">
+                    <h3>${name}</h3>
+                    <p>${price}</p>
+                `;
+                
+                container.appendChild(card);
+            });
+        }
+        
+        function selectProduct(item) {
+            const message = `Wybrałeś: ${item.Nazwa}\nCena: ${item.Cena || 'Na zapytanie'} PLN\n\nCzy chcesz przejść do pełnej konfiguracji?`;
+            
+            if (confirm(message)) {
+                // Save selection and go to full app
+                localStorage.setItem('selectedChair', JSON.stringify(item));
+                openFullApp();
+            }
+        }
+        
+        function openFullApp() {
+            window.location.href = 'index.html';
+        }
+        
+        function installPWA() {
+            alert(`📱 Aby zainstalować aplikację na iOS:
+
+1. Otwórz w Safari (jeśli nie jesteś już w Safari)
+2. Naciśnij przycisk "Udostępnij" (⬆️)
+3. Wybierz "Dodaj do ekranu głównego"
+4. Potwierdź instalację
+
+Aplikacja pojawi się na ekranie głównym!`);
+        }
+        
+        // Start loading data
+        loadData();
+        
+        // Handle saved selection
+        window.addEventListener('load', () => {
+            const saved = localStorage.getItem('selectedChair');
+            if (saved) {
+                console.log('Found saved selection:', JSON.parse(saved));
+            }
+        });
+    </script>
+</body>
+</html>

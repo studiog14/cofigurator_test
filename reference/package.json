@@ -1,0 +1,8 @@
+{
+  "scripts": {
+    "sync:mobile-icons": "node ./scripts/sync-mobile-icons.js"
+  },
+  "dependencies": {
+    "threepipe": "^0.0.49"
+  }
+}

@@ -1,0 +1,11 @@
+name: Placeholder (manual only)
+
+on:
+	workflow_dispatch:
+
+jobs:
+	noop:
+		runs-on: ubuntu-latest
+		steps:
+			- name: No-op
+				run: echo "This workflow is intentionally empty; use deploy-pages.yml for Pages deploys."

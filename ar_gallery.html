@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AR Galeria krzeseł</title>
+  <style>
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#0e0e10; color:#fff; }
+    header { position: sticky; top:0; background:#111; padding:14px 16px; border-bottom:1px solid rgba(255,255,255,0.08); }
+    h1 { margin:0; font-size:18px; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); gap:16px; padding:16px; }
+    .card { background:#161616; border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:10px; }
+    .name { font-weight:700; }
+    .row { display:flex; gap:8px; }
+    .btn { flex:1; text-align:center; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.12); background:#1f1f1f; color:#fff; text-decoration:none; font-weight:600; }
+    .btn.primary { background:#00b7ff; color:#001018; border-color:#0cf; }
+    .note { color:#aaa; font-size:12px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>AR Galeria krzeseł</h1>
+    <div class="note">Kliknij AR: Android — Scene Viewer (GLB), iOS — Quick Look (USDZ jeśli dostępny)</div>
+  </header>
+  <main>
+    <div id="grid" class="grid"></div>
+  </main>
+  <script>
+    async function loadManifest() {
+      const res = await fetch('chairs/manifest.json', {cache:'no-store'});
+      if (!res.ok) throw new Error('Nie można pobrać manifestu');
+      return res.json();
+    }
+    function isIOS() { return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream; }
+    function sceneViewerUrl(glbUrl, title, link) {
+      const u = new URL('https://arvr.google.com/scene-viewer/1.0');
+      u.searchParams.set('file', glbUrl);
+      u.searchParams.set('mode', 'ar_only');
+      if (title) u.searchParams.set('title', title);
+      if (link) u.searchParams.set('link', link);
+      return 'intent://arvr.google.com/scene-viewer/1.0?' + u.searchParams.toString() + '#Intent;scheme=https;package=com.google.android.googlequicksearchbox;action=android.intent.action.VIEW;S.browser_fallback_url=' + encodeURIComponent(glbUrl) + ';end;';
+    }
+    function quickLookLink(usdzUrl, title, retUrl) {
+      // iOS Quick Look uses anchor rel="ar" and optional parameters via fragment
+      const a = document.createElement('a');
+      a.setAttribute('rel','ar');
+      a.setAttribute('href', usdzUrl + (retUrl ? `#callToAction=Powrót&link=${encodeURIComponent(retUrl)}`: ''));
+      const img = document.createElement('img'); img.alt = title || 'AR'; img.src = 'icons/AR_icon.png'; img.style.width='1px'; img.style.height='1px';
+      a.appendChild(img);
+      document.body.appendChild(a);
+      return a;
+    }
+
+    function absoluteUrl(path) {
+      const base = new URL(window.location.href);
+      return new URL(path, base).toString();
+    }
+
+    function makeCard(item) {
+      const card = document.createElement('div'); card.className = 'card';
+      const name = document.createElement('div'); name.className='name'; name.textContent = item.name;
+      const note = document.createElement('div'); note.className='note'; note.textContent = item.usdz ? '' : 'Brak USDZ: Quick Look na iOS może nie działać';
+
+      const row = document.createElement('div'); row.className='row';
+
+      const viewBtn = document.createElement('a'); viewBtn.className='btn'; viewBtn.textContent='Podgląd 3D';
+      viewBtn.href = `ar_modelviewer.html?model=${encodeURIComponent(item.glb)}&usdz=${encodeURIComponent(item.usdz||'')}&name=${encodeURIComponent(item.name)}&ret=${encodeURIComponent('ar_gallery.html')}`;
+
+      const arBtn = document.createElement('a'); arBtn.className='btn primary'; arBtn.textContent='AR'; arBtn.href='#';
+      arBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const ret = absoluteUrl('ar_gallery.html');
+        if (isIOS() && item.usdz) {
+          const a = quickLookLink(absoluteUrl(item.usdz), item.name, ret);
+          a.click();
+          setTimeout(() => a.remove(), 500);
+        } else {
+          // Android Scene Viewer
+          window.location.href = sceneViewerUrl(absoluteUrl(item.glb), item.name, ret);
+        }
+      });
+
+      row.appendChild(viewBtn); row.appendChild(arBtn);
+
+      card.appendChild(name);
+      card.appendChild(note);
+      card.appendChild(row);
+      return card;
+    }
+
+    (async () => {
+      try {
+        const items = await loadManifest();
+        const grid = document.getElementById('grid');
+        items.forEach(it => grid.appendChild(makeCard(it)));
+      } catch (e) {
+        const grid = document.getElementById('grid');
+        grid.textContent = 'Błąd: ' + e.message;
+      }
+    })();
+  </script>
+</body>
+</html>

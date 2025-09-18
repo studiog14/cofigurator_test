@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Search Icon Line Fix</title>
+  <style>
+    /* This is the CSS that needs to be added to the style section */
+    #search-toggle {
+      position: relative !important;
+    }
+
+    #search-toggle::after {
+      content: '';
+      position: absolute;
+      bottom: -8px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 30px;
+      height: 2px;
+      background-color: #F5C842;
+      border-radius: 1px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Search Icon Line Fix</h1>
+  
+  <h2>Option 1: Add CSS to style section</h2>
+  <p>Add the following CSS to the style section in index.html:</p>
+  <pre>
+#search-toggle {
+  position: relative !important;
+}
+
+#search-toggle::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 30px;
+  height: 2px;
+  background-color: #F5C842;
+  border-radius: 1px;
+}
+  </pre>
+  
+  <h2>Option 2: Add JavaScript before closing body tag</h2>
+  <p>Add the following script before the closing body tag in index.html:</p>
+  <pre>
+&lt;script&gt;
+// Add line under search icon
+document.addEventListener('DOMContentLoaded', function() {
+  // Get the search toggle button
+  const searchToggle = document.getElementById('search-toggle');
+  
+  if (searchToggle) {
+    // Add position relative to the search toggle
+    searchToggle.style.position = 'relative';
+    
+    // Create a new element for the line
+    const line = document.createElement('div');
+    
+    // Style the line
+    line.style.position = 'absolute';
+    line.style.bottom = '-8px';
+    line.style.left = '50%';
+    line.style.transform = 'translateX(-50%)';
+    line.style.width = '30px';
+    line.style.height = '2px';
+    line.style.backgroundColor = '#F5C842';
+    line.style.borderRadius = '1px';
+    
+    // Append the line to the search toggle
+    searchToggle.appendChild(line);
+  }
+});
+&lt;/script&gt;
+  </pre>
+  
+  <h2>Option 3: Use Bookmarklet</h2>
+  <p>Create a bookmark with the following JavaScript code as the URL:</p>
+  <pre>
+javascript:(function() {
+  // Get the search toggle button
+  const searchToggle = document.getElementById('search-toggle');
+  
+  if (searchToggle) {
+    // Add position relative to the search toggle
+    searchToggle.style.position = 'relative';
+    
+    // Create a new element for the line
+    const line = document.createElement('div');
+    
+    // Style the line
+    line.style.position = 'absolute';
+    line.style.bottom = '-8px';
+    line.style.left = '50%';
+    line.style.transform = 'translateX(-50%)';
+    line.style.width = '30px';
+    line.style.height = '2px';
+    line.style.backgroundColor = '#F5C842';
+    line.style.borderRadius = '1px';
+    
+    // Append the line to the search toggle
+    searchToggle.appendChild(line);
+  }
+})();
+  </pre>
+  <p>Click the bookmark after the page loads to add the line under the search icon.</p>
+</body>
+</html>

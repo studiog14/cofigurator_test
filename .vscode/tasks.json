@@ -1,0 +1,77 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Uruchom serwer konfiguratora",
+			"type": "shell",
+			"command": "python",
+			"args": [
+				"-m",
+				"http.server",
+				"8000"
+			],
+			"isBackground": true,
+			"group": "build"
+		},
+		{
+			"label": "Uruchom serwer Node (dev)",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"serve:dev"
+			],
+			"isBackground": true,
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Uruchom serwer Node",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"server.js"
+			],
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Uruchom serwer konfiguratora",
+			"type": "shell",
+			"command": "python",
+			"args": [
+				"-m",
+				"http.server",
+				"8000"
+			],
+			"isBackground": true,
+			"group": "build"
+		},
+		{
+			"label": "Uruchom serwer konfiguratora (py -3)",
+			"type": "shell",
+			"command": "py",
+			"args": [
+				"-3",
+				"-m",
+				"http.server",
+				"8000"
+			],
+			"isBackground": true,
+			"group": "build"
+		},
+		{
+			"label": "Uruchom serwer Node (local)",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"server.js"
+			],
+			"isBackground": true,
+			"group": "build"
+		}
+	]
+}

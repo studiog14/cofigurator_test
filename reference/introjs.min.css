@@ -1,0 +1,21 @@
+/* Simple Intro.js CSS */
+.introjs-tooltip {
+    background-color: #333;
+    color: white;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+}
+
+.introjs-button {
+    background: #007cba;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.introjs-button:hover {
+    background: #005a8b;
+}

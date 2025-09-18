@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <title>FK Krzesła - Test iOS</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/favicon.png">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .container {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            max-width: 90%;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+        .btn {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 15px 25px;
+            border-radius: 12px;
+            font-size: 16px;
+            margin: 10px;
+            cursor: pointer;
+            min-width: 200px;
+        }
+        .btn:hover {
+            background: #0056CC;
+        }
+        .status {
+            background: rgba(0,0,0,0.2);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-family: monospace;
+            font-size: 12px;
+            text-align: left;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .success { color: #34C759; }
+        .error { color: #FF3B30; }
+        .warning { color: #FF9500; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🪑 Fajne Krzesła</h1>
+        <h2>Test iOS Compatibility</h2>
+        
+        <div id="device-info">
+            <p><strong>Urządzenie:</strong> <span id="device"></span></p>
+            <p><strong>User Agent:</strong> <span id="user-agent"></span></p>
+            <p><strong>Platform:</strong> <span id="platform"></span></p>
+        </div>
+        
+        <div class="status" id="log"></div>
+        
+        <button class="btn" onclick="testDataLoading()">🔄 Test ładowania danych</button>
+        <button class="btn" onclick="testWebGL()">🎮 Test WebGL</button>
+        <button class="btn" onclick="goToFullApp()">🚀 Przejdź do aplikacji</button>
+        
+        <div style="margin-top: 20px;">
+            <h3>Opcje instalacji:</h3>
+            <button class="btn" onclick="showPWAInstructions()">📱 Instrukcje PWA</button>
+            <button class="btn" onclick="openInSafari()">🌐 Otwórz w Safari</button>
+        </div>
+    </div>
+
+    <script>
+        // Device detection
+        function detectDevice() {
+            const ua = navigator.userAgent;
+            const platform = navigator.platform;
+            const maxTouch = navigator.maxTouchPoints;
+            
+            let device = 'Unknown';
+            if (/iPhone/.test(ua)) device = 'iPhone';
+            else if (/iPad/.test(ua)) device = 'iPad';
+            else if (/iPod/.test(ua)) device = 'iPod';
+            else if (platform === 'MacIntel' && maxTouch > 1) device = 'iPad (iOS 13+)';
+            else if (/Android/.test(ua)) device = 'Android';
+            else device = 'Desktop/Other';
+            
+            document.getElementById('device').textContent = device;
+            document.getElementById('user-agent').textContent = ua.substring(0, 100) + '...';
+            document.getElementById('platform').textContent = platform;
+            
+            log(`Device detected: ${device}`, 'success');
+        }
+        
+        function log(message, type = 'info') {
+            const logEl = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : type === 'warning' ? 'warning' : '';
+            logEl.innerHTML += `<div class="${className}">[${time}] ${message}</div>`;
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+        
+        async function testDataLoading() {
+            log('Starting data loading test...', 'info');
+            
+            try {
+                const sheetId = '1lZMJ-4Qd0nDY-7Hl9iV-pJnZSTVzYiA-A3rDq_bC16U';
+                const url = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=0`;
+                
+                log('Fetching data...', 'info');
+                const response = await fetch(url, {
+                    cache: 'no-store',
+                    headers: { 'Accept': 'text/csv' }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.text();
+                log(`✅ Data loaded successfully! Size: ${data.length} characters`, 'success');
+                log(`First 100 chars: ${data.substring(0, 100)}...`, 'info');
+                
+            } catch (error) {
+                log(`❌ Data loading failed: ${error.message}`, 'error');
+            }
+        }
+        
+        function testWebGL() {
+            log('Testing WebGL support...', 'info');
+            
+            try {
+                const canvas = document.createElement('canvas');
+                const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                
+                if (gl) {
+                    const renderer = gl.getParameter(gl.RENDERER);
+                    const version = gl.getParameter(gl.VERSION);
+                    log(`✅ WebGL supported!`, 'success');
+                    log(`Renderer: ${renderer}`, 'info');
+                    log(`Version: ${version}`, 'info');
+                } else {
+                    log(`❌ WebGL not supported`, 'error');
+                }
+            } catch (error) {
+                log(`❌ WebGL test failed: ${error.message}`, 'error');
+            }
+        }
+        
+        function goToFullApp() {
+            log('Redirecting to full application...', 'info');
+            window.location.href = 'index.html';
+        }
+        
+        function showPWAInstructions() {
+            alert(`📱 Aby zainstalować jako aplikację na iOS:
+
+1. Otwórz tę stronę w Safari
+2. Naciśnij przycisk "Udostępnij" (kwadrat ze strzałką w górę)
+3. Przewiń w dół i wybierz "Dodaj do ekranu głównego"
+4. Potwierdź nazwę i naciśnij "Dodaj"
+
+Aplikacja pojawi się na ekranie głównym jako ikona!`);
+        }
+        
+        function openInSafari() {
+            if (navigator.standalone) {
+                log('Already running as PWA', 'warning');
+                return;
+            }
+            
+            const url = window.location.href;
+            window.open(url, '_blank');
+        }
+        
+        // Initialize
+        detectDevice();
+        log('iOS Test Page loaded', 'success');
+        
+        // Auto-test on load
+        setTimeout(() => {
+            testDataLoading();
+            testWebGL();
+        }, 1000);
+    </script>
+</body>
+</html>

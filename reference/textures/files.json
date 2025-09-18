@@ -1,0 +1,5 @@
+{
+  "Brooklyn/Beige": ["baseColor.jpg", "roughness.jpg", "normal.jpg", "metallic.jpg"],
+  "Brooklyn/Mud": ["baseColor.jpg", "roughness.jpg", "normal.jpg", "metallic.jpg"],
+  "Brooklyn/Ocean": ["baseColor.jpg", "roughness.jpg", "normal.jpg", "metallic.jpg"]
+}

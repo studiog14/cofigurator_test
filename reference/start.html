@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>FK Krzesła - Wybierz wersję</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/favicon.png">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: rgba(255,255,255,0.95);
+            border-radius: 25px;
+            padding: 40px;
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+        }
+        .logo {
+            font-size: 60px;
+            margin-bottom: 10px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+        .version-card {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 15px;
+            padding: 20px;
+            margin: 15px 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+        .version-card:hover {
+            border-color: #007AFF;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,122,255,0.2);
+        }
+        .version-card h3 {
+            color: #007AFF;
+            margin-bottom: 8px;
+            font-size: 18px;
+        }
+        .version-card p {
+            color: #666;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        .device-info {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            font-size: 12px;
+            color: #666;
+        }
+        .badge {
+            display: inline-block;
+            background: #34C759;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 10px;
+            margin: 15px 0;
+            font-size: 12px;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🪑</div>
+        <h1>Fajne Krzesła</h1>
+        <p class="subtitle">Konfigurator 3D</p>
+        
+        <div id="device-warning" class="warning" style="display: none;">
+            ⚠️ Wykryto urządzenie iOS. Rekomendujemy wersję mobilną dla lepszej wydajności.
+        </div>
+        
+        <a href="index.html?full=1" class="version-card">
+            <h3>🚀 Pełna wersja</h3>
+            <p>Zaawansowany konfigurator 3D z wszystkimi funkcjami. Najlepszy na komputerach i nowoczesnych telefonach.</p>
+        </a>
+        
+        <a href="mobile.html" class="version-card">
+            <h3>📱 Wersja mobilna <span class="badge">iOS</span></h3>
+            <p>Uproszczona wersja zoptymalizowana pod urządzenia mobilne. Szybkie ładowanie, mniejsze zużycie baterii.</p>
+        </a>
+        
+        <a href="ios-test.html" class="version-card">
+            <h3>🔧 Test kompatybilności</h3>
+            <p>Sprawdź kompatybilność swojego urządzenia przed uruchomieniem aplikacji.</p>
+        </a>
+        
+        <div class="device-info">
+            <strong>Twoje urządzenie:</strong><br>
+            <span id="device-info-text">Wykrywanie...</span>
+        </div>
+    </div>
+
+    <script>
+        // Device detection
+        function detectDevice() {
+            const ua = navigator.userAgent;
+            const platform = navigator.platform;
+            const maxTouch = navigator.maxTouchPoints;
+            
+            let deviceName = 'Unknown';
+            let isIOS = false;
+            
+            if (/iPhone/.test(ua)) {
+                deviceName = 'iPhone';
+                isIOS = true;
+            } else if (/iPad/.test(ua)) {
+                deviceName = 'iPad';
+                isIOS = true;
+            } else if (/iPod/.test(ua)) {
+                deviceName = 'iPod';
+                isIOS = true;
+            } else if (platform === 'MacIntel' && maxTouch > 1) {
+                deviceName = 'iPad (iOS 13+)';
+                isIOS = true;
+            } else if (/Android/.test(ua)) {
+                deviceName = 'Android';
+            } else if (/Mac/.test(platform)) {
+                deviceName = 'Mac';
+            } else if (/Win/.test(platform)) {
+                deviceName = 'Windows';
+            } else {
+                deviceName = 'Desktop/Other';
+            }
+            
+            document.getElementById('device-info-text').textContent = `${deviceName} (${platform})`;
+            
+            if (isIOS) {
+                document.getElementById('device-warning').style.display = 'block';
+                
+                // Auto-redirect to mobile version after 3 seconds
+                setTimeout(() => {
+                    if (confirm('Wykryto urządzenie iOS. Czy chcesz automatycznie przejść do wersji mobilnej?')) {
+                        window.location.href = 'mobile.html';
+                    }
+                }, 3000);
+            }
+        }
+        
+        // Initialize
+        detectDevice();
+        
+        // Add click tracking
+        document.querySelectorAll('.version-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                const version = e.currentTarget.href.split('/').pop();
+                console.log('Selected version:', version);
+                
+                // Store preference
+                localStorage.setItem('preferredVersion', version);
+            });
+        });
+        
+        // Check for returning users
+        const preferredVersion = localStorage.getItem('preferredVersion');
+        if (preferredVersion && !window.location.search.includes('choose')) {
+            console.log('Redirecting to preferred version:', preferredVersion);
+            // Uncomment to auto-redirect returning users
+            // window.location.href = preferredVersion;
+        }
+    </script>
+</body>
+</html>

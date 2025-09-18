@@ -1,0 +1,10 @@
+{
+  "scripts": {
+    "sync:mobile-icons": "node ./scripts/sync-mobile-icons.js",
+    "start:dev": "npm run sync:mobile-icons && python -m http.server 8000",
+    "serve:dev": "node server.js"
+  },
+  "dependencies": {
+    "threepipe": "^0.0.49"
+  }
+}

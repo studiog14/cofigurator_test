@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Force Mobile Mode Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-btn { 
+            padding: 15px 25px; 
+            margin: 10px; 
+            background: #007bff; 
+            color: white; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .test-btn:hover { background: #0056b3; }
+        .status { 
+            padding: 10px; 
+            margin: 10px 0; 
+            border-radius: 5px; 
+            background: #f8f9fa; 
+            border: 1px solid #dee2e6;
+        }
+    </style>
+</head>
+<body>
+    <h1>Mobile Mode Test</h1>
+    
+    <div class="status" id="status">
+        <strong>Current Status:</strong>
+        <div id="current-info"></div>
+    </div>
+    
+    <button class="test-btn" onclick="forceMobileMode()">Force Mobile Mode</button>
+    <button class="test-btn" onclick="forceDesktopMode()">Force Desktop Mode</button>
+    <button class="test-btn" onclick="openConfigurator()">Open Configurator</button>
+    <button class="test-btn" onclick="refreshStatus()">Refresh Status</button>
+    
+    <script>
+        function refreshStatus() {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            const ua = navigator.userAgent;
+            const hasMobileClass = document.body.classList.contains('mobile-mode');
+            
+            // Test mobile detection logic from configurator
+            const uaMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+            const isNarrowScreen = window.innerWidth <= 900;
+            const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+            const isDevToolsEmulator = isNarrowScreen && (hasTouch || window.orientation !== undefined || navigator.userAgent.includes('Chrome'));
+            const isSmallScreen = window.innerWidth <= 768;
+            const shouldBeMobile = uaMobile || isDevToolsEmulator || isSmallScreen;
+            
+            document.getElementById('current-info').innerHTML = `
+                <p><strong>Window:</strong> ${width} x ${height}</p>
+                <p><strong>UA Mobile:</strong> ${uaMobile}</p>
+                <p><strong>Narrow Screen (≤900):</strong> ${isNarrowScreen}</p>
+                <p><strong>Has Touch:</strong> ${hasTouch}</p>
+                <p><strong>DevTools Emulator:</strong> ${isDevToolsEmulator}</p>
+                <p><strong>Small Screen (≤768):</strong> ${isSmallScreen}</p>
+                <p><strong>Should Be Mobile:</strong> ${shouldBeMobile}</p>
+                <p><strong>Has mobile-mode class:</strong> ${hasMobileClass}</p>
+                <p><strong>User Agent:</strong> ${ua.substring(0, 80)}...</p>
+            `;
+        }
+        
+        function forceMobileMode() {
+            document.body.classList.add('mobile-mode');
+            localStorage.setItem('forceMobileMode', 'true');
+            refreshStatus();
+            alert('Mobile mode forced! Body now has mobile-mode class.');
+        }
+        
+        function forceDesktopMode() {
+            document.body.classList.remove('mobile-mode');
+            localStorage.setItem('forceMobileMode', 'false');
+            refreshStatus();
+            alert('Desktop mode forced! mobile-mode class removed.');
+        }
+        
+        function openConfigurator() {
+            window.open('index.html', '_blank');
+        }
+        
+        // Check if force mode is set
+        const forceMode = localStorage.getItem('forceMobileMode');
+        if (forceMode === 'true') {
+            document.body.classList.add('mobile-mode');
+        } else if (forceMode === 'false') {
+            document.body.classList.remove('mobile-mode');
+        }
+        
+        // Initial status and auto-refresh
+        refreshStatus();
+        window.addEventListener('resize', refreshStatus);
+    </script>
+</body>
+</html>

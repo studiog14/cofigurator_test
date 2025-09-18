@@ -1,0 +1,15 @@
+#search-toggle {
+  position: relative !important;
+}
+
+#search-toggle::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 30px;
+  height: 2px;
+  background-color: #F5C842;
+  border-radius: 1px;
+}

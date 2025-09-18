@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <title>Pseudo AR</title>
+  <meta name="theme-color" content="#000000">
+  <style>
+    html, body { height: 100%; margin: 0; background: #000; }
+    #videoBg { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; background: #000; }
+  #canvas3d { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 1; display: block; touch-action: none; }
+    #ui { position: fixed; left: 0; right: 0; bottom: env(safe-area-inset-bottom, 0); display: flex; gap: 10px; justify-content: center; padding: 12px calc(12px + env(safe-area-inset-right, 0)) calc(12px + env(safe-area-inset-bottom, 0)) calc(12px + env(safe-area-inset-left, 0)); z-index: 2; }
+    .btn { background: rgba(0,0,0,0.6); color: #fff; border: 1px solid rgba(255,255,255,0.2); padding: 10px 14px; border-radius: 12px; font-family: system-ui, sans-serif; font-size: 14px; }
+    #toast { position: fixed; top: calc(10px + env(safe-area-inset-top, 0)); left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); color:#fff; padding:8px 12px; border-radius:10px; z-index:3; font-family: system-ui, sans-serif; font-size: 13px; display:none; }
+  </style>
+  <!-- Import maps shim for wider browser support -->
+  <script async src="https://unpkg.com/es-module-shims@1.10.0/dist/es-module-shims.js"></script>
+  <script type="importmap-shim">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.157.0/build/three.module.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="toast"></div>
+  <video id="videoBg" playsinline webkit-playsinline autoplay muted></video>
+  <canvas id="canvas3d"></canvas>
+  <div id="ui">
+    <button id="backBtn" type="button" class="btn">Wróć</button>
+    <button id="resetBtn" type="button" class="btn">Reset</button>
+  <button id="floorBtn" type="button" class="btn">Na podłodze</button>
+  <button id="configBtn" type="button" class="btn">Konfiguruj</button>
+  </div>
+
+  <!-- iOS/Safari: tap-to-enable camera overlay -->
+  <div id="tapOverlay" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.85);z-index:4;">
+    <button id="tapStart" class="btn" style="font-size:16px;padding:12px 18px;border-radius:14px;border:1px solid rgba(255,255,255,0.3);background:#111;">Dotknij, aby uruchomić kamerę</button>
+  </div>
+
+  <!-- Loading overlay -->
+  <div id="loadingOverlay" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.75);z-index:3;">
+    <div style="color:#fff;font-family:system-ui,sans-serif;text-align:center">
+      <div style="width:36px;height:36px;border:3px solid rgba(255,255,255,0.25);border-top-color:#fff;border-radius:50%;margin:0 auto 12px;animation:spin 1s linear infinite"></div>
+      <div id="loadingText">Ładowanie AR…</div>
+    </div>
+  </div>
+  <style>
+    @keyframes spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
+  </style>
+  <!-- Use ESM modules from examples/jsm (non-module examples/js removed in r157) -->
+  <script type="module-shim">
+  import * as THREE from 'three';
+    import { GLTFLoader } from 'https://unpkg.com/three@0.157.0/examples/jsm/loaders/GLTFLoader.js';
+
+    (function(){
+      const toast = (msg)=>{ const el = document.getElementById('toast'); el.textContent = msg; el.style.display = 'block'; clearTimeout(el._t); el._t = setTimeout(()=>{ el.style.display='none'; }, 2500); };
+
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const video = document.getElementById('videoBg');
+      const canvas = document.getElementById('canvas3d');
+      const backBtn = document.getElementById('backBtn');
+      const resetBtn = document.getElementById('resetBtn');
+      const configBtn = document.getElementById('configBtn');
+      const tapOverlay = document.getElementById('tapOverlay');
+      const tapStart = document.getElementById('tapStart');
+  const loadingOverlay = document.getElementById('loadingOverlay');
+  const loadingText = document.getElementById('loadingText');
+
+  const urlParams = new URLSearchParams(location.search);
+  let modelUrl = urlParams.get('model');
+  const chairName = decodeURIComponent(urlParams.get('name') || '').trim();
+      const retUrl = (() => { try { return urlParams.get('ret') || ''; } catch(_) { return ''; } })();
+
+      if (!modelUrl) {
+        // Fallback to default model
+        modelUrl = 'chairs/Default.glb';
+      }
+
+      function goBack(){
+        if (history.length > 1) { history.back(); return; }
+        if (retUrl) { location.href = retUrl; return; }
+        if (document.referrer) { location.href = document.referrer; return; }
+        location.href = 'index.html';
+      }
+
+  function exitWithLoader(action){
+        loadingText.textContent = action === 'config' ? 'Powrót do konfiguratora…' : 'Powrót…';
+        loadingOverlay.style.display = 'flex';
+        setTimeout(() => {
+          if (action === 'config') {
+    // Prefer history.back to preserve SPA state; else ref/ret/index
+    if (history.length > 1) { history.back(); }
+    else if (document.referrer && document.referrer.startsWith(location.origin) && !/pseudo_ar\.html/i.test(document.referrer)) { location.href = document.referrer; }
+    else if (retUrl) { location.href = retUrl; }
+    else { location.href = 'index.html'; }
+          } else {
+            goBack();
+          }
+        }, 120);
+      }
+  backBtn.addEventListener('click', (e)=>{ e.preventDefault(); exitWithLoader('back'); });
+  // Konfiguruj: teraz identycznie jak Wróć, by zachować stan SPA bez odświeżenia
+  configBtn.addEventListener('click', (e)=>{ e.preventDefault(); goBack(); });
+
+      // Three.js setup
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(innerWidth, innerHeight);
+
+  const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.01, 100);
+      camera.position.set(0.6, 0.5, 1.2);
+
+      const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0);
+      scene.add(light);
+      const dir = new THREE.DirectionalLight(0xffffff, 0.6); dir.position.set(1,2,1); scene.add(dir);
+
+  const root = new THREE.Group();
+      scene.add(root);
+  let loadedModel = null;
+  let modelYOffset = 0; // keep model touching the floor
+  const raycaster = new THREE.Raycaster();
+  const ndc = new THREE.Vector2();
+  const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); // y = 0 plane
+  const tmpVec3 = new THREE.Vector3();
+  let isDragging = false;
+  let dragMode = null; // 'move' | 'rotate'
+  const dragOffset = new THREE.Vector3();
+  let startRotationY = 0;
+  let startAngle = 0;
+
+      // Optional: simple ground shadow
+      const plane = new THREE.Mesh(
+        new THREE.CircleGeometry(0.8, 48),
+        new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.15 })
+      );
+      plane.rotation.x = -Math.PI/2;
+      plane.position.y = 0;
+      root.add(plane);
+
+      // Load model
+      let cameraReady = false;
+      let modelReady = false;
+      const hideLoaderWhenReady = (() => {
+        let forced = false;
+        const maybe = () => {
+          if (!forced && cameraReady && modelReady) {
+            loadingOverlay.style.display = 'none';
+            forced = true;
+          }
+        };
+        // Safety timeout in case one of the sources is unavailable
+        setTimeout(() => {
+          if (!forced) {
+            loadingOverlay.style.display = 'none';
+            forced = true;
+            // If still no camera video, inform user to allow permissions
+            if (!(video.videoWidth && video.videoHeight)) {
+              toast('Brak podglądu kamery – sprawdź uprawnienia');
+            }
+          }
+        }, 3500);
+        return maybe;
+      })();
+
+      async function resolveModelUrl(initialUrl, name){
+        try {
+          const isDefault = !initialUrl || /\/Default\.glb(\b|$)/i.test(initialUrl);
+          if (isDefault && name) {
+            const res = await fetch('chairs/manifest.json', { cache: 'no-store' });
+            const list = await res.json();
+            const found = list.find(x => (x.name || '').toLowerCase() === name.toLowerCase() || (x.id || '').toLowerCase() === name.toLowerCase());
+            if (found && found.glb) return found.glb;
+          }
+          return initialUrl || 'chairs/Default.glb';
+        } catch {
+          return initialUrl || 'chairs/Default.glb';
+        }
+      }
+
+      (async function(){
+        try {
+          const loader = new GLTFLoader();
+          const resolved = await resolveModelUrl(modelUrl, chairName);
+          const abs = new URL(resolved, location.href).toString();
+          let lastPct = 0;
+          toast('Ładowanie modelu...');
+          const gltf = await new Promise((resolve, reject)=>{
+            loader.load(abs, resolve, (ev)=>{
+              if (ev && ev.total) {
+                const pct = Math.min(100, Math.round(ev.loaded * 100 / ev.total));
+                if (pct !== lastPct && (pct === 100 || pct % 10 === 0)) {
+                  toast('Ładowanie modelu: ' + pct + '%');
+                  lastPct = pct;
+                }
+              }
+            }, reject);
+          });
+          const loaded = gltf.scene;
+          loaded.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; } });
+          // Ustaw na podłodze w oryginalnej skali modelu (bez normalizacji)
+          const box = new THREE.Box3().setFromObject(loaded);
+          modelYOffset = -box.min.y;
+          loaded.position.y = modelYOffset;
+          root.add(loaded);
+          loadedModel = loaded;
+          toast('Model wczytany');
+          modelReady = true; hideLoaderWhenReady();
+        } catch (e) {
+          console.warn('Nie udało się wczytać modelu', e);
+          toast('Błąd wczytywania modelu');
+        }
+      })();
+
+      // Reset view
+      resetBtn.addEventListener('click', () => {
+        camera.position.set(0.6, 0.5, 1.2);
+        if (loadedModel) {
+          loadedModel.position.set(0, modelYOffset, 0);
+          loadedModel.rotation.y = 0;
+        }
+      });
+
+      // Snap model to floor
+      document.getElementById('floorBtn').addEventListener('click', () => {
+        if (!loadedModel) return;
+        const box = new THREE.Box3().setFromObject(loadedModel);
+        loadedModel.position.y -= box.min.y;
+        toast('Ustawiono na podłodze');
+      });
+
+      // Resize
+  window.addEventListener('resize', () => {
+        renderer.setSize(innerWidth, innerHeight);
+        camera.aspect = innerWidth/innerHeight;
+        camera.updateProjectionMatrix();
+      });
+
+      // Animate
+      const clock = new THREE.Clock();
+      function tick(){
+        clock.getDelta();
+        renderer.render(scene, camera);
+        requestAnimationFrame(tick);
+      }
+      tick();
+
+      // ===== AR-like gestures: move on floor with one finger/mouse, rotate with two fingers =====
+      function setNDCFromEvent(clientX, clientY){
+        ndc.x = (clientX / innerWidth) * 2 - 1;
+        ndc.y = -(clientY / innerHeight) * 2 + 1;
+      }
+      function intersectFloor(clientX, clientY){
+        setNDCFromEvent(clientX, clientY);
+        raycaster.setFromCamera(ndc, camera);
+        return raycaster.ray.intersectPlane(floorPlane, tmpVec3);
+      }
+
+      // Touch: one finger move, two fingers rotate
+      canvas.addEventListener('touchstart', (e) => {
+        if (!loadedModel) return;
+        if (e.touches.length === 1) {
+          const t = e.touches[0];
+          const hit = intersectFloor(t.clientX, t.clientY);
+          if (hit) {
+            dragMode = 'move';
+            isDragging = true;
+            dragOffset.copy(loadedModel.position).sub(hit);
+          }
+        } else if (e.touches.length === 2) {
+          const [t0, t1] = e.touches;
+          const dx = t1.clientX - t0.clientX;
+          const dy = t1.clientY - t0.clientY;
+          startAngle = Math.atan2(dy, dx);
+          startRotationY = loadedModel.rotation.y;
+          dragMode = 'rotate';
+          isDragging = true;
+        }
+        e.preventDefault();
+      }, { passive: false });
+
+      canvas.addEventListener('touchmove', (e) => {
+        if (!isDragging || !loadedModel) return;
+        if (dragMode === 'move' && e.touches.length === 1) {
+          const t = e.touches[0];
+          const hit = intersectFloor(t.clientX, t.clientY);
+          if (hit) {
+            loadedModel.position.x = hit.x + dragOffset.x;
+            loadedModel.position.z = hit.z + dragOffset.z;
+            loadedModel.position.y = modelYOffset;
+          }
+        } else if (dragMode === 'rotate' && e.touches.length === 2) {
+          const [t0, t1] = e.touches;
+          const dx = t1.clientX - t0.clientX;
+          const dy = t1.clientY - t0.clientY;
+          const angle = Math.atan2(dy, dx);
+          loadedModel.rotation.y = startRotationY + (angle - startAngle);
+        }
+        e.preventDefault();
+      }, { passive: false });
+
+      canvas.addEventListener('touchend', (e) => {
+        if (e.touches.length === 0) { isDragging = false; dragMode = null; }
+      });
+
+      // Mouse: left button drag to move on floor
+      let mouseDown = false;
+      canvas.addEventListener('mousedown', (e) => {
+        if (!loadedModel || e.button !== 0) return;
+        const hit = intersectFloor(e.clientX, e.clientY);
+        if (hit) {
+          dragMode = 'move';
+          isDragging = true;
+          mouseDown = true;
+          dragOffset.copy(loadedModel.position).sub(hit);
+        }
+      });
+      window.addEventListener('mousemove', (e) => {
+        if (!mouseDown || !isDragging || dragMode !== 'move' || !loadedModel) return;
+        const hit = intersectFloor(e.clientX, e.clientY);
+        if (hit) {
+          loadedModel.position.x = hit.x + dragOffset.x;
+          loadedModel.position.z = hit.z + dragOffset.z;
+          loadedModel.position.y = modelYOffset;
+        }
+      });
+      window.addEventListener('mouseup', () => { mouseDown = false; isDragging = false; dragMode = null; });
+
+      // Camera start logic
+      async function pickBackCameraId(){
+        try {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const videos = devices.filter(d=>d.kind==='videoinput');
+          const back = videos.find(d=>/back|rear|environment/i.test(d.label)) || videos[1] || videos[0];
+          return back && back.deviceId;
+        } catch { return null; }
+      }
+
+      async function startCamera(){
+        try {
+          const hasMedia = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+          if (!hasMedia) {
+            toast('Kamera niedostępna na tym urządzeniu');
+            return;
+          }
+          // Try a sequence of constraints
+          const trials = [
+            { video: { facingMode: { ideal: 'environment' } }, audio: false },
+            { video: { facingMode: 'environment' }, audio: false },
+            { video: true, audio: false }
+          ];
+          let stream;
+          let lastErr;
+          for (const c of trials) {
+            try { stream = await navigator.mediaDevices.getUserMedia(c); break; } catch (e) { lastErr = e; }
+          }
+          if (!stream) {
+            // After permission, try selecting a specific back camera
+            const id = await pickBackCameraId();
+            if (id) {
+              try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: id } }, audio: false });
+              } catch (e) { lastErr = e; }
+            }
+          }
+          if (!stream) throw lastErr || new Error('Brak strumienia wideo');
+          video.srcObject = stream;
+          try { await video.play(); } catch(_) {}
+          tapOverlay.style.display = 'none';
+          cameraReady = true; hideLoaderWhenReady();
+        } catch (e) {
+          console.warn('Camera unavailable', e);
+          toast('Brak dostępu do kamery – sprawdź uprawnienia');
+          // Keep overlay visible to allow retry
+          tapOverlay.style.display = 'flex';
+          // As a visual fallback, use subtle gradient background
+          video.style.background = 'linear-gradient(180deg,#111,#222)';
+        }
+      }
+
+      // Always present overlay first; try auto-start in background and hide if it succeeds
+      tapOverlay.style.display = 'flex';
+      startCamera().then(() => {
+        setTimeout(() => {
+          if (video.videoWidth && video.videoHeight) {
+            tapOverlay.style.display = 'none';
+          }
+        }, 800);
+      });
+      tapStart.addEventListener('click', startCamera);
+
+      // Hint if still black after a while
+      setTimeout(() => {
+        try {
+          const w = video.videoWidth || 0;
+          const h = video.videoHeight || 0;
+          if (!w || !h) toast('Jeśli nie widzisz kamery, udziel dostępu w przeglądarce');
+        } catch(_){ }
+      }, 2000);
+    })();
+  </script>
+</body>
+</html>
