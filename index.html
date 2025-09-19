@@ -6054,8 +6054,11 @@ body.mobile-mode #standalone-mobile-ui {
         modelBaseName = `${variant.Nazwa} ${variant.Wariant.toLowerCase()}`;
         console.log(`📂 Silent load z wariantem: ${modelBaseName}`);
       }
-      
-      currentModelContainer = await loadModelWithFreshness(`chairs/${modelBaseName}.glb`, viewer, { autoCenter: true });
+      // 🔒 Opcja A: dla kubełek NIE centrować automatycznie (zachowaj eksportowane pozycje/originy)
+      const _grupaSilent = (variant && variant.Grupa ? String(variant.Grupa).trim().toLowerCase() : '');
+      const _isBucketSilent = _grupaSilent === 'kubełek' || _grupaSilent === 'kubelek';
+
+      currentModelContainer = await loadModelWithFreshness(`chairs/${modelBaseName}.glb`, viewer, { autoCenter: !_isBucketSilent });
 
       console.log("Meshe w modelu:", currentModelContainer.children.map(obj => obj.name)); // <-- DODAJ TO TUTAJ
   // Keep selection in sync for AR helpers
@@ -6105,8 +6108,17 @@ body.mobile-mode #standalone-mobile-ui {
       // Wyśrodkuj kamerę na modelu
       const box = new Box3().setFromObject(currentModelContainer);
       const center = box.getCenter(new Vector3());
-      setCameraView(center);
-      currentModelContainer.position.sub(center);
+      
+      // Dla kubełków nie ustawiaj kamery jeszcze - zrobimy to po załadowaniu nóg
+      const _isKubelek = selectedChair && selectedChair.Grupa && selectedChair.Grupa.toLowerCase() === 'kubełek';
+      if (!_isKubelek) {
+        setCameraView(center);
+      }
+      
+      // 🔒 Nie przesuwaj kubełka do środka sceny – zachowaj pozycje X/Z z eksportu
+      if (!_isBucketSilent) {
+        currentModelContainer.position.sub(center);
+      }
       userInteracted = true;
       updateSummary();
       renderPartButtons();
@@ -6230,11 +6242,15 @@ body.mobile-mode #standalone-mobile-ui {
       return paths;
     }
 
+    // 🔒 Opcja A: flaguj kubełek aby pominąć auto-centrowanie i późniejsze przesuwanie do środka
+    const __grupa = (selectedChair && selectedChair.Grupa ? selectedChair.Grupa.toLowerCase() : '');
+    const __isBucket = __grupa === 'kubełek' || __grupa === 'kubelek';
+
     async function tryLoadAny(paths) {
       let lastError = null;
       for (const p of paths) {
         try {
-          return await loadModelWithFreshness(p, viewer, { autoCenter: true });
+          return await loadModelWithFreshness(p, viewer, { autoCenter: !__isBucket });
         } catch (e) {
           console.warn(`Nie udało się załadować modelu z: ${p}`, e);
           lastError = e;
@@ -6272,15 +6288,15 @@ body.mobile-mode #standalone-mobile-ui {
       const box = new Box3().setFromObject(currentModelContainer);
       const center = box.getCenter(new Vector3());
       setCameraView(center);
-      currentModelContainer.position.sub(center);
-  if (viewer && viewer.render) viewer.render();
+      // 🔒 Nie przesuwaj kubełka do środka sceny – zachowaj pozycje X/Z z eksportu
+      if (!__isBucket) {
+        currentModelContainer.position.sub(center);
+      }
+      if (viewer && viewer.render) viewer.render();
     } catch(e) { console.warn('Nie udało się ustawić kamery po załadowaniu modelu', e); }
 
-    // Jeśli kubełek, to ewentualnie załaduj domyślne nogi
+    // Jeśli kubełek, to ewentualnie załaduj domyślne nogi (bez wyrównywania Y kubełka do podłoża)
     if (selectedChair.Grupa && selectedChair.Grupa.toLowerCase() === 'kubełek') {
-      const chairBounds = new Box3().setFromObject(currentModelContainer);
-      currentModelContainer.position.y -= chairBounds.min.y;
-
       // Filtrowanie nóg po kategorii już na starcie
       const chairKategoria = (selectedChair.Kategoria || '').toLowerCase();
       let legsVariants = allData.filter(d => d.Grupa && d.Grupa.toLowerCase() === 'nogi');
@@ -6335,6 +6351,24 @@ body.mobile-mode #standalone-mobile-ui {
         viewer.scene.remove(currentLegModel);
         currentLegModel = null;
         selectedLeg = null;
+      }
+    }
+
+    // 🎥 Dla kubełków: ustaw kamerę na kubełek (nie na cały zestaw) po załadowaniu wszystkiego
+    if (selectedChair && selectedChair.Grupa && selectedChair.Grupa.toLowerCase() === 'kubełek') {
+      try {
+        // Użyj centrum kubełka jako punktu odniesienia (nie całego zestawu)
+        const bucketBounds = new Box3();
+        if (currentModelContainer) bucketBounds.setFromObject(currentModelContainer);
+        
+        const bucketCenter = bucketBounds.getCenter(new Vector3());
+        console.log(`🎥 silentLoadModel: Ustawiam kamerę na kubełek (origin), center:`, bucketCenter.toArray());
+        setCameraView(bucketCenter);
+        // Uruchom delikatny idle sway na domyślnej kamerze, bez zmiany widoku
+        setTimeout(() => { try { startIdleSway(); } catch(_) {} }, 50);
+        scheduleIdleSwayWatchdog('silentLoadModel+camera');
+      } catch(e) {
+        console.warn('Nie udało się ustawić kamery po załadowaniu kubełka+nóg', e);
       }
     }
 
@@ -6602,9 +6636,52 @@ setTimeout(()=>{
 
         if (currentModelContainer && selectedChair) {
           if (selectedChair.Grupa.toLowerCase() === 'kubełek') {
-            let height = parseFloat(variant.height) || legHeight;
-            newLegs.position.y = -height;
-            currentModelContainer.position.y = 0;
+            // RESET: Zawsze zacznij od pozycji (0,0,0) dla kubełka
+            currentModelContainer.position.set(0, 0, 0);
+            
+            // Oblicz bounding boxy po resecie pozycji
+            const bucketBounds = new Box3().setFromObject(currentModelContainer);
+            const bucketCenter = bucketBounds.getCenter(new Vector3());
+            
+            // Znajdź rzeczywisty dół siedziska przez raycast w dół przez środek kubełka
+            const raycaster = new THREE.Raycaster();
+            const rayOrigin = new Vector3(bucketCenter.x, bucketBounds.max.y + 1, bucketCenter.z); // Start nad kubełkiem
+            const rayDirection = new Vector3(0, -1, 0); // Kierunek w dół
+            
+            raycaster.set(rayOrigin, rayDirection);
+            
+            // Zbierz wszystkie meshe z kubełka
+            const bucketMeshes = [];
+            currentModelContainer.traverse((child) => {
+              if (child.isMesh) bucketMeshes.push(child);
+            });
+            
+            // Znajdź przecięcie z kubełkiem
+            const intersects = raycaster.intersectObjects(bucketMeshes);
+            let realSeatBottom = bucketBounds.min.y; // fallback na dół bounding box
+            
+            if (intersects.length > 0) {
+              // Weź najwyższe trafienie (pierwsze trafienie od góry) - to będzie góra siedziska
+              // Szukamy najniższego trafienia - to będzie dół siedziska
+              let lowestHit = intersects[0].point.y;
+              for (const hit of intersects) {
+                if (hit.point.y < lowestHit) {
+                  lowestHit = hit.point.y;
+                }
+              }
+              realSeatBottom = lowestHit;
+            }
+            
+            // Najpierw ustaw nogi tymczasowo na Y=0 żeby obliczyć ich rzeczywiste wymiary
+            newLegs.position.y = 0;
+            const legBounds = new Box3().setFromObject(newLegs);
+            const legTopY = legBounds.max.y;
+            
+            // Ustaw nogi tak, żeby ich góra dotykała rzeczywistego dołu siedziska
+            const finalLegY = realSeatBottom - legTopY;
+            newLegs.position.y = finalLegY;
+            
+            console.log(`🔧 Auto-pozycjonowanie kubełka: centrum=${bucketCenter.x.toFixed(2)},${bucketCenter.z.toFixed(2)}, raycast dół siedziska=${realSeatBottom.toFixed(3)}, nogi góra=${legTopY.toFixed(3)}, nogi finalna pozycja Y=${finalLegY.toFixed(3)}`);
           } else {
             // Sprawdź czy krzesło to hooker - jeśli tak, podnieś wyżej
             const isHookerChair = selectedChair && selectedChair.Kategoria && 
@@ -6630,6 +6707,21 @@ setTimeout(()=>{
         console.log(`🦵 setLegModel completed: selected leg = ${variant.Nazwa} (variant: ${variant.Wariant || 'none'})`);
 
         updateSummary();
+
+        // Dla kubełków: po załadowaniu nóg ustaw kamerę na kubełek (nie na cały zestaw)
+        if (selectedChair && selectedChair.Grupa.toLowerCase() === 'kubełek') {
+          try {
+            // Użyj centrum kubełka jako punktu odniesienia (nie całego zestawu)
+            const bucketBounds = new Box3();
+            if (currentModelContainer) bucketBounds.setFromObject(currentModelContainer);
+            
+            const bucketCenter = bucketBounds.getCenter(new Vector3());
+            console.log(`🎥 Ustawiam kamerę na kubełek (origin), center:`, bucketCenter.toArray());
+            setCameraView(bucketCenter);
+          } catch(e) {
+            console.warn('Nie udało się ustawić kamery po załadowaniu nóg', e);
+          }
+        }
 
         // Wymuszenie odświeżenia sceny
         if (viewer.render) viewer.render();
@@ -8725,7 +8817,9 @@ updateSummary();
 
         // Kolejność elementów do podsumowania
         const partOrder = ['seat', 'backseat_inside', 'backseat_outside', 'legs_material', 'backseat'];
-        const partLabels = ['Obicie', 'Oparcie wew.', 'Oparcie zew.', 'Stelaż', 'Siedzisko/Oparcie'];
+        // Dla kubełków zamiast "Siedzisko/Oparcie" pokaż "Obicie"
+        const isBucketGroup = selectedChair && selectedChair.Grupa && selectedChair.Grupa.toLowerCase().includes('kube');
+        const partLabels = ['Obicie', 'Oparcie wew.', 'Oparcie zew.', 'Stelaż', isBucketGroup ? 'Obicie' : 'Siedzisko/Oparcie'];
 
         // Ikonka modelu
         if (userInteracted && selectedChair && (selectedChair.Obrazek || selectedChair.Image)) {
@@ -8826,7 +8920,7 @@ updateSummary();
             
             detailLine.innerHTML = `
               <div>
-                <div style="font-weight: 500;">${label}: ${selectedChair.Nazwa}</div>
+                <div><span style="color:#000; font-weight:700;">${label}:</span> <span style="color:#444;">${selectedChair.Nazwa}</span></div>
                 <div style="font-size: 12px; color: #FF6B6B; font-weight: 600;">🔥 Promocja -${procent}%</div>
                 ${extraInfo}
               </div>
@@ -8855,7 +8949,7 @@ updateSummary();
             
             detailLine.innerHTML = `
               <div>
-                <span style="font-weight: 500;">${label}: ${selectedChair.Nazwa}</span>
+                <span style="color:#000; font-weight:700;">${label}:</span> <span style="color:#444;">${selectedChair.Nazwa}</span>
                 ${bestsellerBadge}
               </div>
               <strong style="font-size: 15px;">${price.toFixed(2)} PLN</strong>
@@ -8874,10 +8968,6 @@ updateSummary();
             const detailLine = document.createElement('div');
             detailLine.className = 'detail-item';
             
-            // Różne kolory dla materiałów nóg vs pozostałych
-            const isLegMaterial = partKey === 'legs_material';
-            const textColor = isLegMaterial ? '#333' : '#666';
-            
             detailLine.style.cssText = `
               display: flex;
               justify-content: space-between;
@@ -8885,7 +8975,13 @@ updateSummary();
               margin: 8px 0;
               font-size: 15px;
             `;
-            detailLine.innerHTML = `<span style="color: ${textColor}; font-weight: 700;">${partLabels[idx]}: ${mat.Nazwa}</span><strong>${price.toFixed(2)} PLN</strong>`;
+            detailLine.innerHTML = `
+              <div style="display:flex; gap:6px; align-items:baseline;">
+                <span style="color:#000; font-weight:700;">${partLabels[idx]}:</span>
+                <span style="color:#444;">${mat.Nazwa}</span>
+              </div>
+              <strong>${price.toFixed(2)} PLN</strong>
+            `;
             popupDetailsDiv.appendChild(detailLine);
           }
         });
@@ -8903,7 +8999,13 @@ updateSummary();
             margin: 8px 0;
             font-size: 15px;
           `;
-          detailLine.innerHTML = `<span style="color: #333; font-weight: 700;">Wariant stelaża: ${selectedLeg.Nazwa}</span><strong>${price.toFixed(2)} PLN</strong>`;
+          detailLine.innerHTML = `
+            <div style="display:flex; gap:6px; align-items:baseline;">
+              <span style="color:#000; font-weight:700;">Wariant stelaża:</span>
+              <span style="color:#444;">${selectedLeg.Nazwa}</span>
+            </div>
+            <strong>${price.toFixed(2)} PLN</strong>
+          `;
           popupDetailsDiv.appendChild(detailLine);
         }
 
