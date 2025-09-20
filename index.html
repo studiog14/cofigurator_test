@@ -4496,7 +4496,9 @@ body.mobile-mode #standalone-mobile-ui {
     // Specjalne limity zoomu dla hookerów (pozwalają bardziej się oddalić)
     const MIN_ZOOM_DISTANCE_HOOKER = 2; 
     const MAX_ZOOM_DISTANCE_HOOKER = 12;
-    const VERTICAL_OFFSET = 0;
+  const VERTICAL_OFFSET = 0;
+  // Minimal positive correction to ensure legs visually touch the bucket seat across models
+  const SEAT_CONTACT_CORRECTION = 0.005;
 
     let viewer, currentModelContainer, currentLegModel;
     let allData = [];
@@ -6678,10 +6680,11 @@ setTimeout(()=>{
             const legTopY = legBounds.max.y;
             
             // Ustaw nogi tak, żeby ich góra dotykała rzeczywistego dołu siedziska
-            const finalLegY = realSeatBottom - legTopY;
+            // Apply a tiny correction so legs make visual contact with the seat across varied geometries
+            const finalLegY = realSeatBottom - legTopY + SEAT_CONTACT_CORRECTION;
             newLegs.position.y = finalLegY;
             
-            console.log(`🔧 Auto-pozycjonowanie kubełka: centrum=${bucketCenter.x.toFixed(2)},${bucketCenter.z.toFixed(2)}, raycast dół siedziska=${realSeatBottom.toFixed(3)}, nogi góra=${legTopY.toFixed(3)}, nogi finalna pozycja Y=${finalLegY.toFixed(3)}`);
+            console.log(`🔧 Auto-pozycjonowanie kubełka: centrum=${bucketCenter.x.toFixed(2)},${bucketCenter.z.toFixed(2)}, raycast dół siedziska=${realSeatBottom.toFixed(3)}, nogi góra=${legTopY.toFixed(3)}, korekta=${SEAT_CONTACT_CORRECTION}, nogi finalna pozycja Y=${finalLegY.toFixed(3)}`);
           } else {
             // Sprawdź czy krzesło to hooker - jeśli tak, podnieś wyżej
             const isHookerChair = selectedChair && selectedChair.Kategoria && 

@@ -84,6 +84,37 @@
 			],
 			"isBackground": true,
 			"group": "build"
+		},
+		{
+			"label": "Serwer statyczny 8000 (py -3)",
+			"type": "shell",
+			"command": "py",
+			"args": [
+				"-3",
+				"-m",
+				"http.server",
+				"8000"
+			],
+			"isBackground": true,
+			"problemMatcher": [
+				"$gcc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Serwer statyczny 8000 (python)",
+			"type": "shell",
+			"command": "python",
+			"args": [
+				"-m",
+				"http.server",
+				"8000"
+			],
+			"isBackground": true,
+			"problemMatcher": [
+				"$gcc"
+			],
+			"group": "build"
 		}
 	]
 }
