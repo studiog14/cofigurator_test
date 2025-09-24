@@ -4716,6 +4716,7 @@ body.mobile-mode #standalone-mobile-ui {
     // 🧰 Lekki baner debug — pokazuje m.in. który plik nóg został wybrany
     function installDebugBanner() {
       if (window.__showDebugBanner) return;
+      const persistent = new URL(window.location.href).searchParams.get('debug') === '1';
       window.__showDebugBanner = (text) => {
         let el = document.getElementById('debug-banner');
         if (!el) {
@@ -4725,15 +4726,24 @@ body.mobile-mode #standalone-mobile-ui {
           document.body.appendChild(el);
         }
         el.textContent = String(text || '');
-        try { clearTimeout(el.__hideTimer); } catch(_) {}
-        el.__hideTimer = setTimeout(() => {
-          if (el && el.parentNode) el.parentNode.removeChild(el);
-        }, 4000);
+        if (!persistent) {
+          try { clearTimeout(el.__hideTimer); } catch(_) {}
+          el.__hideTimer = setTimeout(() => {
+            if (el && el.parentNode) el.parentNode.removeChild(el);
+          }, 4000);
+        }
       };
     }
     document.addEventListener('DOMContentLoaded', installDebugBanner);
 
     // 🔄 SYSTEM WERSJONOWANIA — działa także na Live Server (ograniczony do folderu legs/)
+    // Bezpieczne kodowanie ścieżki: koduje każdy segment osobno (spacja, +, diakrytyki itd.)
+    function encodePathSegments(p) {
+      if (!p) return p;
+      // Zachowaj separatory '/', zakoduj każdy segment oddzielnie
+      return p.split('/').map(seg => encodeURIComponent(seg)).join('/');
+    }
+
     async function findLatestVersion(basePath) {
       const urlObj = new URL(window.location.href);
       const isDev = urlObj.searchParams.get('dev') === '1';
@@ -4747,9 +4757,16 @@ body.mobile-mode #standalone-mobile-ui {
         return basePath;
       }
 
+      // 🔥 SPECIAL DEBUG: sprawdź czy to "z obrotem"
+      if (basePath.includes('z obrotem')) {
+        console.log(`🔥🔥🔥 VERSIONING Z OBROTEM: ${basePath}`);
+        console.log(`🔥 baseWithoutExt: ${baseWithoutExt}`);
+        console.log(`🔥 extension: ${extension}`);
+      }
+
       // Helper: sprawdź istnienie pliku. Najpierw HEAD, a w trybie dev fallback do lekkiego GET.
       async function exists(tryPath) {
-        const encoded = encodeURI(tryPath);
+        const encoded = encodePathSegments(tryPath);
         // 1) Spróbuj HEAD
         try {
           const head = await fetch(encoded, { method: 'HEAD', cache: 'no-store' });
@@ -4768,6 +4785,9 @@ body.mobile-mode #standalone-mobile-ui {
       // Najpierw szybkie sprawdzenie typowych wersji: v3..v1
       for (let v of [3,2,1]) {
         const versionedPath = `${baseWithoutExt}_v${v}.${extension}`;
+        if (basePath.includes('z obrotem')) {
+          console.log(`🔥 Checking z obrotem version: ${versionedPath}`);
+        }
         if (await exists(versionedPath)) {
           console.log(`📦 Wersjonowanie: używam ${versionedPath}`);
           return versionedPath;
@@ -4796,21 +4816,21 @@ body.mobile-mode #standalone-mobile-ui {
     }
 
     async function loadModelWithFreshness(path, viewer, options = {}) {
-      // Opcjonalny parametr testowy: ?forceV=3 wymusi _v3.glb
+      // Opcjonalny parametr testowy: ?forceV=3 wymusi _v3.glb TYLKO dla nóg
       const urlObj = new URL(window.location.href);
       const forceV = parseInt(urlObj.searchParams.get('forceV') || '');
       let latestPath;
-      if (!isNaN(forceV) && forceV > 0) {
+      if (!isNaN(forceV) && forceV > 0 && /^legs\//i.test(path)) {
         const pathParts = path.split('.');
         const ext = pathParts.pop();
         const base = pathParts.join('.');
         latestPath = `${base}_v${forceV}.${ext}`;
-        console.log(`🧪 forceV aktywny: ${path} -> ${latestPath}`);
+        console.log(`🧪 forceV aktywny dla nóg: ${path} -> ${latestPath}`);
       } else {
         // Najpierw znajdź najwyższą dostępną wersję
         latestPath = await findLatestVersion(path);
       }
-      const encodedPath = encodeURI(latestPath);
+  const encodedPath = encodePathSegments(latestPath);
       console.log(`🔄 Loading model: ${path} -> ${latestPath} -> ${encodedPath}`);
       let version = Date.now();
       try {
@@ -4829,11 +4849,8 @@ body.mobile-mode #standalone-mobile-ui {
         window.__lastLoadPath = latestPath;
         window.__lastLoadUrl = pathWithVersion;
         if (/\/legs\//i.test(latestPath)) {
-          if (typeof window.__showDebugBanner === 'function') {
-            window.__showDebugBanner(`LEGS: ${latestPath}`);
-          } else {
-            console.log('[DEBUG-BANNER]', `LEGS: ${latestPath}`);
-          }
+          // Banner wyłączony na życzenie - tylko console log
+          console.log('[DEBUG-BANNER]', `LEGS: ${latestPath}`);
         }
       } catch(_) {}
       console.log(`🔄 Loading with cache buster: ${pathWithVersion}`);
@@ -6265,6 +6282,15 @@ body.mobile-mode #standalone-mobile-ui {
   async function loadModel(variant) {
   console.log('📱 loadModel called with variant:', variant);
   
+  // 🔥 MEGA DEBUG NA POCZĄTKU: sprawdź krzesło
+  console.log('🔥🔥🔥 LOADMODEL START - CHAIR DEBUG:', {
+    nazwa: variant?.Nazwa,
+    grupa: variant?.Grupa,
+    kategoria: variant?.Kategoria,
+    wariant: variant?.Wariant,
+    isKubelek: variant?.Grupa && variant.Grupa.toLowerCase() === 'kubełek'
+  });
+  
   // Ukryj welcome screen przy wyborze krzesła
   const welcomeScreen = document.getElementById('welcome-screen');
   if (welcomeScreen) {
@@ -6404,12 +6430,25 @@ body.mobile-mode #standalone-mobile-ui {
       if (viewer && viewer.render) viewer.render();
     } catch(e) { console.warn('Nie udało się ustawić kamery po załadowaniu modelu', e); }
 
+    // 🔥 MEGA DEBUG: sprawdź krzesło Amy-2
+    console.log('🔥🔥🔥 SELECTED CHAIR DEBUG:', {
+      nazwa: selectedChair.Nazwa,
+      grupa: selectedChair.Grupa,
+      kategoria: selectedChair.Kategoria,
+      wariant: selectedChair.Wariant,
+      isKubelek: selectedChair.Grupa && selectedChair.Grupa.toLowerCase() === 'kubełek'
+    });
+
     // Jeśli kubełek, to ewentualnie załaduj domyślne nogi (bez wyrównywania Y kubełka do podłoża)
     if (selectedChair.Grupa && selectedChair.Grupa.toLowerCase() === 'kubełek') {
       // Filtrowanie nóg po kategorii już na starcie
       const chairKategoria = (selectedChair.Kategoria || '').toLowerCase();
       let legsVariants = allData.filter(d => d.Grupa && d.Grupa.toLowerCase() === 'nogi');
-  console.log('🧾 RAW NOGI (przed kategorią):', legsVariants.map(l=>`${l.Nazwa}|W=${l.Wariant||'-'}|DlaKubełka=${l.DlaKubełka||l.DlaKubelka||'-'}`));
+      console.log('🧾 RAW NOGI (przed kategorią):', legsVariants.map(l=>`${l.Nazwa}|W=${l.Wariant||'-'}|DlaKubełka=${l.DlaKubełka||l.DlaKubelka||'-'}`));
+      
+      // 🔥 MEGA DEBUG: sprawdź czy są nogi "z obrotem" w raw data
+      const zObrotemLegs = legsVariants.filter(leg => leg.Nazwa && leg.Nazwa.includes('z obrotem'));
+      console.log('🔥🔥🔥 Z OBROTEM W RAW DATA:', zObrotemLegs.length, zObrotemLegs.map(l => `${l.Nazwa}|W=${l.Wariant||'-'}|DlaKubełka=${l.DlaKubełka||l.DlaKubelka||'-'}`));
       
       if (chairKategoria.includes('hooker')) {
         // Dla kubełków hooker pokazuj TYLKO nogi hooker
@@ -6426,6 +6465,14 @@ body.mobile-mode #standalone-mobile-ui {
         });
       }
 
+      console.log(`🔥 PRZED FILTROWANIEM: chair="${selectedChair.Nazwa}" variant="${selectedChair.Wariant}" availableLegs=${legsVariants.length}`);
+      // 🔥 DEBUG: pokaż wszystkie dostępne nogi przed filtrowaniem
+      legsVariants.forEach((leg, i) => {
+        if (leg.Nazwa && leg.Nazwa.includes('z obrotem')) {
+          console.log(`🔥 FOUND Z OBROTEM BEFORE FILTER [${i}]: "${leg.Nazwa}" variant="${leg.Wariant}" DlaKubelka="${leg.DlaKubełka || leg.DlaKubelka}"`);
+        }
+      });
+      
       let legsResult = getFilteredLegsForChair(selectedChair, legsVariants);
       console.log(`🧮 LEGS DEBUG (STRICT) -> start=${legsResult.debug.start} kubełekOK=${legsResult.debug.kubelek} variantOK=${legsResult.debug.variant} krzesłoOK=${legsResult.debug.krzeslo} final=${legsResult.list.length}`);
       if (!legsResult.list.length) {
@@ -6442,6 +6489,13 @@ body.mobile-mode #standalone-mobile-ui {
           legsResult = { list: legsVariants.slice(0,5), debug: { note:'fallback2' } }; // max 5 żeby nie ładować wszystkiego
         }
       }
+      
+      // 🔥 DEBUG: pokaż co zostało po filtracji
+      console.log(`🔥 PO FILTRACJI: ${legsResult.list.length} nóg pozostało`);
+      legsResult.list.forEach((leg, i) => {
+        console.log(`🔥 POZOSTAŁA NÓG [${i}]: "${leg.Nazwa}" variant="${leg.Wariant}"`);
+      });
+
       if (legsResult.list.length) {
         const firstLeg = legsResult.list[0];
         console.log(`🦵 AUTO WYBÓR NÓG (FINAL): ${firstLeg.Nazwa} [${firstLeg.Wariant||'-'}]`);
@@ -6659,12 +6713,21 @@ function getFilteredLegsForChair(chair, source){
   const acceptableNames = new Set([full, base]);
   if (chairVar) acceptableNames.add(base + ' ' + chairVar); // pełna forma z wariantem
 
+  // 🔥 DEBUG: pokaż co się dzieje z filtrowanem dla Amy-2
+  console.log(`🔥 FILTER DEBUG: chair="${chair.Nazwa}" var="${chairVar}" acceptableNames=[${[...acceptableNames].join('|')}]`);
+
   function toList(v){ return (v||'').toLowerCase().split(',').map(s=>s.trim()).filter(Boolean); }
 
   const afterBucket = [];
   for(const leg of source){
     const list = toList(leg.DlaKubełka || leg.DlaKubelka);
     const bucketMatch = !list.length || [...acceptableNames].some(n=>list.includes(n));
+    
+    // 🔥 DEBUG: szczególnie "z obrotem"
+    if (leg.Nazwa && leg.Nazwa.includes('z obrotem')) {
+      console.log(`🔥 Z OBROTEM CHECK: name="${leg.Nazwa}" var="${leg.Wariant}" DlaKubelka="${leg.DlaKubełka || leg.DlaKubelka}" bucketMatch=${bucketMatch}`);
+    }
+    
     if (bucketMatch){ afterBucket.push(leg); debug.kubelek++; }
     else console.log(`✂️ LEG bucket mismatch: ${leg.Nazwa} needOneOf=[${[...acceptableNames].join('|')}] has=[${list.join('|')}]`);
   }
@@ -6672,7 +6735,14 @@ function getFilteredLegsForChair(chair, source){
   const afterVariant = [];
   for(const leg of afterBucket){
     const legVar = (leg.Wariant||'').trim().toLowerCase();
-    if (!chairVar || (legVar && legVar === chairVar)) { afterVariant.push(leg); debug.variant++; }
+    const varMatch = !chairVar || (legVar && legVar === chairVar);
+    
+    // 🔥 DEBUG: szczególnie "z obrotem"
+    if (leg.Nazwa && leg.Nazwa.includes('z obrotem')) {
+      console.log(`🔥 Z OBROTEM VARIANT CHECK: legVar="${legVar}" chairVar="${chairVar}" match=${varMatch}`);
+    }
+    
+    if (varMatch) { afterVariant.push(leg); debug.variant++; }
     else console.log(`✂️ LEG variant mismatch: ${leg.Nazwa} legVar='${legVar}' chairVar='${chairVar}'`);
   }
 
@@ -6735,7 +6805,39 @@ setTimeout(()=>{
         const modelPath = `legs/${legFileName}.glb`;
         console.log(`🦵 Ładuję model nóg z ścieżki: ${modelPath}`);
         console.log(`🧪 DEBUG: legFileName='${legFileName}', variant.Nazwa='${variant.Nazwa}', variant.Wariant='${variant.Wariant||'BRAK'}'`);
+        
+        // 🔥 SPRAWDZENIE: czy to nogi "z obrotem"?
+        if (legFileName.includes('z obrotem')) {
+          console.log(`🔥🔥🔥 LOADING Z OBROTEM LEGS: ${modelPath}`);
+          console.log(`🔥 Variant object:`, variant);
+        }
+        
         const newLegs = await loadModelWithFreshness(modelPath, viewer, { autoCenter: false });
+
+        // 🧮 Oblicz statystyki geometrii (meshe, trójkąty, wysokość) i opcjonalnie włącz wireframe
+        try {
+          let meshCount = 0, triCount = 0;
+          newLegs.traverse((child) => {
+            if (child.isMesh && child.geometry) {
+              meshCount++;
+              const geom = child.geometry;
+              const pos = geom.attributes && geom.attributes.position;
+              if (geom.index) triCount += Math.floor(geom.index.count / 3);
+              else if (pos) triCount += Math.floor(pos.count / 3);
+            }
+          });
+          const bb = new Box3().setFromObject(newLegs);
+          const size = bb.getSize(new Vector3());
+          window.__lastLegStats = { meshCount, triCount, size: { x: size.x, y: size.y, z: size.z } };
+          const urlParams = new URL(window.location.href).searchParams;
+          // Stats banner wyłączony - tylko console
+          if (urlParams.get('debug') === '1') {
+            console.log(`[LEGS-STATS] meshes=${meshCount} tris≈${triCount} size(y)=${size.y.toFixed(3)}`);
+          }
+          if (urlParams.get('wire') === '1') {
+            newLegs.traverse((child)=>{ if(child.isMesh && child.material){ try { child.material.wireframe = true; } catch(_){} }});
+          }
+        } catch(_) {}
 
         // 🧹 Normalizuj nazwy mesh w nogach (usuń .001, .006 itd.)
         normalizeMeshNames(newLegs, '🧹 LEGS');
@@ -6758,34 +6860,32 @@ setTimeout(()=>{
             // Oblicz bounding boxy po resecie pozycji
             const bucketBounds = new Box3().setFromObject(currentModelContainer);
             const bucketCenter = bucketBounds.getCenter(new Vector3());
+            // Debug/sterowanie: parametry URL
+            const urlCfg = new URL(window.location.href);
+            const seatRayParam = urlCfg.searchParams.get('seatRay'); // '0' = użyj bbox min.y
+            const legYParam = urlCfg.searchParams.get('legY'); // dodatkowy offset Y (liczba)
+            const fixLegParam = urlCfg.searchParams.get('fixLeg'); // '1' = wymusza Y=0 dla nóg
+            const useRay = seatRayParam !== '0';
+            const extraY = isNaN(parseFloat(legYParam)) ? 0 : parseFloat(legYParam);
             
-            // Znajdź rzeczywisty dół siedziska przez raycast w dół przez środek kubełka
-            const raycaster = new THREE.Raycaster();
-            const rayOrigin = new Vector3(bucketCenter.x, bucketBounds.max.y + 1, bucketCenter.z); // Start nad kubełkiem
-            const rayDirection = new Vector3(0, -1, 0); // Kierunek w dół
-            
-            raycaster.set(rayOrigin, rayDirection);
-            
-            // Zbierz wszystkie meshe z kubełka
-            const bucketMeshes = [];
-            currentModelContainer.traverse((child) => {
-              if (child.isMesh) bucketMeshes.push(child);
-            });
-            
-            // Znajdź przecięcie z kubełkiem
-            const intersects = raycaster.intersectObjects(bucketMeshes);
-            let realSeatBottom = bucketBounds.min.y; // fallback na dół bounding box
-            
-            if (intersects.length > 0) {
-              // Weź najwyższe trafienie (pierwsze trafienie od góry) - to będzie góra siedziska
-              // Szukamy najniższego trafienia - to będzie dół siedziska
-              let lowestHit = intersects[0].point.y;
-              for (const hit of intersects) {
-                if (hit.point.y < lowestHit) {
-                  lowestHit = hit.point.y;
+            // Znajdź dół siedziska: raycast (domyślnie) lub prosto min.y z bbox (seatRay=0)
+            let realSeatBottom = bucketBounds.min.y;
+            if (useRay) {
+              const raycaster = new THREE.Raycaster();
+              const rayOrigin = new Vector3(bucketCenter.x, bucketBounds.max.y + 1, bucketCenter.z); // Start nad kubełkiem
+              const rayDirection = new Vector3(0, -1, 0); // Kierunek w dół
+              raycaster.set(rayOrigin, rayDirection);
+              const bucketMeshes = [];
+              currentModelContainer.traverse((child) => { if (child.isMesh) bucketMeshes.push(child); });
+              const intersects = raycaster.intersectObjects(bucketMeshes, true);
+              if (intersects.length > 0) {
+                // Najniższy punkt przecięcia pod środkiem kubełka
+                let lowestHit = intersects[0].point.y;
+                for (const hit of intersects) {
+                  if (hit.point.y < lowestHit) lowestHit = hit.point.y;
                 }
+                realSeatBottom = lowestHit;
               }
-              realSeatBottom = lowestHit;
             }
             
             // Najpierw ustaw nogi tymczasowo na Y=0 żeby obliczyć ich rzeczywiste wymiary
@@ -6795,10 +6895,29 @@ setTimeout(()=>{
             
             // Ustaw nogi tak, żeby ich góra dotykała rzeczywistego dołu siedziska
             // Apply a tiny correction so legs make visual contact with the seat across varied geometries
-            const finalLegY = realSeatBottom - legTopY + SEAT_CONTACT_CORRECTION;
+            let finalLegY = realSeatBottom - legTopY + SEAT_CONTACT_CORRECTION + extraY;
+            
+            // 🔧 EMERGENCY FIX: tylko gdy jawnie wymuszone przez fixLeg=1
+            if (fixLegParam === '1') {
+              console.warn(`🚨 Nogi fixLeg=1, ustawiam na Y=0`);
+              finalLegY = 0;
+            } else if (finalLegY < -0.5) {
+              // Tylko przy ekstremalnie głębokich pozycjach (< -50cm) zastosuj korektę
+              console.warn(`🚨 Nogi ekstremalnie głęboko (${finalLegY.toFixed(3)}), koryguję do -0.1`);
+              finalLegY = -0.1;
+            }
+            
             newLegs.position.y = finalLegY;
             
-            console.log(`🔧 Auto-pozycjonowanie kubełka: centrum=${bucketCenter.x.toFixed(2)},${bucketCenter.z.toFixed(2)}, raycast dół siedziska=${realSeatBottom.toFixed(3)}, nogi góra=${legTopY.toFixed(3)}, korekta=${SEAT_CONTACT_CORRECTION}, nogi finalna pozycja Y=${finalLegY.toFixed(3)}`);
+            console.log(`🔧 Auto-pozycjonowanie kubełka: centrum=${bucketCenter.x.toFixed(2)},${bucketCenter.z.toFixed(2)}, seatBottom=${realSeatBottom.toFixed(3)} (ray=${useRay}), legTopY=${legTopY.toFixed(3)}, extraY=${extraY}, korekta=${SEAT_CONTACT_CORRECTION}, finalY=${finalLegY.toFixed(3)}`);
+            try {
+              window.__lastLegPlacement = { seatBottom: realSeatBottom, legTopY, extraY, correction: SEAT_CONTACT_CORRECTION, finalY: finalLegY };
+              // Debug banner wyłączony - tylko przez ?showBanner=1
+              // Debug banner wyłączony na życzenie
+              // if (typeof window.__showDebugBanner === 'function' && new URL(window.location.href).searchParams.get('showBanner') === '1') {
+              //   window.__showDebugBanner(`LEG Y=${finalLegY.toFixed(3)} (seat=${realSeatBottom.toFixed(3)} ray=${useRay?'on':'off'} top=${legTopY.toFixed(3)} extra=${extraY} corr=${SEAT_CONTACT_CORRECTION})`);
+              // }
+            } catch(_) {}
           } else {
             // Sprawdź czy krzesło to hooker - jeśli tak, podnieś wyżej
             const isHookerChair = selectedChair && selectedChair.Kategoria && 
