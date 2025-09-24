@@ -4713,10 +4713,105 @@ body.mobile-mode #standalone-mobile-ui {
 
     // USUNIĘTO loadCameraTarget - niepotrzebny plik camera_target.glb
 
+    // 🧰 Lekki baner debug — pokazuje m.in. który plik nóg został wybrany
+    function installDebugBanner() {
+      if (window.__showDebugBanner) return;
+      window.__showDebugBanner = (text) => {
+        let el = document.getElementById('debug-banner');
+        if (!el) {
+          el = document.createElement('div');
+          el.id = 'debug-banner';
+          el.style.cssText = 'position:fixed;bottom:8px;left:8px;z-index:99999;background:rgba(0,0,0,0.76);color:#fff;padding:6px 10px;border-radius:6px;font:12px/1.25 monospace;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,0.3)';
+          document.body.appendChild(el);
+        }
+        el.textContent = String(text || '');
+        try { clearTimeout(el.__hideTimer); } catch(_) {}
+        el.__hideTimer = setTimeout(() => {
+          if (el && el.parentNode) el.parentNode.removeChild(el);
+        }, 4000);
+      };
+    }
+    document.addEventListener('DOMContentLoaded', installDebugBanner);
+
+    // 🔄 SYSTEM WERSJONOWANIA — działa także na Live Server (ograniczony do folderu legs/)
+    async function findLatestVersion(basePath) {
+      const urlObj = new URL(window.location.href);
+      const isDev = urlObj.searchParams.get('dev') === '1';
+      const deepScan = urlObj.searchParams.get('scanV') === '1';
+      const pathParts = basePath.split('.');
+      const extension = pathParts.pop(); // np. glb
+      const baseWithoutExt = pathParts.join('.');
+
+      // Wersjonowanie dotyczy tylko nóg (legs/). Dla pozostałych ścieżek zwróć oryginał.
+      if (!/^legs\//i.test(basePath)) {
+        return basePath;
+      }
+
+      // Helper: sprawdź istnienie pliku. Najpierw HEAD, a w trybie dev fallback do lekkiego GET.
+      async function exists(tryPath) {
+        const encoded = encodeURI(tryPath);
+        // 1) Spróbuj HEAD
+        try {
+          const head = await fetch(encoded, { method: 'HEAD', cache: 'no-store' });
+          if (head && head.ok) return true;
+        } catch (_) { /* noop */ }
+        // 2) Fallback w DEV: żywe serwery często nie wspierają HEAD — spróbuj GET z no-store
+        if (isDev) {
+          try {
+            const getResp = await fetch(encoded, { method: 'GET', cache: 'no-store' });
+            return !!(getResp && getResp.ok);
+          } catch (_) { /* noop */ }
+        }
+        return false;
+      }
+
+      // Najpierw szybkie sprawdzenie typowych wersji: v3..v1
+      for (let v of [3,2,1]) {
+        const versionedPath = `${baseWithoutExt}_v${v}.${extension}`;
+        if (await exists(versionedPath)) {
+          console.log(`📦 Wersjonowanie: używam ${versionedPath}`);
+          return versionedPath;
+        }
+      }
+      // Jeśli nie znaleziono żadnej z v3..v1, sprawdź czy istnieje plik bazowy i od razu go zwróć,
+      // aby uniknąć kaskady 404.
+      if (await exists(basePath)) {
+        console.log(`📦 Wersjonowanie: brak v3..v1, używam bazowego ${basePath}`);
+        return basePath;
+      }
+
+      // Opcjonalnie: głębszy skan v10..v4 tylko poza DEV lub gdy jawnie włączony parametrem ?scanV=1
+      if (!isDev || deepScan) {
+        for (let v = 10; v >= 4; v--) {
+          const versionedPath = `${baseWithoutExt}_v${v}.${extension}`;
+          if (await exists(versionedPath)) {
+            console.log(`📦 Wersjonowanie: używam ${versionedPath}`);
+            return versionedPath;
+          }
+        }
+      }
+      // Ostateczny fallback: zwróć bazową ścieżkę
+      console.log(`📦 Wersjonowanie: brak wersji, używam ${basePath}`);
+      return basePath;
+    }
+
     async function loadModelWithFreshness(path, viewer, options = {}) {
-      // Zakoduj URL żeby obsłużyć spacje i diakrytyki w nazwach plików
-      const encodedPath = encodeURI(path);
-      console.log(`🔄 Loading model: ${path} -> ${encodedPath}`);
+      // Opcjonalny parametr testowy: ?forceV=3 wymusi _v3.glb
+      const urlObj = new URL(window.location.href);
+      const forceV = parseInt(urlObj.searchParams.get('forceV') || '');
+      let latestPath;
+      if (!isNaN(forceV) && forceV > 0) {
+        const pathParts = path.split('.');
+        const ext = pathParts.pop();
+        const base = pathParts.join('.');
+        latestPath = `${base}_v${forceV}.${ext}`;
+        console.log(`🧪 forceV aktywny: ${path} -> ${latestPath}`);
+      } else {
+        // Najpierw znajdź najwyższą dostępną wersję
+        latestPath = await findLatestVersion(path);
+      }
+      const encodedPath = encodeURI(latestPath);
+      console.log(`🔄 Loading model: ${path} -> ${latestPath} -> ${encodedPath}`);
       let version = Date.now();
       try {
         // Spróbuj pobrać Last-Modified (niektóre serwery/iOS mogą blokować HEAD)
@@ -4729,6 +4824,18 @@ body.mobile-mode #standalone-mobile-ui {
         console.warn('HEAD failed for', encodedPath, '— using Date.now() as cache buster');
       }
       const pathWithVersion = `${encodedPath}?v=${version}`;
+      // Zapamiętaj ostatnio ładowaną ścieżkę — pomocne do debugowania
+      try {
+        window.__lastLoadPath = latestPath;
+        window.__lastLoadUrl = pathWithVersion;
+        if (/\/legs\//i.test(latestPath)) {
+          if (typeof window.__showDebugBanner === 'function') {
+            window.__showDebugBanner(`LEGS: ${latestPath}`);
+          } else {
+            console.log('[DEBUG-BANNER]', `LEGS: ${latestPath}`);
+          }
+        }
+      } catch(_) {}
       console.log(`🔄 Loading with cache buster: ${pathWithVersion}`);
       // Załaduj model z cache-busterem (nawet jeśli HEAD się nie powiódł)
       return await viewer.load(pathWithVersion, options);
@@ -6368,6 +6475,10 @@ body.mobile-mode #standalone-mobile-ui {
         setCameraView(bucketCenter);
         // Uruchom delikatny idle sway na domyślnej kamerze, bez zmiany widoku
         setTimeout(() => { try { startIdleSway(); } catch(_) {} }, 50);
+        // Safety: jeśli watchdog nie istnieje (np. lokalnie), nie przerywaj wykonywania
+        if (typeof window.scheduleIdleSwayWatchdog !== 'function') {
+          window.scheduleIdleSwayWatchdog = function(){ /* noop */ };
+        }
         scheduleIdleSwayWatchdog('silentLoadModel+camera');
       } catch(e) {
         console.warn('Nie udało się ustawić kamery po załadowaniu kubełka+nóg', e);
@@ -6586,11 +6697,13 @@ setTimeout(()=>{
 
 
     async function setLegModel(variant) {
-  userInteracted = true;
-  console.log("🦵 setLegModel wywołane dla wariantu:", variant);
+  try {
+    userInteracted = true;
+    console.log("🦵 setLegModel wywołane dla wariantu:", variant);
+    console.log("🔥 PIERWSZY LOG W setLegModel - funkcja została wywołana!", variant?.Nazwa || 'BRAK_NAZWY');
 
-  // ✅ Sprawdzenie zgodności kubełka z wariantem nóg (uwzględnia wariant kubełka i wariant nóg)
-  if (selectedChair && selectedChair.Grupa.toLowerCase() === 'kubełek') {
+    // ✅ Sprawdzenie zgodności kubełka z wariantem nóg (uwzględnia wariant kubełka i wariant nóg)
+    if (selectedChair && selectedChair.Grupa.toLowerCase() === 'kubełek') {
     const nazwaKubełka = (selectedChair.Nazwa || '').toLowerCase();
   const wariantKubełka = (selectedChair.Wariant || '').toLowerCase(); // drewno / metal
   const fullBucket = nazwaKubełka; // NIE doklejamy wariantu do nazwy kubełka
@@ -6621,6 +6734,7 @@ setTimeout(()=>{
         
         const modelPath = `legs/${legFileName}.glb`;
         console.log(`🦵 Ładuję model nóg z ścieżki: ${modelPath}`);
+        console.log(`🧪 DEBUG: legFileName='${legFileName}', variant.Nazwa='${variant.Nazwa}', variant.Wariant='${variant.Wariant||'BRAK'}'`);
         const newLegs = await loadModelWithFreshness(modelPath, viewer, { autoCenter: false });
 
         // 🧹 Normalizuj nazwy mesh w nogach (usuń .001, .006 itd.)
@@ -6740,7 +6854,11 @@ setTimeout(()=>{
         console.warn(`🦵 Nie udało się załadować nóg dla wariantu: ${variant.Nazwa}`);
         return; // Przerwij wykonanie
       }
+    } catch (globalError) {
+      console.error("🚨 KRYTYCZNY BŁĄD w setLegModel:", globalError);
+      hideModelLoader();
     }
+  }
 
 
 
