@@ -6922,6 +6922,13 @@ setTimeout(()=>{
             // Apply a tiny correction so legs make visual contact with the seat across varied geometries
             let finalLegY = realSeatBottom - legTopY + SEAT_CONTACT_CORRECTION + extraY;
             
+            // 🔧 SPECIAL FIX: Nogi "z obrotem" potrzebują dodatkowej korekty -0.005
+            if (variant && variant.Nazwa && variant.Nazwa.toLowerCase().includes('z obrotem')) {
+              const obrotCorrection = -0.005;
+              finalLegY += obrotCorrection;
+              console.log(`🔄 NOGI Z OBROTEM: dodatkowa korekta ${obrotCorrection}, finalY=${finalLegY.toFixed(3)}`);
+            }
+            
             // 🔧 EMERGENCY FIX: tylko gdy jawnie wymuszone przez fixLeg=1
             if (fixLegParam === '1') {
               console.warn(`🚨 Nogi fixLeg=1, ustawiam na Y=0`);
