@@ -4782,8 +4782,8 @@ body.mobile-mode #standalone-mobile-ui {
         return false;
       }
 
-      // Najpierw szybkie sprawdzenie typowych wersji: v3..v1
-      for (let v of [3,2,1]) {
+      // Najpierw szybkie sprawdzenie typowych wersji: v4..v1
+      for (let v of [4,3,2,1]) {
         const versionedPath = `${baseWithoutExt}_v${v}.${extension}`;
         if (basePath.includes('z obrotem')) {
           console.log(`🔥 Checking z obrotem version: ${versionedPath}`);
@@ -4793,10 +4793,10 @@ body.mobile-mode #standalone-mobile-ui {
           return versionedPath;
         }
       }
-      // Jeśli nie znaleziono żadnej z v3..v1, sprawdź czy istnieje plik bazowy i od razu go zwróć,
+      // Jeśli nie znaleziono żadnej z v4..v1, sprawdź czy istnieje plik bazowy i od razu go zwróć,
       // aby uniknąć kaskady 404.
       if (await exists(basePath)) {
-        console.log(`📦 Wersjonowanie: brak v3..v1, używam bazowego ${basePath}`);
+        console.log(`📦 Wersjonowanie: brak v4..v1, używam bazowego ${basePath}`);
         return basePath;
       }
 
@@ -4855,7 +4855,32 @@ body.mobile-mode #standalone-mobile-ui {
       } catch(_) {}
       console.log(`🔄 Loading with cache buster: ${pathWithVersion}`);
       // Załaduj model z cache-busterem (nawet jeśli HEAD się nie powiódł)
-      return await viewer.load(pathWithVersion, options);
+      const loadedModel = await viewer.load(pathWithVersion, options);
+      
+      // 🔥 DEBUG: Sprawdzamy zawartość załadowanego modelu nóg z obrotem
+      if (/\/legs\/.*z obrotem.*\.glb/i.test(pathWithVersion)) {
+        console.log(`🔥🔥🔥 Z OBROTEM MODEL LOADED - szczegóły:`, {
+          originalPath: path,
+          finalLoadedPath: pathWithVersion,
+          hasScene: !!loadedModel?.scene,
+          sceneChildren: loadedModel?.scene?.children?.length || 0,
+          firstChildName: loadedModel?.scene?.children?.[0]?.name || 'brak'
+        });
+        
+        // Sprawdzamy geometrię pierwszego mesh-a
+        const firstMesh = loadedModel?.scene?.children?.find(c => c.type === 'Mesh' || c.isMesh);
+        if (firstMesh && firstMesh.geometry) {
+          const vertCount = firstMesh.geometry.attributes.position?.count;
+          console.log(`🔥 Z OBROTEM GEOMETRY:`, {
+            meshName: firstMesh.name,
+            vertexCount: vertCount,
+            hasGeometry: !!firstMesh.geometry,
+            geometryType: firstMesh.geometry.constructor?.name
+          });
+        }
+      }
+      
+      return loadedModel;
     }
 
     // � FUNKCJA DYNAMICZNEGO DOSTOSOWYWANIA PROPORCJI MOBILNYCH
