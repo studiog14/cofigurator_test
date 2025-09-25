@@ -7706,25 +7706,26 @@ function applyMaterialToSpecificMesh(variant, meshKey) {
         const isLegs = targetMesh === 'legs' || targetMesh === 'legs_material';
 
         if (isLegs) {
-          // 🎯 NOWA LOGIKA: Tylko krzesła mają auto-materiał nóg, kubełki NIE
+          // Kubełki: brak auto-wyboru
           const isKubelek = selectedChair && selectedChair.Grupa === 'kubełek';
-          
           if (isKubelek) {
             console.log(`🎯 KUBEŁEK: Pomijam auto-wybór materiału nóg dla: ${selectedChair.Nazwa} (grupa: ${selectedChair.Grupa})`);
-            return; // Wyjdź z funkcji - brak auto-wyboru dla kubełków
+            return;
           }
-          
-          // Dla materiałów nóg - użyj kolumny DefaultLegMaterial z arkusza (tylko dla krzeseł)
-          let defaultLegMaterial = 'Czarny Mat'; // Fallback domyślny
-          
-          // 🎯 Pobierz domyślny materiał dla wariantu (jeśli istnieje)
-          if (selectedChair && selectedChair.DefaultLegMaterial) {
+
+          // Jeśli wybrana jest noga (selectedLeg), pobierz domyślny materiał z jej danych
+          let defaultLegMaterial = null;
+          if (selectedLeg && selectedLeg.DefaultLegMaterial) {
+            defaultLegMaterial = selectedLeg.DefaultLegMaterial;
+            console.log(`🦵 NOGA: Using DefaultLegMaterial from leg sheet: ${defaultLegMaterial} for leg: ${selectedLeg.Nazwa}`);
+          } else if (selectedChair && selectedChair.DefaultLegMaterial) {
             defaultLegMaterial = selectedChair.DefaultLegMaterial;
             console.log(`🎯 KRZESŁO: Using DefaultLegMaterial from sheet: ${defaultLegMaterial} for chair: ${selectedChair.Nazwa}${selectedChair.Wariant ? ` (${selectedChair.Wariant})` : ''}`);
           } else {
-            console.log(`🎯 KRZESŁO: No DefaultLegMaterial found for chair: ${selectedChair?.Nazwa}${selectedChair?.Wariant ? ` (${selectedChair.Wariant})` : ''}, using fallback: ${defaultLegMaterial}`);
+            defaultLegMaterial = 'Czarny Mat';
+            console.log(`🎯 KRZESŁO: No DefaultLegMaterial found for chair or leg, using fallback: ${defaultLegMaterial}`);
           }
-          
+
           defaultMaterial = materialOptions.find(mat => mat.Nazwa === defaultLegMaterial);
           if (defaultMaterial) {
             console.log(`🎯 Auto-selecting default leg material: ${defaultMaterial.Nazwa}`);
@@ -7738,11 +7739,8 @@ function applyMaterialToSpecificMesh(variant, meshKey) {
                     thumb.classList.add('selected');
                     found = true;
                     console.log(`🎯 ✅ Zaznaczono domyślny materiał nóg: ${defaultMaterial.Nazwa}`);
-                    
-                    // Zapisz w selectedMaterials i odśwież podsumowanie
                     selectedMaterials[targetMesh] = defaultMaterial;
                     console.log(`🎯 ✅ Automatycznie ustawiono materiał nóg: ${defaultMaterial.Nazwa} w selectedMaterials['${targetMesh}']`);
-                    
                     updateSummary();
                   } else {
                     thumb.classList.remove('selected');
