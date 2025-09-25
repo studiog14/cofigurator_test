@@ -7706,15 +7706,23 @@ function applyMaterialToSpecificMesh(variant, meshKey) {
         const isLegs = targetMesh === 'legs' || targetMesh === 'legs_material';
 
         if (isLegs) {
-          // Dla materiałów nóg - użyj kolumny DefaultLegMaterial z arkusza
+          // 🎯 NOWA LOGIKA: Tylko krzesła mają auto-materiał nóg, kubełki NIE
+          const isKubelek = selectedChair && selectedChair.Grupa === 'kubełek';
+          
+          if (isKubelek) {
+            console.log(`🎯 KUBEŁEK: Pomijam auto-wybór materiału nóg dla: ${selectedChair.Nazwa} (grupa: ${selectedChair.Grupa})`);
+            return; // Wyjdź z funkcji - brak auto-wyboru dla kubełków
+          }
+          
+          // Dla materiałów nóg - użyj kolumny DefaultLegMaterial z arkusza (tylko dla krzeseł)
           let defaultLegMaterial = 'Czarny Mat'; // Fallback domyślny
           
           // 🎯 Pobierz domyślny materiał dla wariantu (jeśli istnieje)
           if (selectedChair && selectedChair.DefaultLegMaterial) {
             defaultLegMaterial = selectedChair.DefaultLegMaterial;
-            console.log(`🎯 Using DefaultLegMaterial from sheet: ${defaultLegMaterial} for chair: ${selectedChair.Nazwa}${selectedChair.Wariant ? ` (${selectedChair.Wariant})` : ''}`);
+            console.log(`🎯 KRZESŁO: Using DefaultLegMaterial from sheet: ${defaultLegMaterial} for chair: ${selectedChair.Nazwa}${selectedChair.Wariant ? ` (${selectedChair.Wariant})` : ''}`);
           } else {
-            console.log(`🎯 No DefaultLegMaterial found for chair: ${selectedChair?.Nazwa}${selectedChair?.Wariant ? ` (${selectedChair.Wariant})` : ''}, using fallback: ${defaultLegMaterial}`);
+            console.log(`🎯 KRZESŁO: No DefaultLegMaterial found for chair: ${selectedChair?.Nazwa}${selectedChair?.Wariant ? ` (${selectedChair.Wariant})` : ''}, using fallback: ${defaultLegMaterial}`);
           }
           
           defaultMaterial = materialOptions.find(mat => mat.Nazwa === defaultLegMaterial);
