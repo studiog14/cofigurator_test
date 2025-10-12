@@ -1,21 +1,7 @@
-// Android Fallback Loading System with Mobile UI
+// Android Fallback: activate mobile mode within index.html for better responsiveness
 console.log('📱 Android Fallback system loading...');
-// Make fallback opt-in via ?forceAndroidFallback=1 to avoid unintended overlays
-try {
-  var __q = new URLSearchParams(location.search);
-  var __force = __q.get('forceAndroidFallback') === '1';
-  // Expose flag globally so later code can honor it
-  window.__forceAndroidFallback = __force;
-  if (!__force) {
-    console.log('📱 Android fallback disabled by default (opt-in only).');
-    // Soft-disable by short-circuiting init calls
-    window.openFullApp = function(){ window.location.href = 'index.html'; };
-    // Do not initialize fallback UI automatically
-    // Note: we no longer rely on throwing; downstream code must check the flag
-  }
-} catch(_) {}
 
-// Detect Android devices more reliably
+// Mobile detection for Android fallback
 function isAndroidDevice() {
   const userAgent = navigator.userAgent.toLowerCase();
   const platform = navigator.platform.toLowerCase();
@@ -24,6 +10,16 @@ function isAndroidDevice() {
   return /android/.test(userAgent) ||
          (platform.includes('linux') && maxTouchPoints > 1) ||
          /android/.test(platform);
+}
+
+// If Android device detected, force mobile mode
+if (isAndroidDevice()) {
+  try {
+    document.body.classList.add('mobile-mode');
+    console.log('📱 Android Fallback: Android device detected, activated mobile mode');
+  } catch (_) {
+    console.log('📱 Android Fallback: Could not add mobile-mode class');
+  }
 }
 
 // Utility: detect if main app loaded successfully

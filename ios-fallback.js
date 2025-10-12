@@ -1,4 +1,4 @@
-// Minimal runtime fallback for older Safari/iOS: redirect to mobile.html when import maps are unsupported.
+// Mobile fallback system: activate mobile mode within index.html for better responsiveness
 (function () {
   'use strict';
   try {
@@ -18,6 +18,19 @@
     defineOnce('continueToApp', function () {});
     defineOnce('tryAutoInstall', function () {});
 
+    // Detection: mobile device
+    var isMobileDevice = false;
+    try {
+      var ua = navigator.userAgent || '';
+      var isIOS = /iPhone|iPad|iPod/i.test(ua) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+      var isAndroid = /Android/i.test(ua);
+      var isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+      var hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      var isNarrow = window.innerWidth <= 820;
+
+      isMobileDevice = isMobileUA || hasTouch || isNarrow;
+    } catch (_) { isMobileDevice = false; }
+
     // Detection: native import map support
     var importMapSupported = false;
     try {
@@ -26,28 +39,38 @@
         HTMLScriptElement.supports('importmap');
     } catch (_) { importMapSupported = false; }
 
-    // Already on mobile.html? do nothing.
-    var href = String(w.location.href || '');
-    var onMobileHtml = /mobile\.html(\?|#|$)/i.test(href);
-
-    // If import maps unsupported, go to mobile.html (adds a flag to avoid SW/caching loops)
-    if (!importMapSupported && !onMobileHtml) {
+    // If mobile device detected, force mobile mode
+    if (isMobileDevice) {
       try {
-        var url = new URL('mobile.html', w.location.href);
-        url.searchParams.set('fallback', '1');
-        w.location.replace(url.toString());
-        return;
+        document.body.classList.add('mobile-mode');
+        console.log('📱 iOS Fallback: Mobile device detected, activated mobile mode');
       } catch (_) {
-        w.location.href = 'mobile.html?fallback=1';
-        return;
+        console.log('📱 iOS Fallback: Could not add mobile-mode class');
       }
     }
 
-    // Log once for visibility
+    // If import maps not supported on mobile, show warning but don't redirect
+    if (!importMapSupported && isMobileDevice) {
+      console.log('📱 iOS Fallback: Import maps not supported on mobile device');
+      console.log('📱 iOS Fallback: Using fallback rendering mode');
+
+      // Add fallback class for additional mobile adaptations
+      try {
+        document.body.classList.add('mobile-fallback');
+      } catch (_) {}
+    }
+
+    // Log detection results for debugging
     if (typeof console !== 'undefined') {
-      console.log('ios-fallback.js: importmap support =', importMapSupported);
+      console.log('📱 iOS Fallback: Detection results:', {
+        isMobileDevice,
+        importMapSupported,
+        userAgent: navigator.userAgent.substring(0, 50),
+        screenWidth: window.innerWidth,
+        hasTouch: 'ontouchstart' in window || navigator.maxTouchPoints > 0
+      });
     }
   } catch (_) {
-    // swallow
+    // swallow errors
   }
 })();
