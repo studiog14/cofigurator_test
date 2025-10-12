@@ -1382,42 +1382,39 @@
 
     /* USUNIĘTE STARE STYLE CONFIG-OVERVIEW */
 
-   /* 📱 Tryb PIONOWY — ukryj aplikację, pokaż komunikat i mobilne kategorie */
+    /* 📱 FORCE DESKTOP UI ON MOBILE - DISABLE MOBILE-SPECIFIC HIDING */
 @media (max-width: 820px) and (orientation: portrait) {
-  #app,
-  #bottom-toolbar,
-  #sidebar,
-  .dimension-panel,
-  .dimension-label,
-  #dimension-overlay,
-  #qr-button {
+  /* DON'T HIDE DESKTOP UI ON MOBILE */
+  #sidebar {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
+  /* DON'T SHOW MOBILE PANEL ON MOBILE */
+  #mobile-right-panel {
     display: none !important;
   }
 
-  /* Pokaż welcome screen z mobilną sekcją w orientacji pionowej */
-  #welcome-screen {
-    display: flex !important;
-    position: fixed !important;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 2001;
-    background: #fff;
-    overflow-y: auto;
+  /* Adjust canvas for mobile with sidebar */
+  #canvas-container {
+    width: calc(100% - 460px) !important;
+    height: 100vh !important;
   }
-  
+
+  #canvas {
+    width: 100% !important;
+    height: 100% !important;
+    display: block !important;
+  }
+
+  /* Hide rotation message on mobile */
   #rotation-message {
     display: none !important;
   }
 
-   #export-panel {
+  #export-panel {
     display: none !important;
-  }
-
-  /* Ukryj wyszukiwanie w trybie portrait */
-  #search-container {
-    display: none;
   }
 }
 
@@ -2049,36 +2046,30 @@
 }
 
 @media (max-width: 820px) {
-  /* Mobile right panel - stała szerokość dla 2 ikon w rzędzie */
+  /* Mobile right panel - HIDDEN on mobile to force desktop UI */
   #mobile-right-panel {
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 200px; /* Stała szerokość dla 2 ikon w rzędzie */
-    height: 100vh;
-    background: #fff;
-    border-left: 1px solid rgba(0,0,0,0.08);
-    box-shadow: -6px 0 24px rgba(0,0,0,0.06);
-    z-index: 150;
-    overflow-y: auto;
-    padding: 8px;
-    display: block;
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
   }
   /* Welcome overlay i canvas zajmują pozostałą przestrzeń */
   #welcome-screen {
-    width: calc(100% - 140px);
+    width: calc(100% - 460px) !important;
     right: auto;
     left: 0;
   }
   #canvas-container {
-    width: calc(100% - 140px) !important;
+    width: calc(100% - 460px) !important;
   }
   /* Do not use the old mobile container inside welcome */
   #welcome-screen #mobile-ui-container {
     display: none !important;
   }
+  /* FORCE desktop sidebar to be visible on mobile */
   #sidebar {
-    display: none !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
   }
 }
 
@@ -2588,34 +2579,10 @@ body.mobile-mode #standalone-mobile-ui {
             return urlFlag || uaMobile || coarse || narrow || document.body.classList.contains('mobile-mode');
           };
           
-          // Force mobile panel to be visible and styled properly
+          // DISABLED: Mobile panel creation - force desktop UI only
           window.forceMobilePanel = function() {
-            let panel = document.getElementById('mobile-right-panel');
-            if (!panel) {
-              panel = document.createElement('aside');
-              panel.id = 'mobile-right-panel';
-              (document.getElementById('app') || document.body).appendChild(panel);
-            }
-            
-            // Force aggressive styling
-            panel.style.cssText = `
-              position: fixed !important;
-              top: 0 !important;
-              right: 0 !important;
-              width: 280px !important;
-              height: 100vh !important;
-              background: #fff !important;
-              border-left: 1px solid rgba(0,0,0,0.08) !important;
-              box-shadow: -6px 0 24px rgba(0,0,0,0.06) !important;
-              z-index: 9999 !important;
-              overflow-y: auto !important;
-              padding: 12px !important;
-              display: block !important;
-              visibility: visible !important;
-              opacity: 1 !important;
-            `;
-            
-            return panel;
+            // Return null to prevent mobile panel creation
+            return null;
           };
           
           if (!isMobileEarly) {
@@ -5014,44 +4981,71 @@ body.mobile-mode #standalone-mobile-ui {
         // Dostosuj proporcje mobilne AFTER applyMobileMode
         setTimeout(adjustMobileProportions, 50);
         
-        // 📱 KLUCZOWE: Zapewnij mobile panel na początku jeśli w trybie mobilnym
-        if (document.body.classList.contains('mobile-mode') || window.innerWidth <= 820) {
-          console.warn('⚙️ Creating/ensuring mobile panel at DOMContentLoaded');
-          
-          // Próbuj użyć ensureMobilePanel jeśli jest dostępne
-          let mp = null;
-          try {
-            if (typeof ensureMobilePanel === 'function') {
-              const ctx = ensureMobilePanel();
-              mp = ctx ? ctx.panel : null;
-              console.log('📱 Used ensureMobilePanel at DOMContentLoaded:', mp ? 'SUCCESS' : 'FAILED');
-            }
-          } catch (e) {
-            console.warn('⚠️ ensureMobilePanel failed at DOMContentLoaded:', e);
-          }
-          
-          // Fallback: ręczne tworzenie panelu
-          if (!mp) {
-            mp = document.getElementById('mobile-right-panel');
-            if (!mp) {
-              console.warn('⚙️ Creating #mobile-right-panel manually at DOMContentLoaded');
-              const parent = document.getElementById('app') || document.body;
-              mp = document.createElement('aside');
-              mp.id = 'mobile-right-panel';
-              mp.style.cssText = 'position: fixed; top: 0; right: 0; width: 33vw; height: 100vh; background: #fff; border-left: 1px solid rgba(0,0,0,0.08); box-shadow: -6px 0 24px rgba(0,0,0,0.06); z-index: 150; overflow-y: auto; padding: 12px; display: block;';
-              parent.appendChild(mp);
-              console.log('📱 Mobile panel created manually at DOMContentLoaded');
-            }
-          }
-          
-          // Upewnij się, że panel jest widoczny
-          if (mp) {
-            mp.style.display = 'block';
-            mp.style.visibility = 'visible';
-            mp.style.opacity = '1';
-            console.log('📱 Mobile panel made visible at DOMContentLoaded');
-          }
+      // 📱 FORCE DESKTOP UI ON MOBILE - Disable mobile-specific UI logic
+      if (document.body.classList.contains('mobile-mode') || window.innerWidth <= 820) {
+        console.log('📱 Mobile mode detected - forcing desktop UI');
+
+        // Force mobile mode class to ensure CSS rules apply
+        document.body.classList.add('mobile-mode');
+
+        // HIDE mobile-specific elements
+        const mobilePanel = document.getElementById('mobile-right-panel');
+        if (mobilePanel) {
+          mobilePanel.style.display = 'none !important';
+          console.log('📱 Mobile panel hidden');
         }
+
+        // ENSURE desktop UI is visible
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar) {
+          sidebar.style.display = 'block !important';
+          sidebar.style.visibility = 'visible !important';
+          sidebar.style.opacity = '1 !important';
+          console.log('📱 Desktop sidebar shown on mobile');
+        }
+
+        // Adjust canvas for mobile with desktop sidebar
+        const canvasContainer = document.getElementById('canvas-container');
+        if (canvasContainer) {
+          canvasContainer.style.width = 'calc(100% - 460px) !important';
+          canvasContainer.style.height = '100vh !important';
+          canvasContainer.style.display = 'block !important';
+          canvasContainer.style.position = 'relative !important';
+          console.log('📱 Canvas container sized for desktop UI on mobile');
+        }
+
+        // Ensure canvas is properly sized
+        const canvas = document.getElementById('canvas');
+        if (canvas) {
+          canvas.style.width = '100% !important';
+          canvas.style.height = '100% !important';
+          canvas.style.display = 'block !important';
+          canvas.style.position = 'relative !important';
+          console.log('📱 Canvas sized for mobile');
+        }
+
+        // Hide welcome screen on mobile
+        const welcomeScreen = document.getElementById('welcome-screen');
+        if (welcomeScreen) {
+          welcomeScreen.style.display = 'none';
+          console.log('📱 Welcome screen hidden on mobile');
+        }
+
+        // Show app
+        const appElement = document.getElementById('app');
+        if (appElement) {
+          appElement.style.visibility = 'visible';
+          appElement.style.display = 'block';
+          console.log('📱 App made visible');
+        }
+
+        // Hide bottom toolbar initially on mobile
+        const toolbar = document.getElementById('bottom-toolbar');
+        if (toolbar) {
+          toolbar.style.display = 'none';
+          console.log('📱 Bottom toolbar hidden initially on mobile');
+        }
+      }
       } catch(e) { console.warn('Early mobile init failed:', e); }
       
       // Nasłuchuj zmiany orientacji/rozmiaru
@@ -5341,36 +5335,21 @@ body.mobile-mode #standalone-mobile-ui {
       
       // Mark body as mobile-mode when on phone/tablet (UA/touch), so CSS applies even if width wider (Safari UI)
       function computeMobileMode(){
-        // Uproszczona logika - mniej do zepsucia
-        const uaMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
-        
-        // DevTools detection - bardzo liberalne
-        const isNarrowScreen = window.innerWidth <= 900; // zwiększono z 820
-        const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-        const isDevToolsEmulator = isNarrowScreen && (hasTouch || window.orientation !== undefined || navigator.userAgent.includes('Chrome'));
-        
-        // Force mobile dla małych ekranów
-        const isSmallScreen = window.innerWidth <= 768;
-        // Wsparcie dla urządzeń z coarse pointer (większość telefonów/tabletów) i flagi URL
-        const pointerCoarse = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || navigator.maxTouchPoints > 0;
+        // DISABLED: Mobile mode detection - always return false to force desktop UI
         const forceMobileFlag = /[?#&]mobile=1\b/.test(location.search + location.hash);
-        
-        const isMobile = uaMobile || isDevToolsEmulator || isSmallScreen || pointerCoarse || forceMobileFlag;
-        
-        console.log('📱 Mobile detection (simplified):', { 
-          uaMobile, 
-          isDevToolsEmulator, 
-          isSmallScreen,
-          pointerCoarse,
+
+        // Only force mobile if explicitly requested via URL flag
+        const isMobile = forceMobileFlag;
+
+        console.log('📱 Mobile detection (DISABLED - forcing desktop UI):', {
           forceMobileFlag,
           final: isMobile,
-          width: window.innerWidth, 
+          width: window.innerWidth,
           height: window.innerHeight,
           userAgent: navigator.userAgent.substring(0, 50),
-          hasTouch,
           device: `${window.innerWidth}x${window.innerHeight}`
         });
-        
+
         return isMobile;
       }
       function applyMobileMode(){ 
@@ -5397,108 +5376,15 @@ body.mobile-mode #standalone-mobile-ui {
           }, 100);
         }
       }
+      // DISABLED: Move elements to mobile panel - prevent mobile UI interference
       function moveElementsToMobilePanel(){
-        if (!document.body.classList.contains('mobile-mode')) return;
-        const panel = document.getElementById('mobile-right-panel');
-        console.log('moveElementsToMobilePanel: panel exists?', !!panel);
-        if (!panel) return;
-        // Przenieś search-container
-        const search = document.getElementById('search-container');
-        if (search && search.parentElement !== panel) {
-          panel.insertAdjacentElement('afterbegin', search);
-          console.log('Moved search-container to mobile-right-panel');
-          const indicator = document.getElementById('search-filter-indicator');
-          if (indicator && indicator.parentElement !== panel) {
-            panel.insertAdjacentElement('afterbegin', indicator);
-            console.log('Moved search-filter-indicator to mobile-right-panel');
-          }
-        }
-        // Przenieś category-buttons
-        const categoryButtons = document.getElementById('category-buttons');
-        if (categoryButtons && categoryButtons.parentElement !== panel) {
-          panel.insertBefore(categoryButtons, panel.firstChild.nextSibling || null);
-          console.log('Moved category-buttons to mobile-right-panel');
-        }
+        console.log('moveElementsToMobilePanel called but DISABLED - keeping elements in desktop sidebar');
+        return;
       }
-      // Zapewnij strukturę panelu mobilnego oraz dedykowaną strefę listy,
-      // aby nie usuwać UI kategorii przy odświeżaniu listy modeli.
+      // DISABLED: Mobile panel creation - prevent mobile UI interference
       function ensureMobilePanel(){
-        console.log('📱 ensureMobilePanel called, mobile-mode:', document.body.classList.contains('mobile-mode'));
-        
-        if (!document.body.classList.contains('mobile-mode')) {
-          console.log('📱 Not in mobile-mode, returning null');
-          return null;
-        }
-        
-        let panel = document.getElementById('mobile-right-panel');
-        console.log('📱 Found existing panel:', !!panel);
-        
-        if (!panel) {
-          console.log('📱 Creating new mobile panel...');
-          const app = document.getElementById('app') || document.body;
-          panel = document.createElement('aside');
-          panel.id = 'mobile-right-panel';
-          panel.style.cssText = `
-            position: fixed;
-            top: 0;
-            right: 0;
-            width: 280px;
-            height: 100vh;
-            background: #fff;
-            border-left: 1px solid rgba(0,0,0,0.08);
-            box-shadow: -6px 0 24px rgba(0,0,0,0.06);
-            z-index: 150;
-            overflow-y: auto;
-            padding: 12px;
-            display: block;
-            visibility: visible;
-            opacity: 1;
-          `;
-          app.appendChild(panel);
-          console.log('📱 New mobile panel created and added to DOM');
-        }
-        
-        try { 
-          panel.style.display = 'block'; 
-          panel.style.visibility = 'visible';
-          panel.style.opacity = '1';
-          console.log('📱 Panel visibility forced');
-        } catch(_) {}
-        
-        // Upewnij się, że sekcja kategorii istnieje w panelu
-        let catSection = panel.querySelector('#category-buttons');
-        console.log('📱 Found category section:', !!catSection);
-        if (!catSection) {
-          catSection = document.createElement('div');
-          catSection.id = 'category-buttons';
-          catSection.style.marginBottom = '20px';
-          const title = document.createElement('h3');
-          title.style.cssText = 'margin-bottom: 10px; font-size: 16px; color: #555;';
-          title.textContent = 'Kategorie:';
-          const special = document.createElement('div');
-          special.id = 'special-categories-container';
-          special.style.cssText = 'display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;';
-          const buttons = document.createElement('div');
-          buttons.id = 'category-buttons-container';
-          buttons.style.cssText = 'display: flex; flex-wrap: wrap; gap: 8px;';
-          catSection.appendChild(title);
-          catSection.appendChild(special);
-          catSection.appendChild(buttons);
-          // Wstaw tuż po wskaźniku wyszukiwania (jeśli istnieje), inaczej na początek
-          const search = panel.querySelector('#search-container');
-          if (search && search.nextSibling) panel.insertBefore(catSection, search.nextSibling); else panel.insertBefore(catSection, panel.firstChild);
-        }
-        // Strefa listy mobilnej (nie czyść całego panelu)
-        let listArea = panel.querySelector('#mobile-list-area');
-        if (!listArea) {
-          listArea = document.createElement('div');
-          listArea.id = 'mobile-list-area';
-          listArea.style.marginTop = '8px';
-          panel.appendChild(listArea);
-        }
-        // Upewnij się, że elementy zostały przeniesione
-        moveElementsToMobilePanel();
-        return { panel, listArea };
+        console.log('📱 ensureMobilePanel called but DISABLED - returning null');
+        return null;
       }
   applyMobileMode(); 
   window.addEventListener('resize', () => {
@@ -5632,113 +5518,51 @@ body.mobile-mode #standalone-mobile-ui {
         }
         // Zapamiętaj, że welcome został ukryty na mobile, aby inne ścieżki go nie przywracały
         try { window.mobileWelcomeDismissed = true; } catch(_) {}
-        
+
         // Pokaż app
         const appElement = document.getElementById('app');
         if (appElement) {
           appElement.style.visibility = 'visible';
           console.log('📱 App made visible');
         }
-        
-        // 🔧 FORCE: Wymuś widoczność mobile panel
-        const mobilePanel = document.getElementById('mobile-right-panel');
-        if (mobilePanel) {
-          mobilePanel.style.display = 'block';
-          mobilePanel.style.visibility = 'visible';
-          mobilePanel.style.opacity = '1';
-          mobilePanel.style.zIndex = '150';
-          console.log('📱 Mobile panel visibility forced');
+
+        // 🔧 FORCE DESKTOP UI: Ensure desktop sidebar is visible and mobile panel is hidden
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar) {
+          sidebar.style.display = 'block !important';
+          sidebar.style.visibility = 'visible !important';
+          sidebar.style.opacity = '1 !important';
+          console.log('📱 Desktop sidebar forced visible on mobile');
         }
 
-        // 📦 MOBILE: Auto-załaduj domyślny model i pokaż konfigurator
-        setTimeout(async () => {
-          try {
-            // Wait for data to be loaded
-            let attempts = 0;
-            while ((!window.allData || window.allData.length === 0) && attempts < 20) {
-              console.log('📱 Waiting for data to load... attempt', attempts + 1);
-              await new Promise(resolve => setTimeout(resolve, 500));
-              attempts++;
-            }
-            
-            if (!window.allData || window.allData.length === 0) {
-              console.warn('📱 No data available after waiting');
-              return;
-            }
-            
-            if (!window.selectedChair) {
-              // WYŁĄCZONE: Auto-loading modelu na mobile - user powinien wybrać z panelu
-              console.log('📱 Auto-loading disabled - user should pick model from sidebar');
-              /*
-              // Preferuj bestseller lub promocję, w przeciwnym razie pierwszy dostępny model
-              const models = (allData || []).filter(d => d && d.Typ === 'model');
-              let pick = models.find(m => (m.Bestseller+''||'').toLowerCase() === 'true' || (m.Bestseller+''||'') === '✔' || (m.Bestseller+''||'') === 'tak');
-              if (!pick) pick = models.find(m => (m.Promocja+''||'').toLowerCase() === 'true' || (m.Promocja+''||'') === '✔' || (m.Promocja+''||'') === 'tak');
-              if (!pick) pick = models[0];
-              
-              if (pick) {
-                console.log('📱 Auto-loading default mobile model:', pick.Nazwa);
-                
-                // Wait for loadModel function to be available
-                let loadAttempts = 0;
-                while (typeof loadModel !== 'function' && loadAttempts < 20) {
-                  console.log('📱 Waiting for loadModel function... attempt', loadAttempts + 1);
-                  await new Promise(resolve => setTimeout(resolve, 500));
-                  loadAttempts++;
-                }
-                
-                if (typeof loadModel === 'function') {
-                  await loadModel(pick);
-                  console.log('📱 Model loaded successfully');
-                  
-                  // Now populate the mobile panel with categories and models
-                  if (typeof renderCategoryButtons === 'function') {
-                    renderCategoryButtons();
-                    console.log('📱 Categories rendered');
-                  }
-                  
-                  // Ensure config UI shows
-                  if (typeof ensureConfigInMobilePanel === 'function') {
-                    ensureConfigInMobilePanel();
-                    console.log('📱 Config ensured in mobile panel');
-                  }
-                  if (typeof showScreen === 'function') {
-                    showScreen('config');
-                    console.log('📱 Switched to config screen');
-                  }
-                } else {
-                  console.warn('📱 loadModel function not available after waiting');
-                  
-                  // Fallback: at least show categories even without 3D model
-                  console.log('📱 Fallback: showing categories without 3D model');
-                  if (typeof renderCategoryButtons === 'function') {
-                    renderCategoryButtons();
-                    console.log('📱 Categories rendered (fallback)');
-                  }
-                  
-                  // Show a simple 3D placeholder
-                  const canvas = document.getElementById('canvas');
-                  if (canvas && window.viewer) {
-                    const ctx = canvas.getContext('2d');
-                    if (ctx) {
-                      ctx.fillStyle = '#f0f0f0';
-                      ctx.fillRect(0, 0, canvas.width, canvas.height);
-                      ctx.fillStyle = '#666';
-                      ctx.font = '16px Arial';
-                      ctx.textAlign = 'center';
-                      ctx.fillText('3D Viewer Loading...', canvas.width/2, canvas.height/2);
-                    }
-                  }
-                }
-              } else {
-                console.warn('📱 No model found to auto-load on mobile');
-              }
-              */
-            }
-          } catch(e) {
-            console.warn('📱 Failed to auto-load default model on mobile:', e);
-          }
-        }, 2000); // Increased delay to ensure all functions are available
+        // Hide mobile panel completely
+        const mobilePanel = document.getElementById('mobile-right-panel');
+        if (mobilePanel) {
+          mobilePanel.style.display = 'none !important';
+          mobilePanel.style.visibility = 'hidden !important';
+          mobilePanel.style.opacity = '0 !important';
+          console.log('📱 Mobile panel hidden on mobile');
+        }
+
+        // Adjust canvas for mobile with desktop sidebar
+        const canvasContainer = document.getElementById('canvas-container');
+        if (canvasContainer) {
+          canvasContainer.style.width = 'calc(100% - 460px) !important';
+          canvasContainer.style.height = '100vh !important';
+          canvasContainer.style.display = 'block !important';
+          canvasContainer.style.position = 'relative !important';
+          console.log('📱 Canvas container sized for desktop UI on mobile');
+        }
+
+        // Ensure canvas is properly sized
+        const canvas = document.getElementById('canvas');
+        if (canvas) {
+          canvas.style.width = '100% !important';
+          canvas.style.height = '100% !important';
+          canvas.style.display = 'block !important';
+          canvas.style.position = 'relative !important';
+          console.log('📱 Canvas sized for mobile');
+        }
       }
       
       // 🔧 FALLBACK: Jeśli przyciski się nie pojawiły, spróbuj ponownie
@@ -6006,22 +5830,10 @@ body.mobile-mode #standalone-mobile-ui {
       } catch(_) {}
     })();
 
+    // DISABLED: Config in mobile panel - prevent mobile UI interference
     function ensureConfigInMobilePanel() {
-      if (!isMobileMode()) return;
-      const ctx = ensureMobilePanel();
-      const right = ctx ? ctx.panel : document.getElementById('mobile-right-panel');
-      const cs = document.getElementById('config-section');
-      if (!right || !cs) return;
-      // Nie czyść całego panelu – tylko przenieś config w dół panelu
-      if (cs.parentElement !== right) {
-        right.appendChild(cs);
-      }
-      cs.style.display = 'block';
-      // Ensure visibility
-      const appEl = document.getElementById('app');
-      if (appEl) appEl.style.visibility = 'visible';
-      const welcome = document.getElementById('welcome-screen');
-      if (welcome) welcome.style.display = 'none';
+      console.log('📱 ensureConfigInMobilePanel called but DISABLED - using desktop config');
+      return;
     }
 
     function moveConfigToSidebar() {
@@ -6033,168 +5845,11 @@ body.mobile-mode #standalone-mobile-ui {
       }
     }
 
+  // DISABLED: Mobile right panel list rendering - prevent mobile UI interference
   function renderMobileRightPanelList(selectedCategory = 'Wszystkie') {
-      if (!isMobileMode()) return;
-    const ctx = ensureMobilePanel();
-    const right = ctx ? ctx.panel : document.getElementById('mobile-right-panel');
-    const listArea = ctx ? ctx.listArea : null;
-    if (!right) return;
-    // Park config back into sidebar so we don't lose it
-      moveConfigToSidebar();
-    // Czyść tylko obszar listy
-    if (listArea) listArea.innerHTML = '';
-
-    const h = document.createElement('h3');
-      h.textContent = 'Wybierz model:';
-      h.style.margin = '0 0 10px 0';
-    (listArea || right).appendChild(h);
-
-      const catDiv = document.createElement('div');
-      Object.assign(catDiv.style,{display:'flex',flexWrap:'wrap',gap:'8px',marginBottom:'10px'});
-    (listArea || right).appendChild(catDiv);
-
-      const categories = [...new Set((allData||[]).filter(i=>i.Kategoria && i.Typ==='model').map(i=>i.Kategoria))];
-      const pills = ['Wszystkie','Promocje','Bestsellery',...categories];
-      function setActive(el){
-        // Usuń aktywność ze WSZYSTKICH przycisków kategorii w całej aplikacji
-        document.querySelectorAll('.category-button.active').forEach(b => b.classList.remove('active'));
-        // Zresetuj style przycisków (żółte/standardowe), aby nie pozostawały podświetlone
-        document.querySelectorAll('.category-button').forEach(btn => {
-          btn.style.background = 'white';
-          btn.style.color = btn.classList.contains('promotion') ? '#FF6B6B' : '#333';
-        });
-        // Ustaw aktywny na lokalnym pigułkowym przycisku
-        Array.from(catDiv.children).forEach(b=>b.classList.remove('active'));
-        el.classList.add('active');
-      }
-      pills.forEach(cat => {
-        const btn = document.createElement('button');
-        btn.className = 'category-button';
-        btn.textContent = cat;
-        btn.onclick = function(){
-          try { window.__userCategoryPicked = true; } catch(_){}
-          renderList(cat);
-          setActive(btn);
-        };
-        if (cat===selectedCategory) btn.classList.add('active');
-        catDiv.appendChild(btn);
-      });
-
-      const grid = document.createElement('div');
-      grid.style.display = 'grid';
-      grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(120px, 1fr))';
-      grid.style.gap = '12px';
-  (listArea || right).appendChild(grid);
-
-      function normalizeName(name){
-        try { return (name||'').normalize('NFD').replace(/\p{Diacritic}/gu,'').replace(/[^\w\s-]/g,'').trim(); }
-        catch(_) { return (name||'').trim(); }
-      }
-      function candidateMobileIcons(name){
-        const base = normalizeName(name);
-        const variants = [base, base.replace(/\s+/g,' '), base.replace(/\s+/g,''), base.replace(/\s+/g,'-')];
-        const withCase = new Set();
-        variants.forEach(v=>{ withCase.add(v); withCase.add(v.toLowerCase()); withCase.add(v.toUpperCase()); });
-        const exts=['webp','png','jpg','jpeg'];
-        const files=[]; withCase.forEach(v=> exts.forEach(ext=> files.push(`mobile_icons/${v}.${ext}`)));
-        return files;
-      }
-      function applyImgWithFallback(imgEl, model){
-        const list=[]; const primary=model.Obrazek||model.Img||model.Image; if(primary) list.push(primary);
-        candidateMobileIcons(model.Nazwa||model.name||'').forEach(p=> list.push(p));
-        list.push('icons/placeholder.svg'); let idx=0; function tryNext(){ if(idx>=list.length) return; imgEl.src=list[idx++]; }
-        imgEl.onerror=()=>tryNext(); tryNext();
-      }
-
-      function filterModels(sel){
-        let models=(allData||[]).filter(it=> it.Typ==='model');
-        if (sel && sel!=='Wszystkie'){
-          if (sel==='Promocje') models = models.filter(m => (m.Promocja||'').toString().toLowerCase()!=='false' && ((m.Procent||'0')!=='0'));
-          else if (sel==='Bestsellery') models = models.filter(m => ['true','tak','✔','TRUE'].includes((m.Bestseller||'').toString()));
-          else models = models.filter(m => m.Kategoria===sel);
-        }
-        return models;
-      }
-
-      function renderList(sel=selectedCategory){
-        grid.innerHTML='';
-        const models=filterModels(sel);
-        models.forEach(model=>{
-          // Wrapper jak na desktopie, aby działały style i ceny
-          const wrapper = document.createElement('div');
-          wrapper.className = 'thumbnail-wrapper';
-
-          const mBtn=document.createElement('button');
-          mBtn.className='thumbnail';
-          Object.assign(mBtn.style,{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'8px',background:'#fff',border:'1px solid #e5e5e5',borderRadius:'10px',cursor:'pointer'});
-
-          // Oznaczenia promo/bestseller jak na desktopie (dla overlay i kolorów)
-          const promocja = (model.Promocja && (model.Promocja==='TRUE' || model.Promocja==='true' || model.Promocja==='tak' || model.Promocja==='✔'));
-          const procent = parseFloat(model.Procent)||0;
-          const bestseller = (model.Bestseller && (model.Bestseller==='TRUE' || model.Bestseller==='true' || model.Bestseller==='tak' || model.Bestseller==='✔'));
-          if (promocja) {
-            mBtn.classList.add('promotion');
-            if (procent>0) mBtn.setAttribute('data-discount', `-${procent}%`);
-          }
-          if (bestseller) mBtn.classList.add('bestseller');
-
-          const img=document.createElement('img'); applyImgWithFallback(img,model);
-          img.alt=model.Nazwa; Object.assign(img.style,{width:'100px',height:'100px',objectFit:'contain'});
-
-          // Podpis – usuń nawiasy (np. "(hooker)")
-          const cap=document.createElement('div');
-          cap.className = 'thumbnail-caption';
-          cap.textContent = (typeof stripBrackets==='function') ? stripBrackets(model.Nazwa) : (model.Nazwa||'');
-
-          // Ceny pod miniaturą – jak w renderOptions()
-          const priceDiv = document.createElement('div');
-          if (model.Typ==='model' && model.Cena) {
-            const cena = parseFloat(model.Cena)||0;
-            if (promocja && procent>0) {
-              const cenaPo = cena * (1 - procent/100);
-              if (bestseller) {
-                priceDiv.className = 'thumbnail-price promotion bestseller';
-                priceDiv.innerHTML = `
-                  <span class="original-price">${cena.toFixed(0)} zł</span>
-                  <span class="discounted-price">${cenaPo.toFixed(0)} zł</span>
-                  <span class="bestseller-badge">⭐ Bestseller</span>
-                `;
-              } else {
-                priceDiv.className = 'thumbnail-price promotion';
-                priceDiv.innerHTML = `
-                  <span class="original-price">${cena.toFixed(0)} zł</span>
-                  <span class="discounted-price">${cenaPo.toFixed(0)} zł</span>
-                `;
-              }
-            } else if (bestseller && cena>0) {
-              priceDiv.className = 'thumbnail-price bestseller';
-              priceDiv.innerHTML = `
-                <span class="bestseller-price">${cena.toFixed(0)} zł</span>
-                <span class="bestseller-badge">⭐ Bestseller</span>
-              `;
-            } else if (cena>0) {
-              priceDiv.className = 'thumbnail-price';
-              priceDiv.textContent = `${cena.toFixed(0)} zł`;
-            }
-          }
-
-          mBtn.appendChild(img);
-          wrapper.appendChild(mBtn);
-          wrapper.appendChild(cap);
-          if (priceDiv.textContent || priceDiv.innerHTML) wrapper.appendChild(priceDiv);
-
-          mBtn.onclick=function(){
-            window.mobileWelcomeDismissed=true; const welcome=document.getElementById('welcome-screen'); if(welcome) welcome.style.display='none';
-            const appEl=document.getElementById('app'); if(appEl) appEl.style.visibility='visible';
-            const tryLoad=()=>{ if(window.viewer && typeof loadModel==='function'){ loadModel(model); ensureConfigInMobilePanel(); return true; } return false; };
-            if(!tryLoad()){ let attempts=0; const int=setInterval(()=>{ attempts++; if(tryLoad()||attempts>50) clearInterval(int); },100); }
-          };
-
-          grid.appendChild(wrapper);
-        });
-      }
-      renderList();
-    }
+    console.log('📱 renderMobileRightPanelList called but DISABLED - using desktop UI instead');
+    return;
+  }
 
     async function silentLoadModel(variant) {
       if (currentModelContainer) viewer.scene.remove(currentModelContainer);
